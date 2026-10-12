@@ -13,7 +13,7 @@
   --lavender: #9eaded;
   --text-main: #eaf7f8;
   --text-muted: #9eb7be;
-  --text-dim: #67828a;
+  --text-dim: #82a0a8;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -390,6 +390,13 @@ body,
   height: 4px;
 }
 
+.pip-sync-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
 /* Panel Collapse Bar & Toggle Buttons */
 .panel-collapse-bar {
   display: flex;
@@ -694,7 +701,8 @@ body,
   transition: width 0.2s ease, max-height 0.2s ease;
 }
 
-.right-inspector-drawer.split-layout-offset {
+.right-inspector-drawer.split-layout-offset,
+.right-inspector-drawer.pip-offset-none {
   top: 14px;
   max-height: calc(100% - 28px);
 }
@@ -716,7 +724,7 @@ body,
 }
 
 .right-drawer-body {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -728,6 +736,7 @@ body,
   border-bottom: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, rgba(20, 34, 43, 0.72), rgba(12, 21, 27, 0.45));
   overflow-y: auto;
+  flex-shrink: 0;
   transition: background 0.15s ease;
 }
 
@@ -747,6 +756,10 @@ body,
 .inspector-card.expanded {
   max-height: 360px;
   overflow-y: auto;
+}
+
+.inspector-card.expanded.both-open {
+  max-height: 190px;
 }
 
 .inspector-title-row {
@@ -898,7 +911,7 @@ body,
 .part-list-section {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -935,7 +948,7 @@ body,
 
 /* 5-System 27-Mesh Tree View */
 .layer-tree-container {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding: 10px 12px;
   max-height: 320px;
@@ -1287,6 +1300,29 @@ body,
     flex-wrap: wrap;
     padding: 6px 10px;
     gap: 6px;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .brand-cluster {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .mode-switch-pill {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .header-controls {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
   }
 
   .breadcrumb-bar {
@@ -1295,7 +1331,8 @@ body,
 
   .search-wrapper {
     width: 170px;
-    flex: 1;
+    flex: 1 1 160px;
+    min-width: 0;
   }
 
   .pip-frame-hud:not(.split-mode) {
@@ -1542,9 +1579,29 @@ body,
   .pip-btn,
   .mini-vis-btn,
   .toggle-row,
-  .mesh-row {
+  .mesh-row,
+  .disclaimer-link-btn,
+  .search-input,
+  .epley-mute-label,
+  .pip-sync-label,
+  .advanced-tools-bar {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  .lab-range,
+  .pip-slider-row input[type='range'] {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .toggle-row input[type='checkbox'],
+  #chk-advanced-tools,
+  #sync-cam-checkbox,
+  #chk-mute-audio,
+  #clip-flip-checkbox {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .mini-vis-btn {
@@ -1556,32 +1613,40 @@ body,
 }
 
 @media (max-width: 600px) {
+  .brand-title {
+    display: none;
+  }
+
   .workspace-panels-shell {
-    height: 50%;
-    max-height: 50%;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 50vh;
+    max-height: 50vh;
   }
 
   .workspace-panels-shell.drawer-expanded {
-    height: 82%;
-    max-height: 82%;
+    height: 82vh;
+    max-height: 82vh;
   }
 
   .camera-preset-bar {
-    bottom: calc(50% + 8px);
+    bottom: calc(50vh + 8px);
   }
 
   .camera-preset-bar.drawer-expanded-offset {
-    bottom: calc(82% + 6px);
+    bottom: calc(82vh + 6px);
   }
 
   .epley-sandbox-bar,
   .epley-sandbox-bar.left-collapsed,
   .epley-sandbox-bar.right-collapsed {
-    bottom: calc(50% + 8px);
+    bottom: calc(50vh + 8px);
   }
 
   .epley-sandbox-bar.drawer-expanded-offset {
-    bottom: calc(82% + 6px);
+    bottom: calc(82vh + 6px);
   }
 
   .epley-telemetry-grid {
@@ -1592,6 +1657,16 @@ body,
 /* ============================================================================
    PHASE 3: FIRST-VISIT WELCOME OVERLAY, ADVANCED TOOLS TOGGLE & LOADING COUNT
    ============================================================================ */
+.epley-mute-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .loading-count-badge {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -1646,6 +1721,12 @@ body,
 
 .lab-shell.advanced-tools-off .advanced-tool-item {
   display: none !important;
+}
+
+@media (max-width: 900px) {
+  .lab-shell.advanced-tools-off .workspace-panels-shell[data-active-tab='slicer'] #ras-slicer-section {
+    display: block !important;
+  }
 }
 
 /* First-Visit Welcome Overlay */

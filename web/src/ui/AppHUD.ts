@@ -127,6 +127,9 @@ export class AppHUD {
   private infoCardExpanded = false;
   private partListCollapsed = true;
 
+  private lastRenderedInspectorKey = '';
+  private lastRenderedLayerTreeKey = '';
+
   private static readonly LS_KEYS = {
     leftCollapsed: 'gate3_left_panel_collapsed',
     rightCollapsed: 'gate3_right_panel_collapsed',
@@ -214,6 +217,11 @@ export class AppHUD {
     const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
     if (savedWelcome === 'epley_lab') {
       this.scene.setAppMode('mode2_physics');
+    } else if (savedWelcome === 'guided_tour') {
+      this.scene.setAppMode('mode2_physics');
+      if (!this.scene.getSnapshot().tourPlaying) {
+        this.scene.toggleGuidedTour();
+      }
     }
     this.syncViewportRects();
   }
@@ -339,8 +347,8 @@ export class AppHUD {
                 <div class="pip-slider-row">
                   <span>Head Glass</span>
                   <input type="range" id="head-opacity-slider" min="0" max="90" value="34" aria-label="Head glass opacity" />
-                  <label style="display:flex;align-items:center;gap:3px;cursor:pointer;">
-                    <input type="checkbox" id="sync-cam-checkbox" checked /> Sync Orbit
+                  <label class="pip-sync-label">
+                    <input type="checkbox" id="sync-cam-checkbox" checked aria-label="Synchronize camera orbit" /> Sync Orbit
                   </label>
                 </div>
                 <div class="pip-slider-row">
@@ -386,8 +394,8 @@ export class AppHUD {
                 >
                   Predict Mode
                 </button>
-                <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;">
-                  <input type="checkbox" id="chk-mute-audio" /> Mute Audio
+                <label class="epley-mute-label">
+                  <input type="checkbox" id="chk-mute-audio" aria-label="Mute clinical tour audio" /> Mute Audio
                 </label>
               </div>
 
@@ -873,7 +881,14 @@ export class AppHUD {
     this.root.querySelector('#app-mode-switcher')!.addEventListener('click', (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-app-mode]');
       if (!btn) return;
-      this.scene.setAppMode(btn.dataset.appMode as LabAppMode);
+      const nextMode = btn.dataset.appMode as LabAppMode;
+      if (nextMode === 'mode2_physics' && this.quizActive) {
+        this.quizActive = false;
+        this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+      } else if (nextMode === 'mode1_atlas' && this.predictModeActive) {
+        this.predictModeActive = false;
+      }
+      this.scene.setAppMode(nextMode);
     });
 
     const stepsStrip = this.root.querySelector('#epley-steps-strip')!;
@@ -894,12 +909,17 @@ export class AppHUD {
         this.predictPendingStepIdx = idx;
         this.predictRevealed = false;
         this.renderPredictPanel();
+        this.renderState(this.scene.getSnapshot());
         return;
       }
       this.scene.jumpToEpleyStep(idx, true);
     });
 
     this.tourPlayBtn.addEventListener('click', () => {
+      if (this.predictModeActive) {
+        this.predictModeActive = false;
+        this.applyPanelStatesToDOM();
+      }
       this.scene.toggleGuidedTour();
     });
 
@@ -1117,6 +1137,19 @@ export class AppHUD {
       if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k') {
         ev.preventDefault();
         searchInput.focus();
+      } else if (ev.key === 'Escape') {
+        if (this.aboutModalOpen) {
+          this.aboutModalOpen = false;
+          this.applyPanelStatesToDOM();
+        } else if (!this.welcomeDismissed) {
+          this.welcomeDismissed = true;
+          if (!this.readStorageString(AppHUD.LS_KEYS.welcomeChoice)) {
+            this.writeStorageString(AppHUD.LS_KEYS.welcomeChoice, 'explore_atlas');
+          }
+          this.applyPanelStatesToDOM();
+        } else if (searchDropdown.classList.contains('open')) {
+          searchDropdown.classList.remove('open');
+        }
       }
     });
 
@@ -1234,8 +1267,17 @@ export class AppHUD {
     this.advancedToolsCheckbox.addEventListener('change', () => {
       this.advancedToolsEnabled = this.advancedToolsCheckbox.checked;
       this.writeStorageBool(AppHUD.LS_KEYS.advancedTools, this.advancedToolsEnabled);
-      if (!this.advancedToolsEnabled && this.scene.getSnapshot().toolMode !== 'inspect') {
-        this.scene.setOverlays({ toolMode: 'inspect' });
+      if (!this.advancedToolsEnabled) {
+        const snap = this.scene.getSnapshot();
+        if (snap.toolMode !== 'inspect' || snap.showCanalPlanes) {
+          this.scene.setOverlays({ toolMode: 'inspect', showCanalPlanes: false });
+        }
+        if (snap.clipAxis !== 'none') {
+          this.scene.setClippingPlane('none');
+        }
+        if (snap.explodePercent > 0) {
+          this.scene.setSliders({ explodePercent: 0 });
+        }
       }
       this.applyPanelStatesToDOM();
     });
@@ -1271,14 +1313,24 @@ export class AppHUD {
       this.applyPanelStatesToDOM();
 
       if (choice === 'guided_tour') {
+        if (this.quizActive) {
+          this.quizActive = false;
+          this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        }
+        this.predictModeActive = false;
         this.scene.setAppMode('mode2_physics');
         if (!this.scene.getSnapshot().tourPlaying) {
           this.scene.toggleGuidedTour();
         }
       } else if (choice === 'explore_atlas') {
+        this.predictModeActive = false;
         this.scene.stopGuidedTour();
         this.scene.setAppMode('mode1_atlas');
       } else if (choice === 'epley_lab') {
+        if (this.quizActive) {
+          this.quizActive = false;
+          this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        }
         this.scene.stopGuidedTour();
         this.scene.setAppMode('mode2_physics');
       }
@@ -1366,11 +1418,12 @@ export class AppHUD {
         this.scene.stopGuidedTour();
         const curIdx = this.scene.getSnapshot().activeEpleyStepIdx;
         this.predictPendingStepIdx =
-          curIdx < 2 ? 3 : Math.min(EPLEY_CLINICAL_STEPS.length - 1, curIdx + 1);
+          curIdx < 2 ? 2 : Math.min(EPLEY_CLINICAL_STEPS.length - 1, curIdx + 1);
         this.predictRevealed = false;
         this.renderPredictPanel();
       }
       this.applyPanelStatesToDOM();
+      this.renderState(this.scene.getSnapshot());
     });
 
     this.predictPanelEl.addEventListener('click', (ev) => {
@@ -1411,15 +1464,17 @@ export class AppHUD {
 
       if (target.closest('#btn-predict-next-step')) {
         const nextIdx = (this.predictPendingStepIdx + 1) % EPLEY_CLINICAL_STEPS.length;
-        this.predictPendingStepIdx = nextIdx < 2 ? 3 : nextIdx;
+        this.predictPendingStepIdx = nextIdx < 2 ? 2 : nextIdx;
         this.predictRevealed = false;
         this.renderPredictPanel();
+        this.renderState(this.scene.getSnapshot());
         return;
       }
 
       if (target.closest('#btn-close-predict')) {
         this.predictModeActive = false;
         this.applyPanelStatesToDOM();
+        this.renderState(this.scene.getSnapshot());
       }
     });
 
@@ -1762,6 +1817,9 @@ export class AppHUD {
   }
 
   private isPipInsetVisible(): boolean {
+    if (this.scene && this.scene.getSnapshot().layoutMode === 'split_50_50') {
+      return true;
+    }
     if (window.innerWidth <= 600) {
       return this.pipInsetOpenMobile;
     }
@@ -1811,10 +1869,18 @@ export class AppHUD {
     // Floating Info Card (compact vs expanded)
     this.inspectorContainer.classList.toggle('compact', !this.infoCardExpanded);
     this.inspectorContainer.classList.toggle('expanded', this.infoCardExpanded);
+    this.inspectorContainer.classList.toggle(
+      'both-open',
+      this.infoCardExpanded && !this.partListCollapsed
+    );
     this.infoCardToggleBtn.setAttribute('aria-expanded', String(this.infoCardExpanded));
     this.infoCardToggleBtn.innerHTML = this.infoCardExpanded
       ? `<span class="toggle-label">Compact Info ▴</span>`
       : `<span class="toggle-label">Expand Info ▾</span>`;
+    const expandPillEl = this.inspectorContainer.querySelector('.inspector-expand-pill');
+    if (expandPillEl) {
+      expandPillEl.textContent = this.infoCardExpanded ? '▴ Less' : '▾ Expand';
+    }
 
     // 27-Part Layer Tree
     this.layerTreeContainer.classList.toggle('collapsed', this.partListCollapsed);
@@ -1844,6 +1910,7 @@ export class AppHUD {
     // PiP Head Inset visibility
     const pipVis = this.isPipInsetVisible();
     this.pipHudFrame.classList.toggle('pip-hidden', !pipVis);
+    this.rightDrawerEl.classList.toggle('pip-offset-none', !pipVis);
     this.pipToggleBtn.classList.toggle('active', pipVis);
     this.pipToggleBtn.setAttribute('aria-pressed', String(pipVis));
     this.pipToggleBtn.textContent = pipVis ? 'Hide PiP' : 'Show PiP';
@@ -1868,9 +1935,10 @@ export class AppHUD {
     const isSmall = window.innerWidth <= 900;
     const pipW = isSmall ? 230 : 290;
     const pipH = isSmall ? 175 : 215;
+    const pad = isSmall ? 12 : 14;
     this.scene.setViewportRects(
       { left: 0, top: 0, width: w, height: h },
-      { left: Math.max(0, w - pipW - 12), top: 12, width: pipW, height: pipH }
+      { left: Math.max(0, w - pipW - pad), top: pad, width: pipW, height: pipH }
     );
   }
 
@@ -1922,6 +1990,12 @@ export class AppHUD {
     this.cameraPresetBar.style.display = isMode2 ? 'none' : 'flex';
     (this.root.querySelector('#chk-live-physics') as HTMLInputElement).checked =
       snap.livePhysicsEnabled;
+    (this.root.querySelector('#chk-fiducials') as HTMLInputElement).checked = snap.showFiducials;
+    (this.root.querySelector('#chk-canal-planes') as HTMLInputElement).checked =
+      snap.showCanalPlanes;
+    (this.root.querySelector('#chk-spline-canaliths') as HTMLInputElement).checked =
+      snap.showSplineAndCanaliths;
+    (this.root.querySelector('#clip-flip-checkbox') as HTMLInputElement).checked = snap.clipFlip;
 
     // Update Mode 2 Step strip & caption
     this.tourPlayBtn.textContent = snap.tourPlaying
@@ -1934,8 +2008,16 @@ export class AppHUD {
       );
     });
     const curStep = EPLEY_CLINICAL_STEPS[snap.activeEpleyStepIdx] ?? EPLEY_CLINICAL_STEPS[0];
-    this.epleyCaptionHeadline.textContent = curStep.headline;
-    this.epleyCaptionSub.textContent = curStep.caption;
+    if (this.predictModeActive && !this.predictRevealed) {
+      const pendingStep =
+        EPLEY_CLINICAL_STEPS[this.predictPendingStepIdx] ?? EPLEY_CLINICAL_STEPS[2];
+      this.epleyCaptionHeadline.textContent = `Predict Step Outcome: ${pendingStep.clinicalTitle}`;
+      this.epleyCaptionSub.textContent =
+        'Select your prediction for canalith movement and VOR nystagmus direction above, then click "Play Step & Reveal Answer".';
+    } else {
+      this.epleyCaptionHeadline.textContent = curStep.headline;
+      this.epleyCaptionSub.textContent = curStep.caption;
+    }
 
     // Update Sliders & Values
     this.bonyPeelInput.value = String(snap.bonyPeelPercent);
@@ -2022,245 +2104,256 @@ export class AppHUD {
     const inspectedItem =
       STRUCTURE_BY_MESH[snap.selectedMesh ?? 'ls_Hsapiens_Sp'] ?? IEMAP_STRUCTURES[0];
     const inspectedGroup = SYSTEM_GROUPS[inspectedItem.systemGroup];
+    const inspectorKey = `${inspectedItem.meshName}|${this.audienceMode}`;
 
-    const compactPreviewText =
-      this.audienceMode === 'patient'
-        ? inspectedItem.patientSummary
-        : this.audienceMode === 'clinician'
-        ? inspectedItem.clinicalPearl
-        : inspectedItem.physiologicalFunction;
+    if (inspectorKey !== this.lastRenderedInspectorKey) {
+      this.lastRenderedInspectorKey = inspectorKey;
+      const compactPreviewText =
+        this.audienceMode === 'patient'
+          ? inspectedItem.patientSummary
+          : this.audienceMode === 'clinician'
+          ? inspectedItem.clinicalPearl
+          : inspectedItem.physiologicalFunction;
 
-    const expandedBodyHtml =
-      this.audienceMode === 'patient'
-        ? `
-          <div class="clinical-field">
-            <div class="clinical-field-label">Plain-Language Summary (Patient View)</div>
-            <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
-          </div>
-
-          <div class="clinical-field">
-            <div class="clinical-field-label">Inner Ear System</div>
-            <div class="clinical-field-body">${inspectedGroup.title} — ${inspectedGroup.subtitle}</div>
-          </div>
-
-          <div class="clinical-pearl-box">
-            <strong>Why It Matters in BPPV &amp; Balance:</strong> ${inspectedItem.clinicalPearl}
-          </div>
-        `
-        : this.audienceMode === 'student'
-        ? `
-          <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-          <div class="clinical-field">
-            <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-            <div class="clinical-field-body">${inspectedItem.innervation}</div>
-          </div>
-
-          <div class="clinical-field">
-            <div class="clinical-field-label">Physiological Mechanism</div>
-            <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-          </div>
-
-          <div class="clinical-pearl-box">
-            <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
-          </div>
-        `
-        : `
-          <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-          <div class="telemetry-strip">
-            <div class="telemetry-cell">
-              <span class="telemetry-key">Mesh / Raw ID</span>
-              <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
+      const expandedBodyHtml =
+        this.audienceMode === 'patient'
+          ? `
+            <div class="clinical-field">
+              <div class="clinical-field-label">Plain-Language Summary (Patient View)</div>
+              <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
             </div>
-            <div class="telemetry-cell">
-              <span class="telemetry-key">Geometry</span>
-              <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
+
+            <div class="clinical-field">
+              <div class="clinical-field-label">Inner Ear System</div>
+              <div class="clinical-field-body">${inspectedGroup.title} — ${inspectedGroup.subtitle}</div>
             </div>
-            <div class="telemetry-cell">
-              <span class="telemetry-key">RAS Center (mm)</span>
-              <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+
+            <div class="clinical-pearl-box">
+              <strong>Why It Matters in BPPV &amp; Balance:</strong> ${inspectedItem.clinicalPearl}
             </div>
-          </div>
+          `
+          : this.audienceMode === 'student'
+          ? `
+            <div class="inspector-etymology">${inspectedItem.etymology}</div>
 
-          <div class="clinical-field">
-            <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-            <div class="clinical-field-body">${inspectedItem.innervation}</div>
-          </div>
+            <div class="clinical-field">
+              <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+              <div class="clinical-field-body">${inspectedItem.innervation}</div>
+            </div>
 
-          <div class="clinical-field">
-            <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
-            <div class="clinical-field-body">${inspectedItem.morphometry}</div>
-          </div>
+            <div class="clinical-field">
+              <div class="clinical-field-label">Physiological Mechanism</div>
+              <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+            </div>
 
-          <div class="clinical-field">
-            <div class="clinical-field-label">Physiological Mechanism</div>
-            <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-          </div>
+            <div class="clinical-pearl-box">
+              <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+            </div>
+          `
+          : `
+            <div class="inspector-etymology">${inspectedItem.etymology}</div>
 
-          <div class="clinical-pearl-box">
-            <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
-          </div>
+            <div class="telemetry-strip">
+              <div class="telemetry-cell">
+                <span class="telemetry-key">Mesh / Raw ID</span>
+                <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
+              </div>
+              <div class="telemetry-cell">
+                <span class="telemetry-key">Geometry</span>
+                <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
+              </div>
+              <div class="telemetry-cell">
+                <span class="telemetry-key">RAS Center (mm)</span>
+                <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+              </div>
+            </div>
 
-          <div class="clinical-field" style="margin-top:6px;">
-            <div class="clinical-field-label">Patient Counseling Summary</div>
-            <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
-          </div>
-        `;
+            <div class="clinical-field">
+              <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+              <div class="clinical-field-body">${inspectedItem.innervation}</div>
+            </div>
 
-    const sourcesHtml =
-      inspectedItem.sources && inspectedItem.sources.length > 0
-        ? `
-          <div class="clinical-field inspector-sources-section">
-            <div class="clinical-field-label">Atlas &amp; Literature Sources</div>
-            <ul class="sources-list">
-              ${inspectedItem.sources
-                .map((src) => `<li class="source-item">${src}</li>`)
-                .join('')}
-            </ul>
-          </div>
-        `
-        : '';
+            <div class="clinical-field">
+              <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
+              <div class="clinical-field-body">${inspectedItem.morphometry}</div>
+            </div>
 
-    this.inspectorContainer.innerHTML = `
-      <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
-        <div class="inspector-header-badges">
-          <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
-            ${inspectedGroup.shortTitle.toUpperCase()}
-          </span>
-          <span class="compartment-pill">
+            <div class="clinical-field">
+              <div class="clinical-field-label">Physiological Mechanism</div>
+              <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+            </div>
+
+            <div class="clinical-pearl-box">
+              <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+            </div>
+
+            <div class="clinical-field" style="margin-top:6px;">
+              <div class="clinical-field-label">Patient Counseling Summary</div>
+              <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+            </div>
+          `;
+
+      const sourcesHtml =
+        inspectedItem.sources && inspectedItem.sources.length > 0
+          ? `
+            <div class="clinical-field inspector-sources-section">
+              <div class="clinical-field-label">Atlas &amp; Literature Sources</div>
+              <ul class="sources-list">
+                ${inspectedItem.sources
+                  .map((src) => `<li class="source-item">${src}</li>`)
+                  .join('')}
+              </ul>
+            </div>
+          `
+          : '';
+
+      this.inspectorContainer.innerHTML = `
+        <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
+          <div class="inspector-header-badges">
+            <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
+              ${inspectedGroup.shortTitle.toUpperCase()}
+            </span>
+            <span class="compartment-pill">
+              ${
+                this.audienceMode === 'patient'
+                  ? 'Patient Guide'
+                  : inspectedItem.fluidCompartment
+              }
+            </span>
             ${
-              this.audienceMode === 'patient'
-                ? 'Patient Guide'
-                : inspectedItem.fluidCompartment
+              this.audienceMode !== 'patient'
+                ? `<span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
+                     ID: ${inspectedItem.meshName}
+                   </span>`
+                : ''
             }
-          </span>
-          ${
-            this.audienceMode !== 'patient'
-              ? `<span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
-                   ID: ${inspectedItem.meshName}
-                 </span>`
-              : ''
-          }
-        </div>
-        <div class="inspector-title-row">
-          <div>
-            <div class="inspector-title">${inspectedItem.displayName}</div>
-            <div class="inspector-latin">${inspectedItem.latinName}</div>
           </div>
-          <span class="inspector-expand-pill" data-toggle-info-card="true">
-            ${this.infoCardExpanded ? '▴ Less' : '▾ Expand'}
-          </span>
+          <div class="inspector-title-row">
+            <div>
+              <div class="inspector-title">${inspectedItem.displayName}</div>
+              <div class="inspector-latin">${inspectedItem.latinName}</div>
+            </div>
+            <span class="inspector-expand-pill" data-toggle-info-card="true">
+              ${this.infoCardExpanded ? '▴ Less' : '▾ Expand'}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div class="inspector-compact-preview" data-toggle-info-card="true">
-        ${compactPreviewText}
-      </div>
+        <div class="inspector-compact-preview" data-toggle-info-card="true">
+          ${compactPreviewText}
+        </div>
 
-      <div class="inspector-expanded-details">
-        ${expandedBodyHtml}
-        ${sourcesHtml}
-      </div>
-    `;
+        <div class="inspector-expanded-details">
+          ${expandedBodyHtml}
+          ${sourcesHtml}
+        </div>
+      `;
+    }
     this.applyPanelStatesToDOM();
 
-    // Render 5-System 27-Mesh Layer Tree
-    const groupOrder: SystemGroupId[] = [
-      'semicircular_ducts',
-      'ampullae_cupulae',
-      'otolith_vestibule',
-      'cochlear_system',
-      'bony_capsule',
-    ];
+    // Render 5-System 27-Mesh Layer Tree (only rebuild when selectedMesh or visibilityMap changes)
+    const layerTreeKey = `${snap.selectedMesh ?? ''}|${IEMAP_STRUCTURES.map(
+      (s) => snap.visibilityMap[s.meshName] ?? s.defaultState
+    ).join(',')}`;
 
-    this.layerTreeContainer.innerHTML = groupOrder
-      .map((gId) => {
-        const gMeta = SYSTEM_GROUPS[gId];
-        const items = IEMAP_STRUCTURES.filter((s) => s.systemGroup === gId);
+    if (layerTreeKey !== this.lastRenderedLayerTreeKey) {
+      this.lastRenderedLayerTreeKey = layerTreeKey;
+      const groupOrder: SystemGroupId[] = [
+        'semicircular_ducts',
+        'ampullae_cupulae',
+        'otolith_vestibule',
+        'cochlear_system',
+        'bony_capsule',
+      ];
 
-        const rowsHtml = items
-          .map((item) => {
-            const st: VisibilityState = snap.visibilityMap[item.meshName] ?? item.defaultState;
-            const isSel = snap.selectedMesh === item.meshName;
-            return `
-              <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
-                <div class="mesh-row-left">
-                  <span class="mesh-swatch" style="background:${item.colorHex};"></span>
-                  <span class="mesh-row-label" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
-                    ${item.shortLabel}
-                  </span>
+      this.layerTreeContainer.innerHTML = groupOrder
+        .map((gId) => {
+          const gMeta = SYSTEM_GROUPS[gId];
+          const items = IEMAP_STRUCTURES.filter((s) => s.systemGroup === gId);
+
+          const rowsHtml = items
+            .map((item) => {
+              const st: VisibilityState = snap.visibilityMap[item.meshName] ?? item.defaultState;
+              const isSel = snap.selectedMesh === item.meshName;
+              return `
+                <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
+                  <div class="mesh-row-left">
+                    <span class="mesh-swatch" style="background:${item.colorHex};"></span>
+                    <span class="mesh-row-label" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
+                      ${item.shortLabel}
+                    </span>
+                  </div>
+                  <div class="group-vis-btns">
+                    <button
+                      class="mini-vis-btn ${st === 'visible' ? 'active-vis' : ''}"
+                      data-mesh-vis="${item.meshName}:visible"
+                      title="Solid / Translucent Visible (${item.meshName})"
+                    >Vis</button>
+                    <button
+                      class="mini-vis-btn ${st === 'ghost' ? 'active-ghost' : ''}"
+                      data-mesh-vis="${item.meshName}:ghost"
+                      title="Fresnel X-Ray Ghost (${item.meshName})"
+                    >X-Ray</button>
+                    <button
+                      class="mini-vis-btn ${st === 'hidden' ? 'active-hide' : ''}"
+                      data-mesh-vis="${item.meshName}:hidden"
+                      title="Peel / Hide Structure (${item.meshName})"
+                    >Hide</button>
+                  </div>
+                </div>
+              `;
+            })
+            .join('');
+
+          return `
+            <div class="system-group-block">
+              <div class="system-group-header">
+                <div class="system-group-name">
+                  <span class="mesh-swatch" style="background:${gMeta.accentHex};"></span>
+                  <span>${gMeta.shortTitle} (${items.length})</span>
                 </div>
                 <div class="group-vis-btns">
-                  <button
-                    class="mini-vis-btn ${st === 'visible' ? 'active-vis' : ''}"
-                    data-mesh-vis="${item.meshName}:visible"
-                    title="Solid / Translucent Visible (${item.meshName})"
-                  >Vis</button>
-                  <button
-                    class="mini-vis-btn ${st === 'ghost' ? 'active-ghost' : ''}"
-                    data-mesh-vis="${item.meshName}:ghost"
-                    title="Fresnel X-Ray Ghost (${item.meshName})"
-                  >X-Ray</button>
-                  <button
-                    class="mini-vis-btn ${st === 'hidden' ? 'active-hide' : ''}"
-                    data-mesh-vis="${item.meshName}:hidden"
-                    title="Peel / Hide Structure (${item.meshName})"
-                  >Hide</button>
+                  <button class="mini-vis-btn" data-sys-vis="${gId}:visible">All Vis</button>
+                  <button class="mini-vis-btn" data-sys-vis="${gId}:ghost">All X-Ray</button>
+                  <button class="mini-vis-btn" data-sys-vis="${gId}:hidden">Hide</button>
                 </div>
               </div>
-            `;
-          })
-          .join('');
-
-        return `
-          <div class="system-group-block">
-            <div class="system-group-header">
-              <div class="system-group-name">
-                <span class="mesh-swatch" style="background:${gMeta.accentHex};"></span>
-                <span>${gMeta.shortTitle} (${items.length})</span>
-              </div>
-              <div class="group-vis-btns">
-                <button class="mini-vis-btn" data-sys-vis="${gId}:visible">All Vis</button>
-                <button class="mini-vis-btn" data-sys-vis="${gId}:ghost">All X-Ray</button>
-                <button class="mini-vis-btn" data-sys-vis="${gId}:hidden">Hide</button>
-              </div>
+              ${rowsHtml}
             </div>
-            ${rowsHtml}
-          </div>
-        `;
-      })
-      .join('');
+          `;
+        })
+        .join('');
 
-    this.layerTreeContainer
-      .querySelectorAll<HTMLButtonElement>('[data-mesh-vis]')
-      .forEach((btn) => {
-        btn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          const [meshName, vis] = btn.dataset.meshVis!.split(':') as [string, VisibilityState];
-          this.scene.setStructureVisibility(meshName, vis);
+      this.layerTreeContainer
+        .querySelectorAll<HTMLButtonElement>('[data-mesh-vis]')
+        .forEach((btn) => {
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const [meshName, vis] = btn.dataset.meshVis!.split(':') as [string, VisibilityState];
+            this.scene.setStructureVisibility(meshName, vis);
+          });
         });
-      });
 
-    this.layerTreeContainer
-      .querySelectorAll<HTMLButtonElement>('[data-sys-vis]')
-      .forEach((btn) => {
-        btn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          const [gId, vis] = btn.dataset.sysVis!.split(':') as [SystemGroupId, VisibilityState];
-          this.scene.setSystemGroupVisibility(gId, vis);
+      this.layerTreeContainer
+        .querySelectorAll<HTMLButtonElement>('[data-sys-vis]')
+        .forEach((btn) => {
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const [gId, vis] = btn.dataset.sysVis!.split(':') as [SystemGroupId, VisibilityState];
+            this.scene.setSystemGroupVisibility(gId, vis);
+          });
         });
-      });
 
-    this.layerTreeContainer
-      .querySelectorAll<HTMLElement>('[data-tree-select]')
-      .forEach((row) => {
-        row.addEventListener('click', () => {
-          const meshName = row.dataset.treeSelect!;
-          this.scene.selectStructure(meshName, true);
-          this.handleStructurePickedForQuiz(meshName);
+      this.layerTreeContainer
+        .querySelectorAll<HTMLElement>('[data-tree-select]')
+        .forEach((row) => {
+          row.addEventListener('click', () => {
+            const meshName = row.dataset.treeSelect!;
+            this.scene.selectStructure(meshName, true);
+            this.handleStructurePickedForQuiz(meshName);
+          });
         });
-      });
+    }
   }
 
   private renderProjectedPins(pins: ProjectedPin2D[]): void {
