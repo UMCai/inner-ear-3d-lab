@@ -2066,4 +2066,77 @@ body,
   }
 }
 
+/* ============================================================================
+   PHASE 6: SOURCES LIST, EDUCATIONAL DISCLAIMER FOOTER & ABOUT MODAL
+   ============================================================================ */
+.inspector-sources-section {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sources-list {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.source-item {
+  color: var(--text-muted);
+}
+
+.education-disclaimer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(10, 18, 24, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.disclaimer-link-btn {
+  background: transparent;
+  border: 1px solid rgba(82, 220, 242, 0.35);
+  border-radius: 4px;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+
+.disclaimer-link-btn:hover,
+.disclaimer-link-btn:focus-visible {
+  background: rgba(82, 220, 242, 0.14);
+  outline: 2px solid var(--cyan);
+}
+
+.welcome-disclaimer-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.about-disclaimer-banner {
+  background: rgba(240, 170, 98, 0.14);
+  border: 1px solid rgba(240, 170, 98, 0.48);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.45;
+}
+
+
 

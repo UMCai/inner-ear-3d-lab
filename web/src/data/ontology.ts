@@ -40,6 +40,7 @@ export interface StructureOntologyItem {
   physiologicalFunction: string;
   clinicalPearl: string;
   patientSummary: string;
+  sources?: string[];
 }
 
 export interface DissectionPreset {
@@ -880,6 +881,26 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'The outer protective bone shell surrounding the snail-shaped hearing organ.',
   },
 ];
+
+export const VERIFIED_ATLAS_CITATIONS = {
+  iemap2021:
+    'Ahmadi et al., Sci Rep 11, 3293 (2021). doi:10.1038/s41598-021-82716-0 — IE-Map Inner Ear Template & Labyrinth Atlas (Zenodo 10625570)',
+  david2016:
+    'David et al., Sci Rep 6, 32772 (2016). doi:10.1038/srep32772 — Human Membranous Labyrinth Micro-CT Reconstruction',
+};
+
+for (const item of IEMAP_STRUCTURES) {
+  if (!item.sources || item.sources.length === 0) {
+    const refs: string[] = [VERIFIED_ATLAS_CITATIONS.iemap2021];
+    if (item.systemGroup !== 'bony_capsule') {
+      refs.push(VERIFIED_ATLAS_CITATIONS.david2016);
+    }
+    refs.push(
+      `TODO: Author verification needed for primary clinical & physiological citation (${item.shortLabel})`
+    );
+    item.sources = refs;
+  }
+}
 
 export const STRUCTURE_BY_MESH: Record<string, StructureOntologyItem> = Object.fromEntries(
   IEMAP_STRUCTURES.map((item) => [item.meshName, item])

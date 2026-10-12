@@ -118,6 +118,10 @@ export class AppHUD {
   private predictPanelEl!: HTMLElement;
   private predictToggleBtn!: HTMLButtonElement;
 
+  // Phase 6: About & Disclaimer Modal
+  private aboutModalOpen = false;
+  private aboutModalEl!: HTMLElement;
+
   private leftPanelCollapsed = false;
   private rightPanelCollapsed = false;
   private infoCardExpanded = false;
@@ -289,6 +293,16 @@ export class AppHUD {
               title="Open welcome screen (Guided tour, Explore atlas, Epley lab)"
             >
               Start Guide
+            </button>
+
+            <button
+              class="seg-btn pip-toggle-header-btn"
+              id="btn-open-about"
+              type="button"
+              aria-label="Open About, References, and Educational Disclaimer"
+              title="About IE-Map Atlas, Verified Sources &amp; Educational Disclaimer"
+            >
+              About
             </button>
 
             <div class="layout-segmented" id="layout-mode-group">
@@ -656,6 +670,19 @@ export class AppHUD {
                     </button>
                     <div class="layer-tree-container collapsed" id="layer-tree-container"></div>
                   </div>
+
+                  <!-- Phase 6: Educational Disclaimer Footer -->
+                  <div class="education-disclaimer-footer" id="education-disclaimer-footer" data-tab-pane="info">
+                    <span>For education only, not for diagnosis.</span>
+                    <button
+                      class="disclaimer-link-btn"
+                      id="btn-footer-about"
+                      type="button"
+                      aria-label="Open About and Sources dialog"
+                    >
+                      Sources &amp; About
+                    </button>
+                  </div>
                 </div>
               </aside>
             </div>
@@ -735,6 +762,45 @@ export class AppHUD {
                 </span>
               </button>
             </div>
+            <div class="welcome-disclaimer-note">
+              For education only, not for diagnosis.
+            </div>
+          </div>
+        </div>
+
+        <!-- PHASE 6: ABOUT, VERIFIED SOURCES & EDUCATIONAL DISCLAIMER MODAL -->
+        <div class="welcome-overlay hidden" id="about-disclaimer-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+          <div class="welcome-card about-modal-card">
+            <div class="welcome-card-header">
+              <span class="brand-badge">ABOUT &amp; CREDIBILITY · IE-MAP v1.0.0</span>
+              <button
+                class="welcome-close-btn"
+                id="btn-close-about"
+                type="button"
+                aria-label="Close About and Disclaimer dialog"
+                title="Close About dialog"
+              >✕</button>
+            </div>
+            <h2 class="welcome-title" id="about-modal-title">
+              Data Provenance, Verified Citations &amp; Educational Disclaimer
+            </h2>
+            <div class="about-disclaimer-banner" id="about-disclaimer-banner">
+              <strong>Disclaimer:</strong> For education only, not for diagnosis. This interactive 3D inner ear atlas and BPPV canalithiasis physics model is intended solely for anatomical and biomechanical education and must not be used for clinical diagnosis or patient self-treatment.
+            </div>
+            <div class="clinical-field">
+              <div class="clinical-field-label">Verified 3D Atlas &amp; Micro-CT Sources (from iemap_Metadata.json)</div>
+              <ul class="sources-list">
+                <li>
+                  <strong>IE-Map Atlas (2021):</strong> Ahmadi et al., <em>Sci Rep</em> 11, 3293 (2021). <code>doi:10.1038/s41598-021-82716-0</code> · Zenodo Record <code>10625570</code> (Right Inner Ear RAS Template &amp; 27-Mesh Surface Segmentation).
+                </li>
+                <li>
+                  <strong>Membranous Labyrinth Reconstruction (2016):</strong> David et al., <em>Sci Rep</em> 6, 32772 (2016). <code>doi:10.1038/srep32772</code> (Human Membranous Labyrinth Micro-CT Source).
+                </li>
+                <li>
+                  <strong>Clinical &amp; Physiological Notes:</strong> Primary literature citations for individual BPPV clinical pearls and Steinhausen/Ewald physiological notes are marked with explicit <code>TODO</code> items in the structure ontology for author verification.
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -752,6 +818,7 @@ export class AppHUD {
     this.loadingText = this.root.querySelector('#loading-status-text')!;
     this.loadingCountText = this.root.querySelector('#loading-count-text')!;
     this.welcomeOverlay = this.root.querySelector('#welcome-overlay')!;
+    this.aboutModalEl = this.root.querySelector('#about-disclaimer-modal')!;
     this.advancedToolsCheckbox = this.root.querySelector('#chk-advanced-tools')!;
     this.quizPanelEl = this.root.querySelector('#quiz-mode-panel')!;
     this.quizToggleBtn = this.root.querySelector('#btn-toggle-quiz')!;
@@ -1355,6 +1422,24 @@ export class AppHUD {
         this.applyPanelStatesToDOM();
       }
     });
+
+    // 16. Phase 6: About, Verified Sources & Educational Disclaimer Modal
+    const openAboutModal = () => {
+      this.aboutModalOpen = true;
+      this.applyPanelStatesToDOM();
+    };
+    this.root.querySelector('#btn-open-about')!.addEventListener('click', openAboutModal);
+    this.root.querySelector('#btn-footer-about')!.addEventListener('click', openAboutModal);
+    this.root.querySelector('#btn-close-about')!.addEventListener('click', () => {
+      this.aboutModalOpen = false;
+      this.applyPanelStatesToDOM();
+    });
+    this.aboutModalEl.addEventListener('click', (ev) => {
+      if (ev.target === this.aboutModalEl) {
+        this.aboutModalOpen = false;
+        this.applyPanelStatesToDOM();
+      }
+    });
   }
 
   private getQuizCandidateStructures() {
@@ -1690,6 +1775,7 @@ export class AppHUD {
     }
     this.advancedToolsCheckbox.checked = this.advancedToolsEnabled;
     this.welcomeOverlay.classList.toggle('hidden', this.welcomeDismissed);
+    this.aboutModalEl.classList.toggle('hidden', !this.aboutModalOpen);
 
     // Phase 5: Audience mode buttons
     this.root.querySelectorAll<HTMLButtonElement>('[data-audience-mode]').forEach((btn) => {
@@ -2022,6 +2108,20 @@ export class AppHUD {
           </div>
         `;
 
+    const sourcesHtml =
+      inspectedItem.sources && inspectedItem.sources.length > 0
+        ? `
+          <div class="clinical-field inspector-sources-section">
+            <div class="clinical-field-label">Atlas &amp; Literature Sources</div>
+            <ul class="sources-list">
+              ${inspectedItem.sources
+                .map((src) => `<li class="source-item">${src}</li>`)
+                .join('')}
+            </ul>
+          </div>
+        `
+        : '';
+
     this.inspectorContainer.innerHTML = `
       <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
         <div class="inspector-header-badges">
@@ -2060,6 +2160,7 @@ export class AppHUD {
 
       <div class="inspector-expanded-details">
         ${expandedBodyHtml}
+        ${sourcesHtml}
       </div>
     `;
     this.applyPanelStatesToDOM();
