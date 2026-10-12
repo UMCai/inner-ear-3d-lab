@@ -64,8 +64,29 @@ export class AppHUD {
   private headPitchVal!: HTMLElement;
   private undoBtn!: HTMLButtonElement;
 
+  // Phase 1: Collapsible panels & compact floating info card state
+  private leftDockEl!: HTMLElement;
+  private leftPanelToggleBtn!: HTMLButtonElement;
+  private rightDrawerEl!: HTMLElement;
+  private rightPanelToggleBtn!: HTMLButtonElement;
+  private infoCardToggleBtn!: HTMLButtonElement;
+  private partListToggleBtn!: HTMLButtonElement;
+
+  private leftPanelCollapsed = false;
+  private rightPanelCollapsed = false;
+  private infoCardExpanded = false;
+  private partListCollapsed = true;
+
+  private static readonly LS_KEYS = {
+    leftCollapsed: 'gate3_left_panel_collapsed',
+    rightCollapsed: 'gate3_right_panel_collapsed',
+    infoExpanded: 'gate3_info_card_expanded',
+    partsCollapsed: 'gate3_part_list_collapsed',
+  };
+
   constructor(root: HTMLElement) {
     this.root = root;
+    this.loadSavedPanelStates();
     this.buildDOM();
     this.scene = new DualStageScene(this.canvasHost);
 
@@ -74,7 +95,35 @@ export class AppHUD {
     this.scene.onTelemetryUpdate((tel) => this.renderLiveTelemetry(tel));
 
     window.addEventListener('resize', () => this.syncViewportRects());
+    this.applyPanelStatesToDOM();
     this.syncViewportRects();
+  }
+
+  private readStorageBool(key: string, fallback: boolean): boolean {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+    } catch {
+      // Ignore storage access errors (private mode / blocked storage)
+    }
+    return fallback;
+  }
+
+  private writeStorageBool(key: string, value: boolean): void {
+    try {
+      window.localStorage.setItem(key, value ? 'true' : 'false');
+    } catch {
+      // Ignore storage access errors
+    }
+  }
+
+  private loadSavedPanelStates(): void {
+    // Defaults per Phase 1: left panel open (false), part list collapsed (true), info card compact (false)
+    this.leftPanelCollapsed = this.readStorageBool(AppHUD.LS_KEYS.leftCollapsed, false);
+    this.rightPanelCollapsed = this.readStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
+    this.infoCardExpanded = this.readStorageBool(AppHUD.LS_KEYS.infoExpanded, false);
+    this.partListCollapsed = this.readStorageBool(AppHUD.LS_KEYS.partsCollapsed, true);
   }
 
   public async init(): Promise<void> {
@@ -165,120 +214,137 @@ export class AppHUD {
             </div>
 
             <!-- Left Floating Dissection & Layer Control Dock -->
-            <aside class="left-tool-dock">
-              <!-- Section 1: Clinical Dissection Presets -->
-              <div class="dock-section">
-                <div class="dock-section-title">
-                  <span>1. Clinical Dissection Presets</span>
-                </div>
-                <div class="preset-list" id="preset-list"></div>
+            <aside class="left-tool-dock" id="left-tool-dock" aria-label="Left Dissection and Control Panel">
+              <div class="panel-collapse-bar">
+                <span class="panel-collapse-title">Dissection &amp; Controls</span>
+                <button
+                  class="panel-toggle-btn"
+                  id="btn-toggle-left-panel"
+                  type="button"
+                  aria-label="Toggle left control panel"
+                  aria-expanded="true"
+                  title="Collapse or expand left control panel"
+                >
+                  <span class="toggle-icon">◀</span>
+                  <span class="toggle-label">Hide</span>
+                </button>
               </div>
 
-              <!-- Section 2: Active Structure Dissection Actions -->
-              <div class="dock-section">
-                <div class="dock-section-title">
-                  <span>2. Virtual Dissection &amp; Scalpel</span>
-                </div>
-                <div class="action-grid" style="margin-bottom:6px;">
-                  <button class="action-btn" id="btn-fly-selected">Fly Camera Here</button>
-                  <button class="action-btn" id="btn-isolate-selected">Isolate Part</button>
-                  <button class="action-btn" id="btn-ghost-others">X-Ray Ghost Others</button>
-                  <button class="action-btn" id="btn-hide-selected">Peel / Hide Part</button>
-                </div>
-                <div class="action-grid">
-                  <button class="action-btn" id="btn-tool-scalpel" title="Click any 3D structure to immediately peel/hide it">
-                    Scalpel: Click-Peel
-                  </button>
-                  <button class="action-btn" id="btn-tool-xray" title="Click any 3D structure to convert it to X-Ray Ghost">
-                    Brush: Click-Ghost
-                  </button>
-                  <button class="action-btn" id="btn-undo-dissect" disabled>Undo Step</button>
-                  <button class="action-btn" id="btn-reset-all">Reset Atlas</button>
-                </div>
-              </div>
-
-              <!-- Section 3: Concentric Layer Peel & Radial Explode -->
-              <div class="dock-section">
-                <div class="dock-section-title">
-                  <span>3. Layer Peel &amp; Radial Explode</span>
-                </div>
-
-                <div class="control-slider-group">
-                  <div class="slider-header">
-                    <span>Bony Capsule Peel (Otic Shell)</span>
-                    <span class="slider-val" id="bony-peel-val">80%</span>
+              <div class="left-dock-scroll-body" id="left-dock-scroll-body">
+                <!-- Section 1: Clinical Dissection Presets -->
+                <div class="dock-section">
+                  <div class="dock-section-title">
+                    <span>1. Clinical Dissection Presets</span>
                   </div>
-                  <input type="range" class="lab-range" id="bony-peel-slider" min="0" max="100" value="80" />
+                  <div class="preset-list" id="preset-list"></div>
                 </div>
 
-                <div class="control-slider-group">
-                  <div class="slider-header">
-                    <span>Ampulla &amp; Cochlea Micro-Cutaway</span>
-                    <span class="slider-val" id="micro-cut-val">35%</span>
+                <!-- Section 2: Active Structure Dissection Actions -->
+                <div class="dock-section">
+                  <div class="dock-section-title">
+                    <span>2. Virtual Dissection &amp; Scalpel</span>
                   </div>
-                  <input type="range" class="lab-range" id="micro-cut-slider" min="0" max="100" value="35" />
-                </div>
-
-                <div class="control-slider-group">
-                  <div class="slider-header">
-                    <span>Radial Explode Assembly (27 Parts)</span>
-                    <span class="slider-val" id="explode-val">0%</span>
+                  <div class="action-grid" style="margin-bottom:6px;">
+                    <button class="action-btn" id="btn-fly-selected">Fly Camera Here</button>
+                    <button class="action-btn" id="btn-isolate-selected">Isolate Part</button>
+                    <button class="action-btn" id="btn-ghost-others">X-Ray Ghost Others</button>
+                    <button class="action-btn" id="btn-hide-selected">Peel / Hide Part</button>
                   </div>
-                  <input type="range" class="lab-range" id="explode-slider" min="0" max="100" value="0" />
+                  <div class="action-grid">
+                    <button class="action-btn" id="btn-tool-scalpel" title="Click any 3D structure to immediately peel/hide it">
+                      Scalpel: Click-Peel
+                    </button>
+                    <button class="action-btn" id="btn-tool-xray" title="Click any 3D structure to convert it to X-Ray Ghost">
+                      Brush: Click-Ghost
+                    </button>
+                    <button class="action-btn" id="btn-undo-dissect" disabled>Undo Step</button>
+                    <button class="action-btn" id="btn-reset-all">Reset Atlas</button>
+                  </div>
                 </div>
-              </div>
 
-              <!-- Section 4: 3-Axis Multi-Planar Cross-Section Slicer -->
-              <div class="dock-section">
-                <div class="dock-section-title">
-                  <span>4. RAS Cross-Section Slicer</span>
-                  <label style="font-size:10px;cursor:pointer;color:var(--text-muted);">
-                    <input type="checkbox" id="clip-flip-checkbox" /> Flip
+                <!-- Section 3: Concentric Layer Peel & Radial Explode -->
+                <div class="dock-section">
+                  <div class="dock-section-title">
+                    <span>3. Layer Peel &amp; Radial Explode</span>
+                  </div>
+
+                  <div class="control-slider-group">
+                    <div class="slider-header">
+                      <span>Bony Capsule Peel (Otic Shell)</span>
+                      <span class="slider-val" id="bony-peel-val">80%</span>
+                    </div>
+                    <input type="range" class="lab-range" id="bony-peel-slider" min="0" max="100" value="80" />
+                  </div>
+
+                  <div class="control-slider-group">
+                    <div class="slider-header">
+                      <span>Ampulla &amp; Cochlea Micro-Cutaway</span>
+                      <span class="slider-val" id="micro-cut-val">35%</span>
+                    </div>
+                    <input type="range" class="lab-range" id="micro-cut-slider" min="0" max="100" value="35" />
+                  </div>
+
+                  <div class="control-slider-group">
+                    <div class="slider-header">
+                      <span>Radial Explode Assembly (27 Parts)</span>
+                      <span class="slider-val" id="explode-val">0%</span>
+                    </div>
+                    <input type="range" class="lab-range" id="explode-slider" min="0" max="100" value="0" />
+                  </div>
+                </div>
+
+                <!-- Section 4: 3-Axis Multi-Planar Cross-Section Slicer -->
+                <div class="dock-section">
+                  <div class="dock-section-title">
+                    <span>4. RAS Cross-Section Slicer</span>
+                    <label style="font-size:10px;cursor:pointer;color:var(--text-muted);">
+                      <input type="checkbox" id="clip-flip-checkbox" /> Flip
+                    </label>
+                  </div>
+                  <div class="layout-segmented" id="clip-axis-group" style="margin-bottom:8px;width:100%;">
+                    <button class="seg-btn active" data-clip="none" style="flex:1;">Off</button>
+                    <button class="seg-btn" data-clip="axial_z" style="flex:1;">Axial Z</button>
+                    <button class="seg-btn" data-clip="coronal_y" style="flex:1;">Coronal Y</button>
+                    <button class="seg-btn" data-clip="sagittal_x" style="flex:1;">Sagittal X</button>
+                  </div>
+                  <div class="control-slider-group" id="clip-offset-row">
+                    <div class="slider-header">
+                      <span>Section Plane Coordinate</span>
+                      <span class="slider-val" id="clip-offset-val">0.0 mm</span>
+                    </div>
+                    <input type="range" class="lab-range" id="clip-offset-slider" min="-7.0" max="11.0" step="0.1" value="0.0" />
+                  </div>
+                </div>
+
+                <!-- Section 5: Reference Landmarks, Canal Planes & BPPV Path -->
+                <div class="dock-section" style="border-bottom:none;">
+                  <div class="dock-section-title">
+                    <span>5. Spatial Overlays &amp; BPPV Spline</span>
+                  </div>
+                  <label class="toggle-row">
+                    <span>3D Slicer Fiducial Pins (.fcsv)</span>
+                    <input type="checkbox" id="chk-fiducials" checked />
                   </label>
-                </div>
-                <div class="layout-segmented" id="clip-axis-group" style="margin-bottom:8px;width:100%;">
-                  <button class="seg-btn active" data-clip="none" style="flex:1;">Off</button>
-                  <button class="seg-btn" data-clip="axial_z" style="flex:1;">Axial Z</button>
-                  <button class="seg-btn" data-clip="coronal_y" style="flex:1;">Coronal Y</button>
-                  <button class="seg-btn" data-clip="sagittal_x" style="flex:1;">Sagittal X</button>
-                </div>
-                <div class="control-slider-group" id="clip-offset-row">
-                  <div class="slider-header">
-                    <span>Section Plane Coordinate</span>
-                    <span class="slider-val" id="clip-offset-val">0.0 mm</span>
-                  </div>
-                  <input type="range" class="lab-range" id="clip-offset-slider" min="-7.0" max="11.0" step="0.1" value="0.0" />
-                </div>
-              </div>
+                  <label class="toggle-row">
+                    <span>Canal Plane Protractors (LARP/RALP/Lat)</span>
+                    <input type="checkbox" id="chk-canal-planes" />
+                  </label>
+                  <label class="toggle-row">
+                    <span>Posterior Canal Spline &amp; 5 Canaliths</span>
+                    <input type="checkbox" id="chk-spline-canaliths" checked />
+                  </label>
+                  <label class="toggle-row">
+                    <span>Live Stokes Gravity Physics (Mode 2)</span>
+                    <input type="checkbox" id="chk-live-physics" />
+                  </label>
 
-              <!-- Section 5: Reference Landmarks, Canal Planes & BPPV Path -->
-              <div class="dock-section" style="border-bottom:none;">
-                <div class="dock-section-title">
-                  <span>5. Spatial Overlays &amp; BPPV Spline</span>
-                </div>
-                <label class="toggle-row">
-                  <span>3D Slicer Fiducial Pins (.fcsv)</span>
-                  <input type="checkbox" id="chk-fiducials" checked />
-                </label>
-                <label class="toggle-row">
-                  <span>Canal Plane Protractors (LARP/RALP/Lat)</span>
-                  <input type="checkbox" id="chk-canal-planes" />
-                </label>
-                <label class="toggle-row">
-                  <span>Posterior Canal Spline &amp; 5 Canaliths</span>
-                  <input type="checkbox" id="chk-spline-canaliths" checked />
-                </label>
-                <label class="toggle-row">
-                  <span>Live Stokes Gravity Physics (Mode 2)</span>
-                  <input type="checkbox" id="chk-live-physics" />
-                </label>
-
-                <div class="control-slider-group" style="margin-top:8px;">
-                  <div class="slider-header">
-                    <span>Canalith Position (φ)</span>
-                    <span class="slider-val" id="canalith-phi-val">-84° (Base)</span>
+                  <div class="control-slider-group" style="margin-top:8px;">
+                    <div class="slider-header">
+                      <span>Canalith Position (φ)</span>
+                      <span class="slider-val" id="canalith-phi-val">-84° (Base)</span>
+                    </div>
+                    <input type="range" class="lab-range" id="canalith-phi-slider" min="-105" max="192" step="1" value="-84" />
                   </div>
-                  <input type="range" class="lab-range" id="canalith-phi-slider" min="-105" max="192" step="1" value="-84" />
                 </div>
               </div>
             </aside>
@@ -337,13 +403,62 @@ export class AppHUD {
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- RIGHT DOCKED CLINICAL INSPECTOR & 27-PART LAYER TREE DRAWER -->
-          <aside class="right-inspector-drawer">
-            <div class="inspector-card" id="inspector-card-container"></div>
-            <div class="layer-tree-container" id="layer-tree-container"></div>
-          </aside>
+            <!-- RIGHT FLOATING CLINICAL INSPECTOR & COLLAPSIBLE 27-PART LAYER TREE -->
+            <aside class="right-inspector-drawer" id="right-inspector-drawer" aria-label="Right Clinical Info and Parts Panel">
+              <div class="panel-collapse-bar right-collapse-bar">
+                <span class="panel-collapse-title">Structure Info &amp; Parts</span>
+                <div class="right-bar-actions">
+                  <button
+                    class="panel-toggle-btn"
+                    id="btn-toggle-info-card"
+                    type="button"
+                    aria-label="Expand or collapse structure info card"
+                    aria-expanded="false"
+                    title="Expand or collapse full clinical info card"
+                  >
+                    <span class="toggle-label">Expand Info ▾</span>
+                  </button>
+                  <button
+                    class="panel-toggle-btn"
+                    id="btn-toggle-right-panel"
+                    type="button"
+                    aria-label="Toggle right info and part-list panel"
+                    aria-expanded="true"
+                    title="Collapse or expand right panel"
+                  >
+                    <span class="toggle-icon">▶</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="right-drawer-body" id="right-drawer-body">
+                <!-- Floating Info Card (Compact by default, expands on click) -->
+                <div
+                  class="inspector-card compact"
+                  id="inspector-card-container"
+                  role="region"
+                  aria-label="Selected structure clinical inspector"
+                  tabindex="0"
+                ></div>
+
+                <!-- Collapsible 27-Part Layer Tree Section -->
+                <div class="part-list-section" id="part-list-section">
+                  <button
+                    class="part-list-toggle-bar"
+                    id="btn-toggle-part-list"
+                    type="button"
+                    aria-label="Toggle 27-part anatomical layer list"
+                    aria-expanded="false"
+                  >
+                    <span>27-Part Anatomical Layer Tree</span>
+                    <span class="part-list-chevron" id="part-list-chevron">▸ Show Parts</span>
+                  </button>
+                  <div class="layer-tree-container collapsed" id="layer-tree-container"></div>
+                </div>
+              </div>
+            </aside>
+          </div>
         </div>
 
         <!-- LOADING OVERLAY -->
@@ -369,6 +484,13 @@ export class AppHUD {
     this.loadingOverlay = this.root.querySelector('#loading-overlay')!;
     this.loadingBarFill = this.root.querySelector('#loading-bar-fill')!;
     this.loadingText = this.root.querySelector('#loading-status-text')!;
+
+    this.leftDockEl = this.root.querySelector('#left-tool-dock')!;
+    this.leftPanelToggleBtn = this.root.querySelector('#btn-toggle-left-panel')!;
+    this.rightDrawerEl = this.root.querySelector('#right-inspector-drawer')!;
+    this.rightPanelToggleBtn = this.root.querySelector('#btn-toggle-right-panel')!;
+    this.infoCardToggleBtn = this.root.querySelector('#btn-toggle-info-card')!;
+    this.partListToggleBtn = this.root.querySelector('#btn-toggle-part-list')!;
 
     this.epleySandboxBar = this.root.querySelector('#epley-sandbox-bar')!;
     this.cameraPresetBar = this.root.querySelector('#camera-preset-bar')!;
@@ -633,13 +755,102 @@ export class AppHUD {
         searchInput.focus();
       }
     });
+
+    // 10. Phase 1: Collapsible Panels & Expandable Floating Info Card
+    this.leftPanelToggleBtn.addEventListener('click', () => {
+      this.leftPanelCollapsed = !this.leftPanelCollapsed;
+      this.writeStorageBool(AppHUD.LS_KEYS.leftCollapsed, this.leftPanelCollapsed);
+      this.applyPanelStatesToDOM();
+      this.syncViewportRects();
+    });
+
+    this.rightPanelToggleBtn.addEventListener('click', () => {
+      this.rightPanelCollapsed = !this.rightPanelCollapsed;
+      this.writeStorageBool(AppHUD.LS_KEYS.rightCollapsed, this.rightPanelCollapsed);
+      this.applyPanelStatesToDOM();
+      this.syncViewportRects();
+    });
+
+    this.infoCardToggleBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this.infoCardExpanded = !this.infoCardExpanded;
+      this.writeStorageBool(AppHUD.LS_KEYS.infoExpanded, this.infoCardExpanded);
+      if (this.infoCardExpanded && this.rightPanelCollapsed) {
+        this.rightPanelCollapsed = false;
+        this.writeStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
+      }
+      this.applyPanelStatesToDOM();
+    });
+
+    this.inspectorContainer.addEventListener('click', (ev) => {
+      // Allow clicking interactive links/buttons inside expanded card without accidentally collapsing if needed,
+      // unless clicking the expand/collapse hint or clicking anywhere when compact.
+      const target = ev.target as HTMLElement;
+      if (target.closest('a')) return;
+      if (!this.infoCardExpanded || target.closest('[data-toggle-info-card]')) {
+        this.infoCardExpanded = !this.infoCardExpanded;
+        this.writeStorageBool(AppHUD.LS_KEYS.infoExpanded, this.infoCardExpanded);
+        this.applyPanelStatesToDOM();
+      }
+    });
+
+    this.inspectorContainer.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        this.infoCardExpanded = !this.infoCardExpanded;
+        this.writeStorageBool(AppHUD.LS_KEYS.infoExpanded, this.infoCardExpanded);
+        this.applyPanelStatesToDOM();
+      }
+    });
+
+    this.partListToggleBtn.addEventListener('click', () => {
+      this.partListCollapsed = !this.partListCollapsed;
+      this.writeStorageBool(AppHUD.LS_KEYS.partsCollapsed, this.partListCollapsed);
+      this.applyPanelStatesToDOM();
+    });
+  }
+
+  private applyPanelStatesToDOM(): void {
+    // Left control dock
+    this.leftDockEl.classList.toggle('collapsed', this.leftPanelCollapsed);
+    this.leftPanelToggleBtn.setAttribute('aria-expanded', String(!this.leftPanelCollapsed));
+    this.leftPanelToggleBtn.innerHTML = this.leftPanelCollapsed
+      ? `<span class="toggle-icon">▶</span><span class="toggle-label">Controls</span>`
+      : `<span class="toggle-icon">◀</span><span class="toggle-label">Hide</span>`;
+
+    // Right inspector & part-list panel
+    this.rightDrawerEl.classList.toggle('collapsed', this.rightPanelCollapsed);
+    this.rightPanelToggleBtn.setAttribute('aria-expanded', String(!this.rightPanelCollapsed));
+    this.rightPanelToggleBtn.innerHTML = this.rightPanelCollapsed
+      ? `<span class="toggle-icon">◀</span><span class="toggle-label">Info &amp; Parts</span>`
+      : `<span class="toggle-icon">▶</span>`;
+
+    // Floating Info Card (compact vs expanded)
+    this.inspectorContainer.classList.toggle('compact', !this.infoCardExpanded);
+    this.inspectorContainer.classList.toggle('expanded', this.infoCardExpanded);
+    this.infoCardToggleBtn.setAttribute('aria-expanded', String(this.infoCardExpanded));
+    this.infoCardToggleBtn.innerHTML = this.infoCardExpanded
+      ? `<span class="toggle-label">Compact Info ▴</span>`
+      : `<span class="toggle-label">Expand Info ▾</span>`;
+
+    // 27-Part Layer Tree
+    this.layerTreeContainer.classList.toggle('collapsed', this.partListCollapsed);
+    this.partListToggleBtn.setAttribute('aria-expanded', String(!this.partListCollapsed));
+    const chevronEl = this.root.querySelector('#part-list-chevron');
+    if (chevronEl) {
+      chevronEl.textContent = this.partListCollapsed ? '▸ Show 27 Parts' : '▾ Hide Parts';
+    }
+
+    // Adjust Mode 2 Epley bar horizontal margins based on panel collapse states
+    this.epleySandboxBar.classList.toggle('left-collapsed', this.leftPanelCollapsed);
+    this.epleySandboxBar.classList.toggle('right-collapsed', this.rightPanelCollapsed);
   }
 
   private syncViewportRects(): void {
     const w = this.canvasHost.clientWidth;
     const h = this.canvasHost.clientHeight;
-    const pipW = 310;
-    const pipH = 235;
+    const pipW = 290;
+    const pipH = 215;
     this.scene.setViewportRects(
       { left: 0, top: 0, width: w, height: h },
       { left: Math.max(0, w - pipW - 14), top: 14, width: pipW, height: pipH }
@@ -745,9 +956,11 @@ export class AppHUD {
 
     if (snap.layoutMode === 'split_50_50') {
       this.pipHudFrame.classList.add('split-mode');
+      this.rightDrawerEl.classList.add('split-layout-offset');
       this.pipTitleEl.textContent = 'STAGE 1 (LEFT): 3D PATIENT HEAD & PETROUS CUTAWAY';
     } else {
       this.pipHudFrame.classList.remove('split-mode');
+      this.rightDrawerEl.classList.remove('split-layout-offset');
       this.pipTitleEl.textContent =
         snap.layoutMode === 'labyrinth_main'
           ? '3D PATIENT HEAD & RIGHT EAR CUTAWAY'
@@ -784,58 +997,75 @@ export class AppHUD {
       });
     });
 
-    // Render Selected Structure Clinical Inspector Card
+    // Render Selected Structure Clinical Inspector Card (Compact floating vs Expanded)
     const inspectedItem =
       STRUCTURE_BY_MESH[snap.selectedMesh ?? 'ls_Hsapiens_Sp'] ?? IEMAP_STRUCTURES[0];
     const inspectedGroup = SYSTEM_GROUPS[inspectedItem.systemGroup];
 
     this.inspectorContainer.innerHTML = `
-      <div class="inspector-header-badges">
-        <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
-          ${inspectedGroup.shortTitle.toUpperCase()}
-        </span>
-        <span class="compartment-pill">
-          ${inspectedItem.fluidCompartment}
-        </span>
-      </div>
-      <div class="inspector-title">${inspectedItem.displayName}</div>
-      <div class="inspector-latin">${inspectedItem.latinName}</div>
-      <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-      <div class="telemetry-strip">
-        <div class="telemetry-cell">
-          <span class="telemetry-key">Mesh ID</span>
-          <span class="telemetry-val">${inspectedItem.meshName}</span>
+      <div class="inspector-compact-header" data-toggle-info-card="true">
+        <div class="inspector-header-badges">
+          <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
+            ${inspectedGroup.shortTitle.toUpperCase()}
+          </span>
+          <span class="compartment-pill">
+            ${inspectedItem.fluidCompartment}
+          </span>
         </div>
-        <div class="telemetry-cell">
-          <span class="telemetry-key">Geometry</span>
-          <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
-        </div>
-        <div class="telemetry-cell">
-          <span class="telemetry-key">RAS Center (mm)</span>
-          <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+        <div class="inspector-title-row">
+          <div>
+            <div class="inspector-title">${inspectedItem.displayName}</div>
+            <div class="inspector-latin">${inspectedItem.latinName}</div>
+          </div>
+          <span class="inspector-expand-pill" data-toggle-info-card="true">
+            ${this.infoCardExpanded ? '▴ Less' : '▾ Expand'}
+          </span>
         </div>
       </div>
 
-      <div class="clinical-field">
-        <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-        <div class="clinical-field-body">${inspectedItem.innervation}</div>
+      <div class="inspector-compact-preview" data-toggle-info-card="true">
+        ${inspectedItem.physiologicalFunction}
       </div>
 
-      <div class="clinical-field">
-        <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
-        <div class="clinical-field-body">${inspectedItem.morphometry}</div>
-      </div>
+      <div class="inspector-expanded-details">
+        <div class="inspector-etymology">${inspectedItem.etymology}</div>
 
-      <div class="clinical-field">
-        <div class="clinical-field-label">Physiological Mechanism</div>
-        <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-      </div>
+        <div class="telemetry-strip">
+          <div class="telemetry-cell">
+            <span class="telemetry-key">Mesh ID</span>
+            <span class="telemetry-val">${inspectedItem.meshName}</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="telemetry-key">Geometry</span>
+            <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="telemetry-key">RAS Center (mm)</span>
+            <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+          </div>
+        </div>
 
-      <div class="clinical-pearl-box">
-        <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+        <div class="clinical-field">
+          <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+          <div class="clinical-field-body">${inspectedItem.innervation}</div>
+        </div>
+
+        <div class="clinical-field">
+          <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
+          <div class="clinical-field-body">${inspectedItem.morphometry}</div>
+        </div>
+
+        <div class="clinical-field">
+          <div class="clinical-field-label">Physiological Mechanism</div>
+          <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+        </div>
+
+        <div class="clinical-pearl-box">
+          <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+        </div>
       </div>
     `;
+    this.applyPanelStatesToDOM();
 
     // Render 5-System 27-Mesh Layer Tree
     const groupOrder: SystemGroupId[] = [
