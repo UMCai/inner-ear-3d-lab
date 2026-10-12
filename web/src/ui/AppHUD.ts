@@ -15,6 +15,7 @@ import {
   ClipAxisMode,
   DualStageScene,
   LabAppMode,
+  LabelDensityMode,
   LabSceneSnapshot,
   ProjectedPin2D,
   ViewportLayoutMode,
@@ -198,7 +199,7 @@ export class AppHUD {
           <!-- Interactive Anatomical Breadcrumb -->
           <nav class="breadcrumb-bar" id="breadcrumb-bar"></nav>
 
-          <!-- Search & Viewport Layout Switcher -->
+          <!-- Search, Labels Toggle & Viewport Layout Switcher -->
           <div class="header-controls">
             <div class="search-wrapper">
               <input
@@ -210,6 +211,18 @@ export class AppHUD {
                 autocomplete="off"
               />
               <div class="search-dropdown" id="structure-search-dropdown"></div>
+            </div>
+
+            <div class="layout-segmented" id="label-mode-group" role="group" aria-label="3D label density mode">
+              <button class="seg-btn" type="button" data-label-mode="off" title="Labels: Off (hide all 3D callout labels)">
+                Labels: Off
+              </button>
+              <button class="seg-btn active" type="button" data-label-mode="key" title="Labels: Key landmarks (non-overlapping)">
+                Key
+              </button>
+              <button class="seg-btn" type="button" data-label-mode="all" title="Labels: All landmarks (zoom in for full detail)">
+                All
+              </button>
             </div>
 
             <button
@@ -831,12 +844,25 @@ export class AppHUD {
       this.syncViewportRects();
     });
 
-    // 5. Layout Mode Switcher
+    // 5. Layout Mode & Label Density Mode Switchers
     this.root.querySelector('#layout-mode-group')!.addEventListener('click', (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-layout]');
       if (!btn) return;
       this.scene.setOverlays({ layoutMode: btn.dataset.layout as ViewportLayoutMode });
       this.syncViewportRects();
+    });
+
+    this.root.querySelector('#label-mode-group')!.addEventListener('click', (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-label-mode]');
+      if (!btn) return;
+      this.scene.setOverlays({ labelMode: btn.dataset.labelMode as LabelDensityMode });
+    });
+
+    this.pinsLayer.addEventListener('click', (ev) => {
+      const pinEl = (ev.target as HTMLElement).closest<HTMLElement>('[data-pin-mesh]');
+      if (!pinEl) return;
+      const meshName = pinEl.dataset.pinMesh!;
+      this.scene.selectStructure(meshName, false);
     });
 
     // 6. Cross-Section Slicer
@@ -1287,6 +1313,9 @@ export class AppHUD {
     this.root.querySelectorAll<HTMLButtonElement>('[data-layout]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.layout === snap.layoutMode);
     });
+    this.root.querySelectorAll<HTMLButtonElement>('[data-label-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.labelMode === snap.labelMode);
+    });
     this.root.querySelectorAll<HTMLButtonElement>('[data-clip]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.clip === snap.clipAxis);
     });
@@ -1322,7 +1351,7 @@ export class AppHUD {
       <span class="crumb-sep">›</span>
       <span class="crumb-item" data-crumb-group="${sysGroup.id}">${activeItem.subGroup}</span>
       <span class="crumb-sep">›</span>
-      <span class="crumb-item active" data-crumb-mesh="${activeItem.meshName}">${activeItem.shortLabel}</span>
+      <span class="crumb-item active" data-crumb-mesh="${activeItem.meshName}" title="${activeItem.displayName} (${activeItem.latinName}) · Raw ID: ${activeItem.meshName}">${activeItem.shortLabel}</span>
     `;
 
     this.breadcrumbBar.querySelectorAll<HTMLElement>('[data-crumb-action]').forEach((el) => {
@@ -1346,13 +1375,16 @@ export class AppHUD {
     const inspectedGroup = SYSTEM_GROUPS[inspectedItem.systemGroup];
 
     this.inspectorContainer.innerHTML = `
-      <div class="inspector-compact-header" data-toggle-info-card="true">
+      <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
         <div class="inspector-header-badges">
           <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
             ${inspectedGroup.shortTitle.toUpperCase()}
           </span>
           <span class="compartment-pill">
             ${inspectedItem.fluidCompartment}
+          </span>
+          <span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
+            ID: ${inspectedItem.meshName}
           </span>
         </div>
         <div class="inspector-title-row">
@@ -1375,8 +1407,8 @@ export class AppHUD {
 
         <div class="telemetry-strip">
           <div class="telemetry-cell">
-            <span class="telemetry-key">Mesh ID</span>
-            <span class="telemetry-val">${inspectedItem.meshName}</span>
+            <span class="telemetry-key">Mesh / Raw ID</span>
+            <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
           </div>
           <div class="telemetry-cell">
             <span class="telemetry-key">Geometry</span>
@@ -1429,10 +1461,10 @@ export class AppHUD {
             const st: VisibilityState = snap.visibilityMap[item.meshName] ?? item.defaultState;
             const isSel = snap.selectedMesh === item.meshName;
             return `
-              <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}">
+              <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
                 <div class="mesh-row-left">
                   <span class="mesh-swatch" style="background:${item.colorHex};"></span>
-                  <span class="mesh-row-label" title="${item.displayName} (${item.latinName})">
+                  <span class="mesh-row-label" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
                     ${item.shortLabel}
                   </span>
                 </div>
@@ -1440,17 +1472,17 @@ export class AppHUD {
                   <button
                     class="mini-vis-btn ${st === 'visible' ? 'active-vis' : ''}"
                     data-mesh-vis="${item.meshName}:visible"
-                    title="Solid / Translucent Visible"
+                    title="Solid / Translucent Visible (${item.meshName})"
                   >Vis</button>
                   <button
                     class="mini-vis-btn ${st === 'ghost' ? 'active-ghost' : ''}"
                     data-mesh-vis="${item.meshName}:ghost"
-                    title="Fresnel X-Ray Ghost"
+                    title="Fresnel X-Ray Ghost (${item.meshName})"
                   >X-Ray</button>
                   <button
                     class="mini-vis-btn ${st === 'hidden' ? 'active-hide' : ''}"
                     data-mesh-vis="${item.meshName}:hidden"
-                    title="Peel / Hide Structure"
+                    title="Peel / Hide Structure (${item.meshName})"
                   >Hide</button>
                 </div>
               </div>
@@ -1520,6 +1552,7 @@ export class AppHUD {
           p.colorHex
         };"
           title="${p.sublabel}"
+          data-raw-id="${p.rawId}"
           ${p.meshName ? `data-pin-mesh="${p.meshName}"` : ''}
         >
           <span class="pin-dot" style="background:${p.colorHex};"></span>

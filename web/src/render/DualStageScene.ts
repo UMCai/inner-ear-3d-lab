@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   DISSECTION_PRESETS,
+  getHumanReadableLabel,
   IEMAP_STRUCTURES,
+  KEY_FIDUCIAL_IDS,
+  KEY_STRUCTURE_MESH_NAMES,
   StructureOntologyItem,
   SystemGroupId,
   VisibilityState,
@@ -29,9 +32,11 @@ export type LabAppMode = 'mode1_atlas' | 'mode2_physics';
 export type ViewportLayoutMode = 'labyrinth_main' | 'head_main' | 'split_50_50';
 export type ClipAxisMode = 'none' | 'axial_z' | 'coronal_y' | 'sagittal_x';
 export type DissectionToolMode = 'inspect' | 'scalpel_hide' | 'scalpel_ghost';
+export type LabelDensityMode = 'off' | 'key' | 'all';
 
 export interface ProjectedPin2D {
   id: string;
+  rawId: string;
   label: string;
   sublabel: string;
   category: 'fiducial' | 'structure' | 'plane';
@@ -56,6 +61,7 @@ export interface LabSceneSnapshot {
   clipOffsetMm: number;
   clipFlip: boolean;
   showFiducials: boolean;
+  labelMode: LabelDensityMode;
   showCanalPlanes: boolean;
   showSplineAndCanaliths: boolean;
   showPhysicsVectors: boolean;
@@ -168,6 +174,7 @@ export class DualStageScene {
     clipOffsetMm: 0.0,
     clipFlip: false,
     showFiducials: true,
+    labelMode: 'key',
     showCanalPlanes: false,
     showSplineAndCanaliths: true,
     showPhysicsVectors: true,
@@ -324,11 +331,20 @@ export class DualStageScene {
     };
   }
 
+  private emitPins(): void {
+    if (this.onPinsUpdateCallbacks.length === 0) return;
+    const pins = this.computeProjectedPins();
+    for (const cb of this.onPinsUpdateCallbacks) {
+      cb(pins);
+    }
+  }
+
   private emitState(): void {
     const snap = this.getSnapshot();
     for (const cb of this.onStateChangeCallbacks) {
       cb(snap);
     }
+    this.emitPins();
   }
 
   public setViewportRects(
@@ -920,7 +936,8 @@ export class DualStageScene {
       });
     }
 
-    this.fiducialsGroup.visible = this.state.showFiducials;
+    this.fiducialsGroup.visible =
+      this.state.showFiducials && this.state.labelMode !== 'off';
     this.canalPlanesGroup.visible = this.state.showCanalPlanes;
     this.splineGroup.visible = this.state.showSplineAndCanaliths;
     this.vectorsGroup.visible =
@@ -1374,6 +1391,7 @@ export class DualStageScene {
 
   public setOverlays(params: {
     showFiducials?: boolean;
+    labelMode?: LabelDensityMode;
     showCanalPlanes?: boolean;
     showSplineAndCanaliths?: boolean;
     showPhysicsVectors?: boolean;
@@ -1383,6 +1401,7 @@ export class DualStageScene {
     toolMode?: DissectionToolMode;
   }): void {
     if (params.showFiducials !== undefined) this.state.showFiducials = params.showFiducials;
+    if (params.labelMode !== undefined) this.state.labelMode = params.labelMode;
     if (params.showCanalPlanes !== undefined) this.state.showCanalPlanes = params.showCanalPlanes;
     if (params.showSplineAndCanaliths !== undefined)
       this.state.showSplineAndCanaliths = params.showSplineAndCanaliths;
@@ -1395,6 +1414,28 @@ export class DualStageScene {
     if (params.toolMode !== undefined) this.state.toolMode = params.toolMode;
     this.applySceneStateToMeshes();
     this.emitState();
+  }
+
+  public setCameraDistance(distance: number): void {
+    const clamped = Math.max(
+      this.labyrinthControls.minDistance,
+      Math.min(this.labyrinthControls.maxDistance, distance)
+    );
+    const dir = this.labyrinthCamera.position
+      .clone()
+      .sub(this.labyrinthControls.target)
+      .normalize();
+    if (dir.lengthSq() < 1e-6) {
+      dir.set(1, -0.5, 0.3).normalize();
+    }
+    this.labyrinthCamera.position
+      .copy(this.labyrinthControls.target)
+      .addScaledVector(dir, clamped);
+    this.labyrinthControls.update();
+  }
+
+  public getCameraDistance(): number {
+    return this.labyrinthCamera.position.distanceTo(this.labyrinthControls.target);
   }
 
   // ===========================================================================
@@ -1579,21 +1620,43 @@ export class DualStageScene {
   }
 
   // ===========================================================================
-  // PROJECT 3D FIDUCIAL & STRUCTURE PINS TO 2D OVERLAY
+  // PROJECT 3D FIDUCIAL & STRUCTURE PINS TO 2D OVERLAY (PHASE 4)
   // ===========================================================================
   private computeProjectedPins(): ProjectedPin2D[] {
-    const pins: ProjectedPin2D[] = [];
+    if (this.state.labelMode === 'off') {
+      return [];
+    }
+
     const labRect = this.getLabyrinthViewportRect();
-    if (labRect.width <= 10 || labRect.height <= 10) return pins;
+    if (labRect.width <= 10 || labRect.height <= 10) return [];
+
+    const camDist = this.labyrinthCamera.position.distanceTo(this.labyrinthControls.target);
+    const isAllMode = this.state.labelMode === 'all';
 
     const projectWorldPoint = (worldPt: THREE.Vector3) => {
       const v = worldPt.clone().project(this.labyrinthCamera);
       const sx = labRect.left + (v.x * 0.5 + 0.5) * labRect.width;
       const sy = labRect.top + (-v.y * 0.5 + 0.5) * labRect.height;
-      const inFrustum = v.z >= -1 && v.z <= 1;
+      const inFrustum =
+        v.z >= -1 &&
+        v.z <= 1 &&
+        sx >= labRect.left + 20 &&
+        sx <= labRect.left + labRect.width - 20 &&
+        sy >= labRect.top + 28 &&
+        sy <= labRect.top + labRect.height - 16;
       return { sx, sy, inFrustum, depth: v.z };
     };
 
+    interface PinCandidate {
+      pin: ProjectedPin2D;
+      priority: number;
+      maxDist: number;
+      depth: number;
+    }
+
+    const candidates: PinCandidate[] = [];
+
+    // 1. Selected structure pin (highest priority = 0)
     if (this.state.selectedMesh) {
       const entry = this.meshEntries.get(this.state.selectedMesh);
       if (entry && entry.mesh.visible) {
@@ -1604,21 +1667,79 @@ export class DualStageScene {
           ontology.centroidRAS[2] + mesh.position.z
         ).applyMatrix4(this.labyrinthRoot.matrix);
         const proj = projectWorldPoint(pt);
-        pins.push({
-          id: `sel_${ontology.meshName}`,
+        candidates.push({
+          pin: {
+            id: `sel_${ontology.meshName}`,
+            rawId: ontology.meshName,
+            label: ontology.shortLabel,
+            sublabel: `${ontology.displayName} (${ontology.latinName}) · Raw ID: ${ontology.meshName} / ${ontology.structureId}`,
+            category: 'structure',
+            colorHex: ontology.colorHex,
+            screenX: proj.sx,
+            screenY: proj.sy,
+            visible: proj.inFrustum,
+            occluded: false,
+            meshName: ontology.meshName,
+          },
+          priority: 0,
+          maxDist: 999,
+          depth: proj.depth,
+        });
+      }
+    }
+
+    // 2. Structure pins (Key vs All, filtered by camera distance)
+    for (const [meshName, entry] of this.meshEntries.entries()) {
+      if (meshName === this.state.selectedMesh) continue;
+      if (!entry.mesh.visible) continue;
+      if (meshName === 'segT2_th1.07_Otsu' || meshName === 'seg_coch_outer_T2') continue;
+
+      const isKeyStruct = KEY_STRUCTURE_MESH_NAMES.has(meshName);
+      if (!isAllMode && !isKeyStruct) continue;
+
+      const { ontology, mesh } = entry;
+      const isMicroCupula = meshName.includes('_Cup_');
+      const priority = isKeyStruct ? 1 : isMicroCupula ? 4 : 3;
+      const maxDist = isKeyStruct
+        ? isAllMode
+          ? 48
+          : 34
+        : isMicroCupula
+        ? isAllMode
+          ? 18
+          : 12
+        : isAllMode
+        ? 28
+        : 18;
+
+      const pt = new THREE.Vector3(
+        ontology.centroidRAS[0] + mesh.position.x,
+        ontology.centroidRAS[1] + mesh.position.y,
+        ontology.centroidRAS[2] + mesh.position.z
+      ).applyMatrix4(this.labyrinthRoot.matrix);
+      const proj = projectWorldPoint(pt);
+
+      candidates.push({
+        pin: {
+          id: `struct_${ontology.meshName}`,
+          rawId: ontology.meshName,
           label: ontology.shortLabel,
-          sublabel: ontology.latinName,
+          sublabel: `${ontology.displayName} (${ontology.latinName}) · Raw ID: ${ontology.meshName} / ${ontology.structureId}`,
           category: 'structure',
           colorHex: ontology.colorHex,
           screenX: proj.sx,
           screenY: proj.sy,
           visible: proj.inFrustum,
-          occluded: false,
+          occluded: proj.depth > 0.985,
           meshName: ontology.meshName,
-        });
-      }
+        },
+        priority,
+        maxDist,
+        depth: proj.depth,
+      });
     }
 
+    // 3. 3D Slicer Fiducial pins (mapped to human-readable labels, raw IDs in tooltip)
     if (this.state.showFiducials) {
       const groupColor: Record<FiducialPointRAS['canalGroup'], string> = {
         posterior: '#52dcf2',
@@ -1628,27 +1749,89 @@ export class DualStageScene {
       };
 
       for (const f of this.fiducialPoints) {
+        const isKeyFid = KEY_FIDUCIAL_IDS.has(f.label);
+        if (!isAllMode && !isKeyFid && camDist > 16) continue;
+
+        const priority = isKeyFid ? 2 : 3;
+        const maxDist = isKeyFid ? (isAllMode ? 45 : 30) : isAllMode ? 28 : 16;
+
         const pt = new THREE.Vector3(
           f.positionRAS[0],
           f.positionRAS[1],
           f.positionRAS[2]
         ).applyMatrix4(this.labyrinthRoot.matrix);
         const proj = projectWorldPoint(pt);
-        pins.push({
-          id: `fid_${f.label}`,
-          label: f.label.replace('SSC_', ''),
-          sublabel: f.description,
-          category: 'fiducial',
-          colorHex: groupColor[f.canalGroup],
-          screenX: proj.sx,
-          screenY: proj.sy,
-          visible: proj.inFrustum,
-          occluded: proj.depth > 0.985,
+        const strippedRaw = f.label.replace(/^SSC_/, '');
+
+        candidates.push({
+          pin: {
+            id: `fid_${f.label}`,
+            rawId: f.label,
+            label: getHumanReadableLabel(f.label),
+            sublabel: `${f.description} · Raw ID: ${f.label} (${strippedRaw})`,
+            category: 'fiducial',
+            colorHex: groupColor[f.canalGroup],
+            screenX: proj.sx,
+            screenY: proj.sy,
+            visible: proj.inFrustum,
+            occluded: proj.depth > 0.985,
+          },
+          priority,
+          maxDist,
+          depth: proj.depth,
         });
       }
     }
 
-    return pins;
+    // Sort by priority (selected structure first, then key structures, then key fiducials, then depth)
+    candidates.sort((a, b) => a.priority - b.priority || a.depth - b.depth);
+
+    // Distance-adaptive screen-space bounding-box collision culling:
+    // As camera zooms in (camDist decreases), spacing margin shrinks so more detail is revealed without overlap.
+    const distFactor = Math.max(0, Math.min(1, (camDist - 7) / 22));
+    const padX = isAllMode ? 4 + distFactor * 8 : 8 + distFactor * 14;
+    const padY = isAllMode ? 3 + distFactor * 6 : 6 + distFactor * 10;
+
+    const acceptedBoxes: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    const results: ProjectedPin2D[] = [];
+
+    for (const cand of candidates) {
+      if (!cand.pin.visible || camDist > cand.maxDist) {
+        results.push({ ...cand.pin, visible: false });
+        continue;
+      }
+
+      const w = Math.max(78, cand.pin.label.length * 6.8 + 28);
+      const h = cand.pin.category === 'structure' ? 26 : 23;
+      const box = {
+        left: cand.pin.screenX - w * 0.5 - padX,
+        right: cand.pin.screenX + w * 0.5 + padX,
+        top: cand.pin.screenY - h * 1.25 - padY,
+        bottom: cand.pin.screenY - h * 0.25 + padY,
+      };
+
+      let collides = false;
+      for (const existing of acceptedBoxes) {
+        if (
+          box.left < existing.right &&
+          box.right > existing.left &&
+          box.top < existing.bottom &&
+          box.bottom > existing.top
+        ) {
+          collides = true;
+          break;
+        }
+      }
+
+      if (collides) {
+        results.push({ ...cand.pin, visible: false });
+      } else {
+        acceptedBoxes.push(box);
+        results.push({ ...cand.pin, visible: true });
+      }
+    }
+
+    return results;
   }
 
   // ===========================================================================

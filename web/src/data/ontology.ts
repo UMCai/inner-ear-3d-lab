@@ -110,7 +110,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Sp',
     structureId: 'right.posterior_duct',
     displayName: 'Posterior Semicircular Duct',
-    shortLabel: 'Posterior Duct (Sp)',
+    shortLabel: 'Posterior Semicircular Duct',
     latinName: 'Ductus semicircularis posterior',
     etymology: 'Latin: ductus (channel) + semi (half) + circularis (ring) + posterior (behind)',
     systemGroup: 'semicircular_ducts',
@@ -136,7 +136,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Sa',
     structureId: 'right.anterior_duct',
     displayName: 'Anterior (Superior) Semicircular Duct',
-    shortLabel: 'Anterior Duct (Sa)',
+    shortLabel: 'Anterior Semicircular Duct',
     latinName: 'Ductus semicircularis anterior',
     etymology: 'Latin: anterior (foremost / superior vertical canal)',
     systemGroup: 'semicircular_ducts',
@@ -162,7 +162,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Sl',
     structureId: 'right.lateral_duct',
     displayName: 'Lateral (Horizontal) Semicircular Duct',
-    shortLabel: 'Lateral Duct (Sl)',
+    shortLabel: 'Lateral Semicircular Duct',
     latinName: 'Ductus semicircularis lateralis',
     etymology: 'Latin: latus (flank / side — horizontal yaw canal)',
     systemGroup: 'semicircular_ducts',
@@ -188,7 +188,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_CCp',
     structureId: 'right.common_crus_posterior',
     displayName: 'Common Crus — Posterior Limb',
-    shortLabel: 'Common Crus Post (CCp)',
+    shortLabel: 'Common Crus (Posterior)',
     latinName: 'Crus osseum commune (pars posterior)',
     etymology: 'Latin: crus (leg / limb) + commune (shared)',
     systemGroup: 'semicircular_ducts',
@@ -214,7 +214,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_CCa',
     structureId: 'right.common_crus_anterior',
     displayName: 'Common Crus — Anterior Limb',
-    shortLabel: 'Common Crus Ant (CCa)',
+    shortLabel: 'Common Crus (Anterior)',
     latinName: 'Crus membranaceum commune (pars anterior)',
     etymology: 'Latin: crus commune (shared limb, anterior duct tributary)',
     systemGroup: 'semicircular_ducts',
@@ -240,7 +240,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_SC',
     structureId: 'right.simple_crus_limb',
     displayName: 'Simple Crus of Lateral Duct',
-    shortLabel: 'Simple Crus (SC)',
+    shortLabel: 'Simple Crus (Lateral)',
     latinName: 'Crus membranaceum simplex',
     etymology: 'Latin: crus simplex (single/unshared limb)',
     systemGroup: 'semicircular_ducts',
@@ -270,7 +270,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Ap',
     structureId: 'right.posterior_ampulla',
     displayName: 'Posterior Membranous Ampulla',
-    shortLabel: 'Posterior Ampulla (Ap)',
+    shortLabel: 'Posterior Ampulla',
     latinName: 'Ampulla membranacea posterior',
     etymology: 'Latin: ampulla (two-handled globular Roman flask)',
     systemGroup: 'ampullae_cupulae',
@@ -374,7 +374,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Aa',
     structureId: 'right.anterior_ampulla',
     displayName: 'Anterior Membranous Ampulla',
-    shortLabel: 'Anterior Ampulla (Aa)',
+    shortLabel: 'Anterior Ampulla',
     latinName: 'Ampulla membranacea anterior',
     etymology: 'Latin: ampulla (flask) + anterior (front/superior)',
     systemGroup: 'ampullae_cupulae',
@@ -478,7 +478,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_Al',
     structureId: 'right.lateral_ampulla',
     displayName: 'Lateral Membranous Ampulla',
-    shortLabel: 'Lateral Ampulla (Al)',
+    shortLabel: 'Lateral Ampulla',
     latinName: 'Ampulla membranacea lateralis',
     etymology: 'Latin: ampulla (flask) + lateralis (lateral/horizontal)',
     systemGroup: 'ampullae_cupulae',
@@ -612,7 +612,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     meshName: 'ls_Hsapiens_UCp',
     structureId: 'right.posterior_utricular_limb',
     displayName: 'Posterior Utricular Cistern (Sinus Posterior)',
-    shortLabel: 'Utricular Cistern (UCp)',
+    shortLabel: 'Utricular Cistern',
     latinName: 'Sinus posterior utriculi',
     etymology: 'Latin: sinus (bay / recess) + posterior utriculi',
     systemGroup: 'otolith_vestibule',
@@ -983,3 +983,77 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
     },
   },
 ];
+
+// ============================================================================
+// PHASE 4: HUMAN-READABLE DISPLAY NAMES FOR RAW FIDUCIAL & MESH IDS
+// ============================================================================
+export const RAW_ID_TO_DISPLAY_NAME: Record<string, string> = {
+  // 3D Slicer Fiducial IDs (.fcsv raw labels & stripped variants)
+  SSC_post_ampulla: 'Posterior ampulla',
+  post_ampulla: 'Posterior ampulla',
+  SSC_post_inf_limb: 'Posterior canal (inferior limb)',
+  post_inf_limb: 'Posterior canal (inferior limb)',
+  SSC_post_apex: 'Posterior canal (apex)',
+  post_apex: 'Posterior canal (apex)',
+  SSC_post_sup_limb: 'Posterior canal (superior limb)',
+  post_sup_limb: 'Posterior canal (superior limb)',
+  SSC_post_cc_junction: 'Posterior–common crus junction',
+  post_cc_junction: 'Posterior–common crus junction',
+  SSC_ant_ampulla: 'Anterior ampulla',
+  ant_ampulla: 'Anterior ampulla',
+  SSC_ant_apex: 'Anterior canal (apex)',
+  ant_apex: 'Anterior canal (apex)',
+  SSC_ant_cc_junction: 'Anterior–common crus junction',
+  ant_cc_junction: 'Anterior–common crus junction',
+  SSC_lat_ampulla: 'Lateral ampulla',
+  lat_ampulla: 'Lateral ampulla',
+  SSC_lat_apex: 'Lateral canal (apex)',
+  lat_apex: 'Lateral canal (apex)',
+  SSC_lat_utricle: 'Lateral–utricular junction',
+  lat_utricle: 'Lateral–utricular junction',
+  SSC_ccrus_sup: 'Common crus (superior)',
+  ccrus_sup: 'Common crus (superior)',
+  SSC_ccrus_mid: 'Common crus (mid)',
+  ccrus_mid: 'Common crus (mid)',
+  SSC_ccrus_utricle: 'Common crus (utricular base)',
+  ccrus_utricle: 'Common crus (utricular base)',
+  // Raw Mesh Names & Structure IDs (auto-populated from IEMAP_STRUCTURES below)
+  ...Object.fromEntries(
+    IEMAP_STRUCTURES.flatMap((item) => [
+      [item.meshName, item.displayName],
+      [item.structureId, item.displayName],
+    ])
+  ),
+};
+
+export function getHumanReadableLabel(rawId: string): string {
+  if (RAW_ID_TO_DISPLAY_NAME[rawId]) {
+    return RAW_ID_TO_DISPLAY_NAME[rawId];
+  }
+  const stripped = rawId.replace(/^SSC_/, '');
+  if (RAW_ID_TO_DISPLAY_NAME[stripped]) {
+    return RAW_ID_TO_DISPLAY_NAME[stripped];
+  }
+  return rawId;
+}
+
+export const KEY_FIDUCIAL_IDS = new Set<string>([
+  'SSC_post_apex',
+  'SSC_post_ampulla',
+  'SSC_ccrus_mid',
+  'SSC_ant_apex',
+  'SSC_lat_apex',
+  'SSC_ccrus_utricle',
+]);
+
+export const KEY_STRUCTURE_MESH_NAMES = new Set<string>([
+  'ls_Hsapiens_Sp',
+  'ls_Hsapiens_Sa',
+  'ls_Hsapiens_Sl',
+  'ls_Hsapiens_CCp',
+  'ls_Hsapiens_Ap',
+  'ls_Hsapiens_utricle',
+  'mesh_david_sacculus',
+  'mesh_david_cochlea',
+]);
+
