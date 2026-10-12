@@ -68,6 +68,9 @@ export interface LabSceneSnapshot {
   activePresetId: string;
   canUndo: boolean;
   loadingProgress: number;
+  loadingCompletedCount: number;
+  loadingTotalCount: number;
+  loadingItemLabel: string;
   isLoaded: boolean;
   // Mode 2 Physics & Tour State
   livePhysicsEnabled: boolean;
@@ -177,6 +180,9 @@ export class DualStageScene {
     activePresetId: 'full_atlas_xray',
     canUndo: false,
     loadingProgress: 0,
+    loadingCompletedCount: 0,
+    loadingTotalCount: IEMAP_STRUCTURES.length + 6 + 4 + 1,
+    loadingItemLabel: 'Initializing WebGL & 3D Anatomy Pipeline...',
     isLoaded: false,
     livePhysicsEnabled: false,
     activeEpleyStepIdx: 0,
@@ -337,10 +343,13 @@ export class DualStageScene {
   // INITIAL ASSET LOADING (27 IE-Map Meshes + 6 Head Meshes + 4 FCSV + Spline)
   // ===========================================================================
   public async loadAllAssets(): Promise<void> {
-    const totalTasks = IEMAP_STRUCTURES.length + 6 + 2;
+    const totalTasks = IEMAP_STRUCTURES.length + 6 + 4 + 1;
     let completed = 0;
-    const bumpProgress = () => {
+    this.state.loadingTotalCount = totalTasks;
+    const bumpProgress = (itemLabel: string) => {
       completed++;
+      this.state.loadingCompletedCount = completed;
+      this.state.loadingItemLabel = itemLabel;
       this.state.loadingProgress = Math.min(100, Math.round((completed / totalTasks) * 100));
       this.emitState();
     };
@@ -419,7 +428,7 @@ export class DualStageScene {
           embeddedMesh,
         });
 
-        bumpProgress();
+        bumpProgress(`Loaded RAS mesh: ${item.displayName} (${item.meshName}.obj)`);
       })
     );
 
@@ -494,7 +503,7 @@ export class DualStageScene {
         const m = new THREE.Mesh(geom, mat);
         m.renderOrder = hf.renderOrder;
         this.headPivotGroup.add(m);
-        bumpProgress();
+        bumpProgress(`Loaded patient head mesh: ${hf.file}`);
       })
     );
 
@@ -503,12 +512,11 @@ export class DualStageScene {
 
     // 3. Load 3D Slicer Fiducials (.fcsv) & Posterior Canal Centerline Spline
     const [fiducials, canalPath] = await Promise.all([
-      loadAllFiducials().then((res) => {
-        bumpProgress();
-        return res;
+      loadAllFiducials((fcsvFile) => {
+        bumpProgress(`Loaded 3D Slicer fiducials: ${fcsvFile}`);
       }),
       loadPosteriorCanalPath().then((res) => {
-        bumpProgress();
+        bumpProgress('Loaded posterior_canal_path.json spline');
         return res;
       }),
     ]);
@@ -522,6 +530,8 @@ export class DualStageScene {
     this.applySceneStateToMeshes();
     this.state.isLoaded = true;
     this.state.loadingProgress = 100;
+    this.state.loadingCompletedCount = totalTasks;
+    this.state.loadingItemLabel = 'All 27 meshes & 4 .fcsv fiducial sets ready';
     this.emitState();
   }
 

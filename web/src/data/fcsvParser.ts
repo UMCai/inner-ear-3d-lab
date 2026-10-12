@@ -56,7 +56,9 @@ export function parseFcsvText(
   return points;
 }
 
-export async function loadAllFiducials(): Promise<FiducialPointRAS[]> {
+export async function loadAllFiducials(
+  onProgress?: (fileLabel: string) => void
+): Promise<FiducialPointRAS[]> {
   const files: Array<{ url: string; group: FiducialPointRAS['canalGroup'] }> = [
     { url: '/assets/iemap/fcsv/SSC_post.fcsv', group: 'posterior' },
     { url: '/assets/iemap/fcsv/SSC_ant.fcsv', group: 'anterior' },
@@ -67,9 +69,14 @@ export async function loadAllFiducials(): Promise<FiducialPointRAS[]> {
   const results = await Promise.all(
     files.map(async ({ url, group }) => {
       const res = await fetch(url);
-      if (!res.ok) return [];
+      if (!res.ok) {
+        onProgress?.(url.split('/').pop() ?? url);
+        return [];
+      }
       const text = await res.text();
-      return parseFcsvText(text, group);
+      const parsed = parseFcsvText(text, group);
+      onProgress?.(url.split('/').pop() ?? url);
+      return parsed;
     })
   );
 

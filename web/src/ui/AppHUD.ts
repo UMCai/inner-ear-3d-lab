@@ -33,6 +33,9 @@ export class AppHUD {
   private loadingOverlay!: HTMLElement;
   private loadingBarFill!: HTMLElement;
   private loadingText!: HTMLElement;
+  private loadingCountText!: HTMLElement;
+  private welcomeOverlay!: HTMLElement;
+  private advancedToolsCheckbox!: HTMLInputElement;
 
   // Mode 2 Epley Sandbox Bar Elements
   private epleySandboxBar!: HTMLElement;
@@ -82,6 +85,10 @@ export class AppHUD {
   private pipInsetOpenDesktop = true;
   private pipInsetOpenMobile = false;
 
+  // Phase 3: First-visit welcome overlay & Advanced tools toggle (off by default)
+  private welcomeDismissed = false;
+  private advancedToolsEnabled = false;
+
   private leftPanelCollapsed = false;
   private rightPanelCollapsed = false;
   private infoCardExpanded = false;
@@ -92,6 +99,8 @@ export class AppHUD {
     rightCollapsed: 'gate3_right_panel_collapsed',
     infoExpanded: 'gate3_info_card_expanded',
     partsCollapsed: 'gate3_part_list_collapsed',
+    welcomeChoice: 'gate3_welcome_choice',
+    advancedTools: 'gate3_advanced_tools',
   };
 
   constructor(root: HTMLElement) {
@@ -110,6 +119,22 @@ export class AppHUD {
     });
     this.applyPanelStatesToDOM();
     this.syncViewportRects();
+  }
+
+  private readStorageString(key: string): string | null {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private writeStorageString(key: string, value: string): void {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage access errors
+    }
   }
 
   private readStorageBool(key: string, fallback: boolean): boolean {
@@ -137,11 +162,19 @@ export class AppHUD {
     this.rightPanelCollapsed = this.readStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
     this.infoCardExpanded = this.readStorageBool(AppHUD.LS_KEYS.infoExpanded, false);
     this.partListCollapsed = this.readStorageBool(AppHUD.LS_KEYS.partsCollapsed, true);
+    // Phase 3: Welcome overlay shown unless a choice was previously saved; Advanced tools off by default
+    const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
+    this.welcomeDismissed = Boolean(savedWelcome);
+    this.advancedToolsEnabled = this.readStorageBool(AppHUD.LS_KEYS.advancedTools, false);
   }
 
   public async init(): Promise<void> {
     this.scene.startRenderLoop();
     await this.scene.loadAllAssets();
+    const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
+    if (savedWelcome === 'epley_lab') {
+      this.scene.setAppMode('mode2_physics');
+    }
     this.syncViewportRects();
   }
 
@@ -187,6 +220,16 @@ export class AppHUD {
               title="Show or hide 3D Patient Head PiP inset"
             >
               Head PiP
+            </button>
+
+            <button
+              class="seg-btn pip-toggle-header-btn"
+              id="btn-open-welcome"
+              type="button"
+              aria-label="Open welcome and mode guide"
+              title="Open welcome screen (Guided tour, Explore atlas, Epley lab)"
+            >
+              Start Guide
             </button>
 
             <div class="layout-segmented" id="layout-mode-group">
@@ -336,6 +379,19 @@ export class AppHUD {
                 </div>
 
                 <div class="left-dock-scroll-body" id="left-dock-scroll-body">
+                  <!-- Phase 3: Advanced Tools Toggle Bar (Off by default) -->
+                  <div class="advanced-tools-bar" id="advanced-tools-bar">
+                    <label class="advanced-tools-label" for="chk-advanced-tools" title="Show or hide expert tools: RAS slicer, fiducial pins, canal-plane protractors, radial explode, scalpel &amp; brush">
+                      <span class="advanced-tools-title">Advanced tools</span>
+                      <span class="advanced-tools-sub">Slicer, Fiducials, Protractors, Explode, Scalpel &amp; Brush</span>
+                    </label>
+                    <input
+                      type="checkbox"
+                      id="chk-advanced-tools"
+                      aria-label="Advanced tools"
+                    />
+                  </div>
+
                   <!-- Section 1: Clinical Dissection Presets -->
                   <div class="dock-section" data-tab-pane="presets">
                     <div class="dock-section-title">
@@ -347,7 +403,7 @@ export class AppHUD {
                   <!-- Section 2: Active Structure Dissection Actions -->
                   <div class="dock-section" data-tab-pane="dissect">
                     <div class="dock-section-title">
-                      <span>2. Virtual Dissection &amp; Scalpel</span>
+                      <span>2. Virtual Dissection</span>
                     </div>
                     <div class="action-grid" style="margin-bottom:6px;">
                       <button class="action-btn" id="btn-fly-selected">Fly Camera Here</button>
@@ -355,13 +411,15 @@ export class AppHUD {
                       <button class="action-btn" id="btn-ghost-others">X-Ray Ghost Others</button>
                       <button class="action-btn" id="btn-hide-selected">Peel / Hide Part</button>
                     </div>
-                    <div class="action-grid">
+                    <div class="action-grid advanced-tool-item" id="scalpel-brush-grid" style="margin-bottom:6px;">
                       <button class="action-btn" id="btn-tool-scalpel" title="Click any 3D structure to immediately peel/hide it">
                         Scalpel: Click-Peel
                       </button>
                       <button class="action-btn" id="btn-tool-xray" title="Click any 3D structure to convert it to X-Ray Ghost">
                         Brush: Click-Ghost
                       </button>
+                    </div>
+                    <div class="action-grid">
                       <button class="action-btn" id="btn-undo-dissect" disabled>Undo Step</button>
                       <button class="action-btn" id="btn-reset-all">Reset Atlas</button>
                     </div>
@@ -370,7 +428,7 @@ export class AppHUD {
                   <!-- Section 3: Concentric Layer Peel & Radial Explode -->
                   <div class="dock-section" data-tab-pane="layers">
                     <div class="dock-section-title">
-                      <span>3. Layer Peel &amp; Radial Explode</span>
+                      <span>3. Layer Peel &amp; Cutaway</span>
                     </div>
 
                     <div class="control-slider-group">
@@ -389,7 +447,7 @@ export class AppHUD {
                       <input type="range" class="lab-range" id="micro-cut-slider" min="0" max="100" value="35" aria-label="Ampulla and cochlea micro-cutaway percentage" />
                     </div>
 
-                    <div class="control-slider-group">
+                    <div class="control-slider-group advanced-tool-item" id="explode-control-group">
                       <div class="slider-header">
                         <span>Radial Explode Assembly (27 Parts)</span>
                         <span class="slider-val" id="explode-val">0%</span>
@@ -398,8 +456,8 @@ export class AppHUD {
                     </div>
                   </div>
 
-                  <!-- Section 4: 3-Axis Multi-Planar Cross-Section Slicer -->
-                  <div class="dock-section" data-tab-pane="slicer">
+                  <!-- Section 4: 3-Axis Multi-Planar Cross-Section Slicer (Advanced Tool) -->
+                  <div class="dock-section advanced-tool-item" id="ras-slicer-section" data-tab-pane="slicer">
                     <div class="dock-section-title">
                       <span>4. RAS Cross-Section Slicer</span>
                       <label style="font-size:10px;cursor:pointer;color:var(--text-muted);">
@@ -426,11 +484,11 @@ export class AppHUD {
                     <div class="dock-section-title">
                       <span>5. Spatial Overlays &amp; BPPV Spline</span>
                     </div>
-                    <label class="toggle-row">
+                    <label class="toggle-row advanced-tool-item" id="fiducials-toggle-row">
                       <span>3D Slicer Fiducial Pins (.fcsv)</span>
                       <input type="checkbox" id="chk-fiducials" checked />
                     </label>
-                    <label class="toggle-row">
+                    <label class="toggle-row advanced-tool-item" id="canal-planes-toggle-row">
                       <span>Canal Plane Protractors (LARP/RALP/Lat)</span>
                       <input type="checkbox" id="chk-canal-planes" />
                     </label>
@@ -519,8 +577,73 @@ export class AppHUD {
           <div style="font-size:14px;font-weight:600;" id="loading-status-text">
             Ingesting 27 RAS Meshes &amp; Sculpted Head Context...
           </div>
+          <div class="loading-count-badge" id="loading-count-text">
+            0 / 38 assets (0%)
+          </div>
           <div class="loading-bar-track">
             <div class="loading-bar-fill" id="loading-bar-fill"></div>
+          </div>
+        </div>
+
+        <!-- PHASE 3: FIRST-VISIT WELCOME OVERLAY -->
+        <div class="welcome-overlay hidden" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title">
+          <div class="welcome-card">
+            <div class="welcome-card-header">
+              <span class="brand-badge">GATE 3 · IE-MAP v1.0.0</span>
+              <button
+                class="welcome-close-btn"
+                id="btn-close-welcome"
+                type="button"
+                aria-label="Close welcome dialog"
+                title="Dismiss welcome overlay"
+              >✕</button>
+            </div>
+            <h2 class="welcome-title" id="welcome-modal-title">
+              Interactive Inner Ear 3D Anatomy &amp; Dissection Lab
+            </h2>
+            <p class="welcome-subtitle">
+              Choose how you would like to start exploring the 27-mesh micro-CT inner ear atlas and BPPV canalithiasis simulator:
+            </p>
+            <div class="welcome-options-grid">
+              <button
+                class="welcome-option-btn"
+                type="button"
+                data-welcome-choice="guided_tour"
+                aria-label="Guided tour: Start the narrated 8-shot clinical audio tour"
+              >
+                <span class="welcome-opt-badge">AUDIO + 3D TOUR</span>
+                <span class="welcome-opt-title">Guided tour</span>
+                <span class="welcome-opt-desc">
+                  Start the narrated 8-shot clinical walkthrough of posterior canal BPPV and the Epley maneuver.
+                </span>
+              </button>
+
+              <button
+                class="welcome-option-btn"
+                type="button"
+                data-welcome-choice="explore_atlas"
+                aria-label="Explore atlas: Open Mode 1 27-mesh anatomy atlas"
+              >
+                <span class="welcome-opt-badge">MODE 1 · ANATOMY</span>
+                <span class="welcome-opt-title">Explore atlas</span>
+                <span class="welcome-opt-desc">
+                  Inspect, peel, and isolate all 27 inner ear structures in the IE-Map micro-CT atlas.
+                </span>
+              </button>
+
+              <button
+                class="welcome-option-btn"
+                type="button"
+                data-welcome-choice="epley_lab"
+                aria-label="Epley lab: Open Mode 2 live BPPV and Epley physics lab"
+              >
+                <span class="welcome-opt-badge">MODE 2 · PHYSICS</span>
+                <span class="welcome-opt-title">Epley lab</span>
+                <span class="welcome-opt-desc">
+                  Control 3D head orientation and watch real-time Stokes gravitational otoconia settling.
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -536,6 +659,9 @@ export class AppHUD {
     this.loadingOverlay = this.root.querySelector('#loading-overlay')!;
     this.loadingBarFill = this.root.querySelector('#loading-bar-fill')!;
     this.loadingText = this.root.querySelector('#loading-status-text')!;
+    this.loadingCountText = this.root.querySelector('#loading-count-text')!;
+    this.welcomeOverlay = this.root.querySelector('#welcome-overlay')!;
+    this.advancedToolsCheckbox = this.root.querySelector('#chk-advanced-tools')!;
 
     this.workspacePanelsShell = this.root.querySelector('#workspace-panels-shell')!;
     this.mobileDrawerHeader = this.root.querySelector('#mobile-drawer-header')!;
@@ -922,6 +1048,60 @@ export class AppHUD {
 
     this.pipToggleBtn.addEventListener('click', togglePipInset);
     this.root.querySelector('#pip-hide-btn')!.addEventListener('click', togglePipInset);
+
+    // 12. Phase 3: Welcome Overlay & Advanced Tools Toggle
+    this.advancedToolsCheckbox.addEventListener('change', () => {
+      this.advancedToolsEnabled = this.advancedToolsCheckbox.checked;
+      this.writeStorageBool(AppHUD.LS_KEYS.advancedTools, this.advancedToolsEnabled);
+      if (!this.advancedToolsEnabled && this.scene.getSnapshot().toolMode !== 'inspect') {
+        this.scene.setOverlays({ toolMode: 'inspect' });
+      }
+      this.applyPanelStatesToDOM();
+    });
+
+    this.root.querySelector('#btn-open-welcome')!.addEventListener('click', () => {
+      this.welcomeDismissed = false;
+      this.applyPanelStatesToDOM();
+    });
+
+    this.root.querySelector('#btn-close-welcome')!.addEventListener('click', () => {
+      this.welcomeDismissed = true;
+      if (!this.readStorageString(AppHUD.LS_KEYS.welcomeChoice)) {
+        this.writeStorageString(AppHUD.LS_KEYS.welcomeChoice, 'explore_atlas');
+      }
+      this.applyPanelStatesToDOM();
+    });
+
+    this.welcomeOverlay.addEventListener('click', (ev) => {
+      const choiceBtn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-welcome-choice]');
+      if (!choiceBtn) {
+        if (ev.target === this.welcomeOverlay) {
+          this.welcomeDismissed = true;
+          if (!this.readStorageString(AppHUD.LS_KEYS.welcomeChoice)) {
+            this.writeStorageString(AppHUD.LS_KEYS.welcomeChoice, 'explore_atlas');
+          }
+          this.applyPanelStatesToDOM();
+        }
+        return;
+      }
+      const choice = choiceBtn.dataset.welcomeChoice!;
+      this.writeStorageString(AppHUD.LS_KEYS.welcomeChoice, choice);
+      this.welcomeDismissed = true;
+      this.applyPanelStatesToDOM();
+
+      if (choice === 'guided_tour') {
+        this.scene.setAppMode('mode2_physics');
+        if (!this.scene.getSnapshot().tourPlaying) {
+          this.scene.toggleGuidedTour();
+        }
+      } else if (choice === 'explore_atlas') {
+        this.scene.stopGuidedTour();
+        this.scene.setAppMode('mode1_atlas');
+      } else if (choice === 'epley_lab') {
+        this.scene.stopGuidedTour();
+        this.scene.setAppMode('mode2_physics');
+      }
+    });
   }
 
   private isPipInsetVisible(): boolean {
@@ -932,6 +1112,13 @@ export class AppHUD {
   }
 
   private applyPanelStatesToDOM(): void {
+    const labShell = this.root.querySelector('.lab-shell');
+    if (labShell) {
+      labShell.classList.toggle('advanced-tools-off', !this.advancedToolsEnabled);
+    }
+    this.advancedToolsCheckbox.checked = this.advancedToolsEnabled;
+    this.welcomeOverlay.classList.toggle('hidden', this.welcomeDismissed);
+
     // Left control dock
     this.leftDockEl.classList.toggle('collapsed', this.leftPanelCollapsed);
     this.leftPanelToggleBtn.setAttribute('aria-expanded', String(!this.leftPanelCollapsed));
@@ -1039,7 +1226,8 @@ export class AppHUD {
   // ===========================================================================
   private renderState(snap: LabSceneSnapshot): void {
     this.loadingBarFill.style.width = `${snap.loadingProgress}%`;
-    this.loadingText.textContent = `Loading 27 IE-Map RAS Meshes & Head Context (${snap.loadingProgress}%)...`;
+    this.loadingText.textContent = snap.loadingItemLabel;
+    this.loadingCountText.textContent = `${snap.loadingCompletedCount} / ${snap.loadingTotalCount} assets (${snap.loadingProgress}%)`;
     if (snap.isLoaded) {
       this.loadingOverlay.classList.add('hidden');
     }
