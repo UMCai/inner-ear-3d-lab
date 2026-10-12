@@ -1259,3 +1259,333 @@ body,
   color: var(--text-main);
   margin-top: 1px;
 }
+
+/* ============================================================================
+   PHASE 2: RESPONSIVE LAYOUT (<= 900px Bottom Tabbed Drawer, <= 600px Half-Height & PiP)
+   ============================================================================ */
+.workspace-panels-shell {
+  display: contents;
+}
+
+.mobile-drawer-header {
+  display: none;
+}
+
+.pip-frame-hud.pip-hidden {
+  display: none !important;
+}
+
+.pip-toggle-header-btn {
+  border: 1px solid rgba(82, 220, 242, 0.28);
+  background: rgba(14, 24, 30, 0.9);
+}
+
+@media (max-width: 900px) {
+  .lab-header {
+    height: auto;
+    min-height: 54px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .breadcrumb-bar {
+    display: none;
+  }
+
+  .search-wrapper {
+    width: 170px;
+    flex: 1;
+  }
+
+  .pip-frame-hud:not(.split-mode) {
+    top: 12px;
+    right: 12px;
+    width: 230px;
+    height: 175px;
+  }
+
+  /* Bottom Tabbed Drawer Container */
+  .workspace-panels-shell {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 44%;
+    max-height: 46%;
+    background: rgba(10, 19, 25, 0.97);
+    border-top: 1.5px solid var(--border-bright);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(18px);
+    z-index: 30;
+    overflow: hidden;
+    transition: height 0.22s ease, max-height 0.22s ease;
+  }
+
+  .workspace-panels-shell.drawer-expanded {
+    height: 76%;
+    max-height: 78%;
+  }
+
+  .mobile-drawer-header {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    background: rgba(14, 24, 31, 0.98);
+    border-bottom: 1px solid rgba(82, 220, 242, 0.22);
+  }
+
+  .mobile-drawer-handle {
+    width: 100%;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px 12px;
+  }
+
+  .mobile-drawer-handle:hover,
+  .mobile-drawer-handle:focus-visible {
+    color: var(--cyan);
+    background: rgba(82, 220, 242, 0.08);
+    outline: 2px solid var(--cyan);
+    outline-offset: -2px;
+  }
+
+  .drawer-pill-grip {
+    width: 38px;
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(82, 220, 242, 0.45);
+  }
+
+  .mobile-drawer-tabs {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    gap: 2px;
+    padding: 2px 6px;
+  }
+
+  .drawer-tab-btn {
+    flex: 1;
+    min-width: 64px;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-bottom: 2.5px solid transparent;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 6px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.14s ease;
+  }
+
+  .drawer-tab-btn:hover,
+  .drawer-tab-btn:focus-visible {
+    color: var(--text-main);
+    background: rgba(82, 220, 242, 0.08);
+    outline: none;
+  }
+
+  .drawer-tab-btn.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+    background: rgba(82, 220, 242, 0.14);
+  }
+
+  /* Normalize left and right panels inside bottom drawer */
+  .left-tool-dock,
+  .left-tool-dock.collapsed,
+  .right-inspector-drawer,
+  .right-inspector-drawer.collapsed {
+    position: static;
+    width: 100%;
+    max-height: none;
+    height: auto;
+    flex: 1;
+    min-height: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow-y: auto;
+  }
+
+  .left-tool-dock .panel-collapse-bar,
+  .right-inspector-drawer .panel-collapse-bar,
+  .part-list-toggle-bar {
+    display: none !important;
+  }
+
+  .left-dock-scroll-body,
+  .left-tool-dock.collapsed .left-dock-scroll-body,
+  .right-drawer-body,
+  .right-inspector-drawer.collapsed .right-drawer-body {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Show only the active drawer tab's pane */
+  .workspace-panels-shell[data-active-tab='info'] .left-tool-dock,
+  .workspace-panels-shell[data-active-tab='parts'] .left-tool-dock {
+    display: none !important;
+  }
+
+  .workspace-panels-shell[data-active-tab='presets'] .right-inspector-drawer,
+  .workspace-panels-shell[data-active-tab='dissect'] .right-inspector-drawer,
+  .workspace-panels-shell[data-active-tab='layers'] .right-inspector-drawer,
+  .workspace-panels-shell[data-active-tab='slicer'] .right-inspector-drawer {
+    display: none !important;
+  }
+
+  .workspace-panels-shell [data-tab-pane] {
+    display: none !important;
+  }
+
+  .workspace-panels-shell[data-active-tab='presets'] [data-tab-pane='presets'],
+  .workspace-panels-shell[data-active-tab='dissect'] [data-tab-pane='dissect'],
+  .workspace-panels-shell[data-active-tab='layers'] [data-tab-pane='layers'],
+  .workspace-panels-shell[data-active-tab='slicer'] [data-tab-pane='slicer'] {
+    display: block !important;
+  }
+
+  .workspace-panels-shell[data-active-tab='info'] [data-tab-pane='info'] {
+    display: block !important;
+    max-height: none !important;
+    cursor: default;
+    border-bottom: none;
+  }
+
+  .workspace-panels-shell[data-active-tab='info'] .inspector-expanded-details {
+    display: block !important;
+  }
+
+  .workspace-panels-shell[data-active-tab='info'] .inspector-compact-preview,
+  .workspace-panels-shell[data-active-tab='info'] .inspector-expand-pill {
+    display: none !important;
+  }
+
+  .workspace-panels-shell[data-active-tab='parts'] [data-tab-pane='parts'] {
+    display: flex !important;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .workspace-panels-shell[data-active-tab='parts'] .layer-tree-container {
+    display: block !important;
+    max-height: none !important;
+    flex: 1;
+  }
+
+  /* Position Camera Preset Bar & Mode 2 Epley Bar above bottom drawer */
+  .camera-preset-bar {
+    left: 10px;
+    right: 10px;
+    bottom: calc(44% + 10px);
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .camera-preset-bar.drawer-expanded-offset {
+    bottom: calc(76% + 8px);
+  }
+
+  .epley-sandbox-bar,
+  .epley-sandbox-bar.left-collapsed,
+  .epley-sandbox-bar.right-collapsed {
+    left: 10px;
+    right: 10px;
+    bottom: calc(44% + 10px);
+    padding: 8px 10px;
+    max-height: 36vh;
+    overflow-y: auto;
+  }
+
+  .epley-sandbox-bar.drawer-expanded-offset {
+    bottom: calc(76% + 8px);
+  }
+
+  .epley-telemetry-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  /* Guarantee >= 44px touch tap targets on responsive screens */
+  .mode-tab-btn,
+  .seg-btn,
+  .preset-btn,
+  .action-btn,
+  .cam-btn,
+  .epley-step-btn,
+  .tour-play-btn,
+  .pip-btn,
+  .mini-vis-btn,
+  .toggle-row,
+  .mesh-row {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .mini-vis-btn {
+    padding: 6px 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .workspace-panels-shell {
+    height: 50%;
+    max-height: 50%;
+  }
+
+  .workspace-panels-shell.drawer-expanded {
+    height: 82%;
+    max-height: 82%;
+  }
+
+  .camera-preset-bar {
+    bottom: calc(50% + 8px);
+  }
+
+  .camera-preset-bar.drawer-expanded-offset {
+    bottom: calc(82% + 6px);
+  }
+
+  .epley-sandbox-bar,
+  .epley-sandbox-bar.left-collapsed,
+  .epley-sandbox-bar.right-collapsed {
+    bottom: calc(50% + 8px);
+  }
+
+  .epley-sandbox-bar.drawer-expanded-offset {
+    bottom: calc(82% + 6px);
+  }
+
+  .epley-telemetry-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+

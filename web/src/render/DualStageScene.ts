@@ -217,6 +217,7 @@ export class DualStageScene {
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.style.touchAction = 'none';
     this.container.appendChild(this.renderer.domElement);
 
     // -------------------------------------------------------------------------
@@ -234,6 +235,12 @@ export class DualStageScene {
     this.labyrinthControls.target.set(4.4, 1.5, 0.2);
     this.labyrinthControls.enableDamping = true;
     this.labyrinthControls.dampingFactor = 0.08;
+    this.labyrinthControls.enableZoom = true;
+    this.labyrinthControls.enableRotate = true;
+    this.labyrinthControls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
     this.labyrinthControls.minDistance = 4.0;
     this.labyrinthControls.maxDistance = 65.0;
     this.labyrinthControls.update();
@@ -273,8 +280,15 @@ export class DualStageScene {
     this.headControls.target.set(-12, 15, -10);
     this.headControls.enableDamping = true;
     this.headControls.dampingFactor = 0.08;
+    this.headControls.enableZoom = true;
+    this.headControls.enableRotate = true;
+    this.headControls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
     this.headControls.minDistance = 75;
     this.headControls.maxDistance = 650;
+    this.headControls.enabled = false;
     this.headControls.update();
 
     this.headPivotGroup = new THREE.Group();
@@ -1379,10 +1393,26 @@ export class DualStageScene {
   private setupPointerInteractions(): void {
     const dom = this.renderer.domElement;
 
-    dom.addEventListener('pointerdown', (ev) => {
-      this.pointerDownPos.set(ev.clientX, ev.clientY);
-      this.updateActiveControlsForPointer(ev.clientX, ev.clientY);
-    });
+    dom.addEventListener(
+      'pointerdown',
+      (ev) => {
+        this.pointerDownPos.set(ev.clientX, ev.clientY);
+        this.updateActiveControlsForPointer(ev.clientX, ev.clientY);
+      },
+      { capture: true }
+    );
+
+    dom.addEventListener(
+      'touchstart',
+      (ev) => {
+        if (ev.touches.length > 0) {
+          const t = ev.touches[0];
+          this.pointerDownPos.set(t.clientX, t.clientY);
+          this.updateActiveControlsForPointer(t.clientX, t.clientY);
+        }
+      },
+      { capture: true, passive: true }
+    );
 
     dom.addEventListener('pointermove', (ev) => {
       const hitMesh = this.raycastLabyrinthAtScreen(ev.clientX, ev.clientY);
@@ -1462,6 +1492,8 @@ export class DualStageScene {
 
     const headRect = this.getHeadViewportRect();
     const inHeadRect =
+      headRect.width > 4 &&
+      headRect.height > 4 &&
       x >= headRect.left &&
       x <= headRect.left + headRect.width &&
       y >= headRect.top &&
@@ -1473,6 +1505,8 @@ export class DualStageScene {
     } else if (this.state.layoutMode === 'head_main') {
       const labRect = this.getLabyrinthViewportRect();
       const inLabRect =
+        labRect.width > 4 &&
+        labRect.height > 4 &&
         x >= labRect.left &&
         x <= labRect.left + labRect.width &&
         y >= labRect.top &&
