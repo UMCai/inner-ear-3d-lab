@@ -1,5 +1,6 @@
 import {
   DISSECTION_PRESETS,
+  getPatientSystemSummary,
   IEMAP_STRUCTURES,
   STRUCTURE_BY_MESH,
   SYSTEM_GROUPS,
@@ -21,11 +22,28 @@ import {
   ViewportLayoutMode,
 } from '../render/DualStageScene';
 
+const UNOBSTRUCTED_QUIZ_MESHES = new Set<string>([
+  'ls_Hsapiens_Sp',
+  'ls_Hsapiens_Sa',
+  'ls_Hsapiens_Sl',
+  'ls_Hsapiens_CCp',
+  'ls_Hsapiens_CCa',
+  'ls_Hsapiens_SC',
+  'ls_Hsapiens_Ap',
+  'ls_Hsapiens_Aa',
+  'ls_Hsapiens_Al',
+  'ls_Hsapiens_utricle',
+  'ls_Hsapiens_UCp',
+  'mesh_david_sacculus',
+  'mesh_david_cochlea',
+]);
+
 export class AppHUD {
   private root: HTMLElement;
   private scene!: DualStageScene;
   private canvasHost!: HTMLElement;
   private pinsLayer!: HTMLElement;
+  private pinElements = new Map<string, HTMLElement>();
   private pipHudFrame!: HTMLElement;
   private pipTitleEl!: HTMLElement;
   private breadcrumbBar!: HTMLElement;
@@ -44,6 +62,13 @@ export class AppHUD {
   private tourPlayBtn!: HTMLButtonElement;
   private epleyCaptionHeadline!: HTMLElement;
   private epleyCaptionSub!: HTMLElement;
+  private patientTelemetryGrid!: HTMLElement;
+  private technicalTelemetryGrid!: HTMLElement;
+  private patientClearanceText!: HTMLElement;
+  private patientClearanceFill!: HTMLElement;
+  private patientSensationDot!: HTMLElement;
+  private patientSensationText!: HTMLElement;
+  private patientLocationText!: HTMLElement;
   private telPhiArc!: HTMLElement;
   private telGravityDrive!: HTMLElement;
   private telSpikeRate!: HTMLElement;
@@ -73,7 +98,6 @@ export class AppHUD {
   private leftPanelToggleBtn!: HTMLButtonElement;
   private rightDrawerEl!: HTMLElement;
   private rightPanelToggleBtn!: HTMLButtonElement;
-  private infoCardToggleBtn!: HTMLButtonElement;
   private partListToggleBtn!: HTMLButtonElement;
 
   // Phase 2: Responsive bottom drawer (<900px) & half-height swipe/tap (<600px) + PiP toggle
@@ -90,8 +114,8 @@ export class AppHUD {
   private welcomeDismissed = false;
   private advancedToolsEnabled = false;
 
-  // Phase 5: Audience mode, Mode 1 Quiz mode, Mode 2 Predict mode
-  private audienceMode: 'student' | 'clinician' | 'patient' = 'student';
+  // Phase 5: Audience mode (Patient default), Mode 1 Quiz mode, Mode 2 Predict mode
+  private audienceMode: 'student' | 'clinician' | 'patient' = 'patient';
   private quizActive = false;
   private quizType: 'name_highlighted' | 'click_in_3d' = 'name_highlighted';
   private quizTargetMesh = 'ls_Hsapiens_Sp';
@@ -195,19 +219,21 @@ export class AppHUD {
   }
 
   private loadSavedPanelStates(): void {
-    // Defaults per Phase 1: left panel open (false), part list collapsed (true), info card compact (false)
+    // Defaults: left panel open (false), part list collapsed (true), info card compact (false)
     this.leftPanelCollapsed = this.readStorageBool(AppHUD.LS_KEYS.leftCollapsed, false);
     this.rightPanelCollapsed = this.readStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
     this.infoCardExpanded = this.readStorageBool(AppHUD.LS_KEYS.infoExpanded, false);
     this.partListCollapsed = this.readStorageBool(AppHUD.LS_KEYS.partsCollapsed, true);
-    // Phase 3: Welcome overlay shown unless a choice was previously saved; Advanced tools off by default
+    // Welcome overlay shown unless a choice was previously saved; Advanced tools off by default
     const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
     this.welcomeDismissed = Boolean(savedWelcome);
     this.advancedToolsEnabled = this.readStorageBool(AppHUD.LS_KEYS.advancedTools, false);
-    // Phase 5: Audience mode (Student / Clinician / Patient)
+    // Audience mode defaults to 'patient' unless explicitly saved
     const savedAud = this.readStorageString(AppHUD.LS_KEYS.audienceMode);
     if (savedAud === 'student' || savedAud === 'clinician' || savedAud === 'patient') {
       this.audienceMode = savedAud;
+    } else {
+      this.audienceMode = 'patient';
     }
   }
 
@@ -215,36 +241,31 @@ export class AppHUD {
     this.scene.startRenderLoop();
     await this.scene.loadAllAssets();
     const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
-    if (savedWelcome === 'epley_lab') {
+    if (savedWelcome === 'epley_lab' || savedWelcome === 'guided_tour') {
+      this.leftPanelCollapsed = true;
+      this.partListCollapsed = true;
       this.scene.setAppMode('mode2_physics');
-    } else if (savedWelcome === 'guided_tour') {
-      this.scene.setAppMode('mode2_physics');
-      if (!this.scene.getSnapshot().tourPlaying) {
-        this.scene.toggleGuidedTour();
-      }
     }
+    this.applyPanelStatesToDOM();
     this.syncViewportRects();
   }
 
   private buildDOM(): void {
     this.root.innerHTML = `
       <div class="lab-shell">
-        <!-- TOP CLINICAL HEADER BAR -->
+        <!-- TOP HEADER BAR -->
         <header class="lab-header">
           <div class="brand-cluster">
-            <span class="brand-badge">GATE 3 · IE-MAP v1.0.0</span>
+            <span class="brand-badge" title="Gate 3 · IE-Map v1.0.0 Micro-CT Atlas">Inner Ear 3D Guide</span>
             <div class="mode-switch-pill" id="app-mode-switcher">
               <button class="mode-tab-btn active" data-app-mode="mode1_atlas">
-                Mode 1: 27-Mesh Anatomy Atlas
+                1. Explore Ear Anatomy
               </button>
               <button class="mode-tab-btn" data-app-mode="mode2_physics">
-                Mode 2: Live BPPV &amp; Epley Physics Lab
+                2. Vertigo &amp; Epley Treatment
               </button>
             </div>
           </div>
-
-          <!-- Interactive Anatomical Breadcrumb -->
-          <nav class="breadcrumb-bar" id="breadcrumb-bar"></nav>
 
           <!-- Search, Labels Toggle & Viewport Layout Switcher -->
           <div class="header-controls">
@@ -253,8 +274,8 @@ export class AppHUD {
                 type="text"
                 class="search-input"
                 id="structure-search-input"
-                placeholder="Search 27 parts, Latin, BPPV... (⌘K)"
-                aria-label="Search anatomical structures"
+                placeholder="Search ear parts, vertigo, balance... (⌘K)"
+                aria-label="Search inner ear parts"
                 autocomplete="off"
               />
               <div class="search-dropdown" id="structure-search-dropdown"></div>
@@ -276,21 +297,21 @@ export class AppHUD {
               class="seg-btn pip-toggle-header-btn"
               id="btn-toggle-quiz"
               type="button"
-              aria-label="Toggle Mode 1 3D Anatomy Quiz"
+              aria-label="Toggle 3D Ear Anatomy Quiz"
               aria-pressed="false"
-              title="Open or close Mode 1 interactive 3D Anatomy Quiz"
+              title="Open or close interactive 3D Ear Anatomy Quiz"
             >
-              Quiz Mode
+              Quiz
             </button>
 
             <button
               class="seg-btn pip-toggle-header-btn"
               id="btn-toggle-pip-inset"
               type="button"
-              aria-label="Toggle 3D patient head PiP inset"
-              title="Show or hide 3D Patient Head PiP inset"
+              aria-label="Toggle 3D patient head view"
+              title="Show or hide 3D Patient Head view"
             >
-              Head PiP
+              Hide Head
             </button>
 
             <button
@@ -298,7 +319,7 @@ export class AppHUD {
               id="btn-open-welcome"
               type="button"
               aria-label="Open welcome and mode guide"
-              title="Open welcome screen (Guided tour, Explore atlas, Epley lab)"
+              title="Open welcome guide (Guided tour, Explore anatomy, Epley treatment)"
             >
               Start Guide
             </button>
@@ -308,19 +329,19 @@ export class AppHUD {
               id="btn-open-about"
               type="button"
               aria-label="Open About, References, and Educational Disclaimer"
-              title="About IE-Map Atlas, Verified Sources &amp; Educational Disclaimer"
+              title="About Inner Ear 3D Guide, Verified Sources &amp; Educational Disclaimer"
             >
               About
             </button>
 
             <div class="layout-segmented" id="layout-mode-group">
-              <button class="seg-btn active" data-layout="labyrinth_main" title="Labyrinth Main + Patient Head PiP">
-                Labyrinth Main
+              <button class="seg-btn active" data-layout="labyrinth_main" title="Inner Ear Main + 3D Head PiP">
+                Ear Main
               </button>
-              <button class="seg-btn" data-layout="head_main" title="Swap Role: Patient Head Main + Labyrinth PiP">
-                Swap Main ↔ PiP
+              <button class="seg-btn" data-layout="head_main" title="Swap Role: 3D Head Main + Inner Ear PiP">
+                Swap ⇄
               </button>
-              <button class="seg-btn" data-layout="split_50_50" title="Side-by-Side 50/50 Dual Stage">
+              <button class="seg-btn" data-layout="split_50_50" title="Side-by-Side 50/50 Split View">
                 50/50 Split
               </button>
             </div>
@@ -337,52 +358,52 @@ export class AppHUD {
             <!-- Synchronized Dual-Stage PiP / Split Frame HUD -->
             <div class="pip-frame-hud" id="pip-frame-hud">
               <div class="pip-header">
-                <span class="pip-title" id="pip-stage-title">3D PATIENT HEAD &amp; RIGHT EAR CUTAWAY</span>
+                <span class="pip-title" id="pip-stage-title">3D HEAD &amp; EAR VIEW</span>
                 <div style="display:flex;gap:4px;">
-                  <button class="pip-btn" id="pip-swap-btn" type="button" aria-label="Swap main and PiP stages">Swap Stage ⇄</button>
-                  <button class="pip-btn" id="pip-hide-btn" type="button" aria-label="Hide head PiP inset" title="Hide Head PiP">✕</button>
+                  <button class="pip-btn" id="pip-swap-btn" type="button" aria-label="Swap main and PiP stages">Swap View ⇄</button>
+                  <button class="pip-btn" id="pip-hide-btn" type="button" aria-label="Hide head PiP inset" title="Hide 3D Head View">✕</button>
                 </div>
               </div>
               <div class="pip-footer">
                 <div class="pip-slider-row">
-                  <span>Head Glass</span>
-                  <input type="range" id="head-opacity-slider" min="0" max="90" value="34" aria-label="Head glass opacity" />
+                  <span>Skin See-Through</span>
+                  <input type="range" id="head-opacity-slider" min="0" max="90" value="34" aria-label="Skin see-through opacity" />
                   <label class="pip-sync-label">
-                    <input type="checkbox" id="sync-cam-checkbox" checked aria-label="Synchronize camera orbit" /> Sync Orbit
+                    <input type="checkbox" id="sync-cam-checkbox" checked aria-label="Link camera views" /> Link Views
                   </label>
                 </div>
                 <div class="pip-slider-row">
-                  <span>Head Yaw ψ</span>
-                  <input type="range" id="head-yaw-slider" min="-90" max="150" step="1" value="0" aria-label="Head yaw angle" />
+                  <span>Turn Head (Left/Right)</span>
+                  <input type="range" id="head-yaw-slider" min="-90" max="150" step="1" value="0" aria-label="Turn head left or right angle" />
                   <span id="head-yaw-val" style="width:36px;text-align:right;">0°</span>
                 </div>
                 <div class="pip-slider-row">
-                  <span>Recline θ</span>
-                  <input type="range" id="head-pitch-slider" min="-20" max="130" step="1" value="0" aria-label="Head recline angle" />
+                  <span>Tilt Head (Back/Forward)</span>
+                  <input type="range" id="head-pitch-slider" min="-20" max="130" step="1" value="0" aria-label="Tilt head back or forward angle" />
                   <span id="head-pitch-val" style="width:36px;text-align:right;">0°</span>
                 </div>
               </div>
             </div>
 
             <!-- PHASE 5: MODE 1 INTERACTIVE 3D ANATOMY QUIZ PANEL -->
-            <div class="quiz-mode-panel hidden" id="quiz-mode-panel" role="region" aria-label="Mode 1 3D Anatomy Quiz"></div>
+            <div class="quiz-mode-panel hidden" id="quiz-mode-panel" role="region" aria-label="3D Ear Anatomy Quiz"></div>
 
-            <!-- Bottom RAS Anatomical ViewCube / Camera Orientation Bar -->
+            <!-- Bottom Camera View Angle Bar -->
             <div class="camera-preset-bar" id="camera-preset-bar">
-              <span class="cam-label">RAS CAMERA:</span>
-              <button class="cam-btn" data-cam="posterior_3_4">Gate 3 (Post 3/4)</button>
-              <button class="cam-btn" data-cam="right_lateral">Right Lateral (+X)</button>
-              <button class="cam-btn" data-cam="anterior">Anterior (+Y)</button>
-              <button class="cam-btn" data-cam="superior">Superior (+Z)</button>
-              <button class="cam-btn" data-cam="medial">Medial (-X)</button>
-              <button class="cam-btn" data-cam="posterior_ampulla_zoom">Post. Cupula Zoom</button>
-              <button class="cam-btn" data-cam="cochlea_zoom">Cochlear Scalae Zoom</button>
+              <span class="cam-label">VIEW ANGLE:</span>
+              <button class="cam-btn" data-cam="posterior_3_4">Overview</button>
+              <button class="cam-btn" data-cam="right_lateral">Outer Side</button>
+              <button class="cam-btn" data-cam="anterior">Front</button>
+              <button class="cam-btn" data-cam="superior">Top</button>
+              <button class="cam-btn" data-cam="medial">Inner Side</button>
+              <button class="cam-btn" data-cam="posterior_ampulla_zoom">Balance Sensor</button>
+              <button class="cam-btn" data-cam="cochlea_zoom">Hearing Snail</button>
             </div>
 
-            <!-- MODE 2: REAL-TIME BPPV & EPLEY PHYSICS SANDBOX BAR -->
+            <!-- MODE 2: REAL-TIME BPPV & EPLEY TREATMENT BAR -->
             <div class="epley-sandbox-bar" id="epley-sandbox-bar">
               <div class="epley-top-row">
-                <button class="tour-play-btn" id="btn-tour-play">▶ Play 8-Shot Audio Tour</button>
+                <button class="tour-play-btn" id="btn-tour-play">▶ Play Audio Guide</button>
                 <div class="epley-steps-strip" id="epley-steps-strip"></div>
                 <button
                   class="seg-btn predict-toggle-btn"
@@ -390,12 +411,12 @@ export class AppHUD {
                   type="button"
                   aria-label="Toggle Epley Step Predict Mode"
                   aria-pressed="false"
-                  title="Predict canalith motion and nystagmus direction before playing each Epley step"
+                  title="Predict crystal movement and spinning sensation before playing each Epley step"
                 >
-                  Predict Mode
+                  Predict Step
                 </button>
                 <label class="epley-mute-label">
-                  <input type="checkbox" id="chk-mute-audio" aria-label="Mute clinical tour audio" /> Mute Audio
+                  <input type="checkbox" id="chk-mute-audio" aria-label="Mute audio guide" /> Mute Audio
                 </label>
               </div>
 
@@ -404,25 +425,50 @@ export class AppHUD {
 
               <div class="epley-caption-banner">
                 <div class="epley-caption-headline" id="epley-caption-headline">
-                  Step 1: Sit Upright &amp; Turn Head 45° Right (ψ = -45°, θ = 0°)
+                  Step 1: Sit Upright &amp; Turn Head 45° Right
                 </div>
                 <div class="epley-caption-sub" id="epley-caption-sub">
-                  Drag Head Yaw ψ &amp; Recline θ in the top-right PiP gimbal (or click any Epley step above) to watch real-time Stokes gravitational sedimentation along the 3D posterior canal spline.
+                  Click any Epley step button above (or use the Turn/Tilt Head sliders in the top-right box) to watch gravity guide the loose balance crystals through the ear tube.
                 </div>
               </div>
 
-              <div class="epley-telemetry-grid">
+              <!-- Patient-Friendly Visual Progress & Sensation Bar (Default in Patient Mode) -->
+              <div class="epley-patient-telemetry" id="patient-telemetry-grid">
+                <div class="patient-tel-card">
+                  <div class="patient-tel-header">
+                    <span class="patient-tel-label">Crystal Clearance Progress</span>
+                    <span class="patient-tel-value" id="patient-clearance-text" style="color:var(--warm);">0% Cleared</span>
+                  </div>
+                  <div class="patient-progress-track">
+                    <div class="patient-progress-fill" id="patient-clearance-fill" style="width: 0%;"></div>
+                  </div>
+                </div>
+                <div class="patient-tel-card">
+                  <span class="patient-tel-label">Dizziness / Spinning Sensation</span>
+                  <div class="patient-sensation-row">
+                    <span class="sensation-dot calm" id="patient-sensation-dot"></span>
+                    <span class="patient-tel-value" id="patient-sensation-text">Calm (No Spinning)</span>
+                  </div>
+                </div>
+                <div class="patient-tel-card">
+                  <span class="patient-tel-label">Crystal Location</span>
+                  <span class="patient-tel-value" id="patient-location-text" style="color:var(--cyan);">Trapped in Bottom Loop</span>
+                </div>
+              </div>
+
+              <!-- Clinical & Physics Telemetry Grid (Shown in Student / Clinician / Advanced Mode) -->
+              <div class="epley-telemetry-grid" id="technical-telemetry-grid">
                 <div class="tel-box">
                   <span class="tel-label">Otoconia Angle &amp; Arc</span>
                   <span class="tel-value" id="tel-phi-arc" style="color:var(--warm);">-84.0° (1.82 mm)</span>
                 </div>
                 <div class="tel-box">
                   <span class="tel-label">Gravity Drive (g · T)</span>
-                  <span class="tel-value" id="tel-gravity-drive">+0.00 (Static)</span>
+                  <span class="tel-value" id="tel-gravity-drive">+0.00 (Settled)</span>
                 </div>
                 <div class="tel-box">
                   <span class="tel-label">CN VIII Ampullary Firing</span>
-                  <span class="tel-value" id="tel-spike-rate">90 spk/s (Tonic)</span>
+                  <span class="tel-value" id="tel-spike-rate">90 spk/s</span>
                 </div>
                 <div class="tel-box">
                   <span class="tel-label">VOR Nystagmus State</span>
@@ -448,20 +494,20 @@ export class AppHUD {
                   <span class="drawer-pill-grip"></span>
                   <span class="drawer-handle-text" id="drawer-handle-text">▴ Tap or swipe to expand drawer</span>
                 </button>
-                <div class="mobile-drawer-tabs" id="mobile-drawer-tabs" role="tablist" aria-label="Lab tools and anatomy tabs">
-                  <button class="drawer-tab-btn active" type="button" role="tab" aria-selected="true" data-drawer-tab="presets">Presets</button>
-                  <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="dissect">Dissect</button>
+                <div class="mobile-drawer-tabs" id="mobile-drawer-tabs" role="tablist" aria-label="Ear tools and anatomy tabs">
+                  <button class="drawer-tab-btn active" type="button" role="tab" aria-selected="true" data-drawer-tab="presets">Views</button>
+                  <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="dissect">Peel</button>
                   <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="layers">Layers</button>
-                  <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="slicer">Slicer</button>
+                  <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="slicer">Overlays</button>
                   <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="info">Info</button>
                   <button class="drawer-tab-btn" type="button" role="tab" aria-selected="false" data-drawer-tab="parts">Parts</button>
                 </div>
               </div>
 
-              <!-- Left Floating Dissection & Layer Control Dock -->
-              <aside class="left-tool-dock" id="left-tool-dock" aria-label="Left Dissection and Control Panel">
+              <!-- Left Floating Layer & View Control Dock -->
+              <aside class="left-tool-dock" id="left-tool-dock" aria-label="Left View and Layer Control Panel">
                 <div class="panel-collapse-bar">
-                  <span class="panel-collapse-title">Dissection &amp; Controls</span>
+                  <span class="panel-collapse-title">Views &amp; Layer Controls</span>
                   <button
                     class="panel-toggle-btn"
                     id="btn-toggle-left-panel"
@@ -478,9 +524,9 @@ export class AppHUD {
                 <div class="left-dock-scroll-body" id="left-dock-scroll-body">
                   <!-- Phase 3: Advanced Tools Toggle Bar (Off by default) -->
                   <div class="advanced-tools-bar" id="advanced-tools-bar">
-                    <label class="advanced-tools-label" for="chk-advanced-tools" title="Show or hide expert tools: RAS slicer, fiducial pins, canal-plane protractors, radial explode, scalpel &amp; brush">
+                    <label class="advanced-tools-label" for="chk-advanced-tools" title="Show or hide expert tools: 3-axis slicer, fiducial landmarks, canal protractors, radial explode, scalpel &amp; brush">
                       <span class="advanced-tools-title">Advanced tools</span>
-                      <span class="advanced-tools-sub">Slicer, Fiducials, Protractors, Explode, Scalpel &amp; Brush</span>
+                      <span class="advanced-tools-sub">Cross-section slicer, landmarks, protractors &amp; expert tools</span>
                     </label>
                     <input
                       type="checkbox"
@@ -489,141 +535,133 @@ export class AppHUD {
                     />
                   </div>
 
-                  <!-- Section 1: Clinical Dissection Presets -->
+                  <!-- Section 1: Quick View Presets -->
                   <div class="dock-section" data-tab-pane="presets">
                     <div class="dock-section-title">
-                      <span>1. Clinical Dissection Presets</span>
+                      <span>1. Quick View Presets</span>
                     </div>
                     <div class="preset-list" id="preset-list"></div>
                   </div>
 
-                  <!-- Section 2: Active Structure Dissection Actions -->
+                  <!-- Section 2: Active Structure Actions -->
                   <div class="dock-section" data-tab-pane="dissect">
                     <div class="dock-section-title">
-                      <span>2. Virtual Dissection</span>
+                      <span>2. Focus &amp; Peel Selected Part</span>
                     </div>
                     <div class="action-grid" style="margin-bottom:6px;">
-                      <button class="action-btn" id="btn-fly-selected">Fly Camera Here</button>
-                      <button class="action-btn" id="btn-isolate-selected">Isolate Part</button>
-                      <button class="action-btn" id="btn-ghost-others">X-Ray Ghost Others</button>
-                      <button class="action-btn" id="btn-hide-selected">Peel / Hide Part</button>
+                      <button class="action-btn" id="btn-fly-selected">Zoom to Part</button>
+                      <button class="action-btn" id="btn-isolate-selected">Show Only This Part</button>
+                      <button class="action-btn" id="btn-ghost-others">Make Others See-Through</button>
+                      <button class="action-btn" id="btn-hide-selected">Hide This Part</button>
                     </div>
                     <div class="action-grid advanced-tool-item" id="scalpel-brush-grid" style="margin-bottom:6px;">
                       <button class="action-btn" id="btn-tool-scalpel" title="Click any 3D structure to immediately peel/hide it">
-                        Scalpel: Click-Peel
+                        Scalpel: Click-Hide
                       </button>
-                      <button class="action-btn" id="btn-tool-xray" title="Click any 3D structure to convert it to X-Ray Ghost">
+                      <button class="action-btn" id="btn-tool-xray" title="Click any 3D structure to make it see-through">
                         Brush: Click-Ghost
                       </button>
                     </div>
                     <div class="action-grid">
-                      <button class="action-btn" id="btn-undo-dissect" disabled>Undo Step</button>
-                      <button class="action-btn" id="btn-reset-all">Reset Atlas</button>
+                      <button class="action-btn" id="btn-undo-dissect" disabled>Undo Last Step</button>
+                      <button class="action-btn" id="btn-reset-all">Reset View</button>
                     </div>
                   </div>
 
-                  <!-- Section 3: Concentric Layer Peel & Radial Explode -->
+                  <!-- Section 3: Layer Peel & Cutaway -->
                   <div class="dock-section" data-tab-pane="layers">
                     <div class="dock-section-title">
-                      <span>3. Layer Peel &amp; Cutaway</span>
+                      <span>3. Peel Outer Layers</span>
                     </div>
 
                     <div class="control-slider-group">
                       <div class="slider-header">
-                        <span>Bony Capsule Peel (Otic Shell)</span>
+                        <span>Outer Bone Peel</span>
                         <span class="slider-val" id="bony-peel-val">80%</span>
                       </div>
-                      <input type="range" class="lab-range" id="bony-peel-slider" min="0" max="100" value="80" aria-label="Bony capsule peel percentage" />
+                      <input type="range" class="lab-range" id="bony-peel-slider" min="0" max="100" value="80" aria-label="Outer bone peel percentage" />
                     </div>
 
                     <div class="control-slider-group">
                       <div class="slider-header">
-                        <span>Ampulla &amp; Cochlea Micro-Cutaway</span>
+                        <span>Open Balance &amp; Hearing Shells</span>
                         <span class="slider-val" id="micro-cut-val">35%</span>
                       </div>
-                      <input type="range" class="lab-range" id="micro-cut-slider" min="0" max="100" value="35" aria-label="Ampulla and cochlea micro-cutaway percentage" />
+                      <input type="range" class="lab-range" id="micro-cut-slider" min="0" max="100" value="35" aria-label="Open balance and hearing shells percentage" />
                     </div>
 
                     <div class="control-slider-group advanced-tool-item" id="explode-control-group">
                       <div class="slider-header">
-                        <span>Radial Explode Assembly (27 Parts)</span>
+                        <span>Separate All 27 Parts (Explode)</span>
                         <span class="slider-val" id="explode-val">0%</span>
                       </div>
-                      <input type="range" class="lab-range" id="explode-slider" min="0" max="100" value="0" aria-label="Radial explode assembly percentage" />
+                      <input type="range" class="lab-range" id="explode-slider" min="0" max="100" value="0" aria-label="Separate all 27 parts percentage" />
                     </div>
                   </div>
 
                   <!-- Section 4: 3-Axis Multi-Planar Cross-Section Slicer (Advanced Tool) -->
                   <div class="dock-section advanced-tool-item" id="ras-slicer-section" data-tab-pane="slicer">
                     <div class="dock-section-title">
-                      <span>4. RAS Cross-Section Slicer</span>
-                      <label style="font-size:10px;cursor:pointer;color:var(--text-muted);">
+                      <span>4. 3D Cross-Section Slicer</span>
+                      <label class="inline-flip-label" style="font-size:10px;cursor:pointer;color:var(--text-muted);">
                         <input type="checkbox" id="clip-flip-checkbox" /> Flip
                       </label>
                     </div>
                     <div class="layout-segmented" id="clip-axis-group" style="margin-bottom:8px;width:100%;">
                       <button class="seg-btn active" data-clip="none" style="flex:1;">Off</button>
-                      <button class="seg-btn" data-clip="axial_z" style="flex:1;">Axial Z</button>
-                      <button class="seg-btn" data-clip="coronal_y" style="flex:1;">Coronal Y</button>
-                      <button class="seg-btn" data-clip="sagittal_x" style="flex:1;">Sagittal X</button>
+                      <button class="seg-btn" data-clip="axial_z" style="flex:1;">Top-Down</button>
+                      <button class="seg-btn" data-clip="coronal_y" style="flex:1;">Front-Back</button>
+                      <button class="seg-btn" data-clip="sagittal_x" style="flex:1;">Side-to-Side</button>
                     </div>
                     <div class="control-slider-group" id="clip-offset-row">
                       <div class="slider-header">
-                        <span>Section Plane Coordinate</span>
+                        <span>Slice Position</span>
                         <span class="slider-val" id="clip-offset-val">0.0 mm</span>
                       </div>
-                      <input type="range" class="lab-range" id="clip-offset-slider" min="-7.0" max="11.0" step="0.1" value="0.0" aria-label="Section plane coordinate in millimeters" />
+                      <input type="range" class="lab-range" id="clip-offset-slider" min="-7.0" max="11.0" step="0.1" value="0.0" aria-label="Slice position in millimeters" />
                     </div>
                   </div>
 
                   <!-- Section 5: Reference Landmarks, Canal Planes & BPPV Path -->
                   <div class="dock-section" data-tab-pane="slicer" style="border-bottom:none;">
                     <div class="dock-section-title">
-                      <span>5. Spatial Overlays &amp; BPPV Spline</span>
+                      <span>5. Overlays &amp; Crystal Path</span>
                     </div>
                     <label class="toggle-row advanced-tool-item" id="fiducials-toggle-row">
-                      <span>3D Slicer Fiducial Pins (.fcsv)</span>
-                      <input type="checkbox" id="chk-fiducials" checked />
+                      <span>3D Slicer Landmark Pins (.fcsv)</span>
+                      <input type="checkbox" id="chk-fiducials" />
                     </label>
                     <label class="toggle-row advanced-tool-item" id="canal-planes-toggle-row">
                       <span>Canal Plane Protractors (LARP/RALP/Lat)</span>
                       <input type="checkbox" id="chk-canal-planes" />
                     </label>
                     <label class="toggle-row">
-                      <span>Posterior Canal Spline &amp; 5 Canaliths</span>
+                      <span>Balance Tube Path &amp; 5 Crystals</span>
                       <input type="checkbox" id="chk-spline-canaliths" checked />
                     </label>
-                    <label class="toggle-row">
-                      <span>Live Stokes Gravity Physics (Mode 2)</span>
-                      <input type="checkbox" id="chk-live-physics" />
-                    </label>
+                    <div class="mode2-only-left-controls" id="mode2-only-left-controls">
+                      <label class="toggle-row">
+                        <span>Live Gravity Simulation (Mode 2)</span>
+                        <input type="checkbox" id="chk-live-physics" />
+                      </label>
 
-                    <div class="control-slider-group" style="margin-top:8px;">
-                      <div class="slider-header">
-                        <span>Canalith Position (φ)</span>
-                        <span class="slider-val" id="canalith-phi-val">-84° (Base)</span>
+                      <div class="control-slider-group" style="margin-top:8px;">
+                        <div class="slider-header">
+                          <span>Manual Crystal Position (φ)</span>
+                          <span class="slider-val" id="canalith-phi-val">-84° (Base)</span>
+                        </div>
+                        <input type="range" class="lab-range" id="canalith-phi-slider" min="-105" max="192" step="1" value="-84" aria-label="Canalith angular position phi" />
                       </div>
-                      <input type="range" class="lab-range" id="canalith-phi-slider" min="-105" max="192" step="1" value="-84" aria-label="Canalith angular position phi" />
                     </div>
                   </div>
                 </div>
               </aside>
 
-              <!-- RIGHT FLOATING CLINICAL INSPECTOR & COLLAPSIBLE 27-PART LAYER TREE -->
-              <aside class="right-inspector-drawer" id="right-inspector-drawer" aria-label="Right Clinical Info and Parts Panel">
+              <!-- RIGHT FLOATING INFO CARD & COLLAPSIBLE 27-PART LAYER TREE -->
+              <aside class="right-inspector-drawer" id="right-inspector-drawer" aria-label="Right Part Info and List Panel">
                 <div class="panel-collapse-bar right-collapse-bar">
-                  <span class="panel-collapse-title">Structure Info &amp; Parts</span>
+                  <span class="panel-collapse-title">Part Info &amp; List</span>
                   <div class="right-bar-actions">
-                    <button
-                      class="panel-toggle-btn"
-                      id="btn-toggle-info-card"
-                      type="button"
-                      aria-label="Expand or collapse structure info card"
-                      aria-expanded="false"
-                      title="Expand or collapse full clinical info card"
-                    >
-                      <span class="toggle-label">Expand Info ▾</span>
-                    </button>
                     <button
                       class="panel-toggle-btn"
                       id="btn-toggle-right-panel"
@@ -638,29 +676,32 @@ export class AppHUD {
                 </div>
 
                 <div class="right-drawer-body" id="right-drawer-body">
-                  <!-- Phase 5: Audience Depth Selector (Student / Clinician / Patient) -->
+                  <!-- Interactive Anatomical Breadcrumb (Moved from Top Header to prevent overflow) -->
+                  <nav class="breadcrumb-bar" id="breadcrumb-bar" data-tab-pane="info" aria-label="Selected structure path"></nav>
+
+                  <!-- Phase 5: Audience Depth Selector (Patient default / Student / Clinician) -->
                   <div class="audience-selector-bar" id="audience-selector-bar" data-tab-pane="info">
-                    <span class="audience-bar-label">Audience:</span>
-                    <div class="layout-segmented audience-segmented" id="audience-mode-group" role="group" aria-label="Info card audience depth">
-                      <button class="seg-btn active" type="button" data-audience-mode="student" title="Student: Core anatomy, innervation, physiology, and clinical pearls">
+                    <span class="audience-bar-label">Explanation:</span>
+                    <div class="layout-segmented audience-segmented" id="audience-mode-group" role="group" aria-label="Info card explanation level">
+                      <button class="seg-btn active" type="button" data-audience-mode="patient" title="Patient: Simple everyday explanation of balance and hearing parts">
+                        Patient
+                      </button>
+                      <button class="seg-btn" type="button" data-audience-mode="student" title="Student: Core anatomy, nerve supply, physiology, and clinical pearls">
                         Student
                       </button>
                       <button class="seg-btn" type="button" data-audience-mode="clinician" title="Clinician: Full RAS morphometry, mesh telemetry, and diagnostic pearls">
                         Clinician
                       </button>
-                      <button class="seg-btn" type="button" data-audience-mode="patient" title="Patient: Plain-language explanation of balance and hearing structures">
-                        Patient
-                      </button>
                     </div>
                   </div>
 
-                  <!-- Floating Info Card (Compact by default, expands on click) -->
+                  <!-- Floating Info Card (Compact by default, single expand button inside) -->
                   <div
                     class="inspector-card compact"
                     id="inspector-card-container"
                     data-tab-pane="info"
                     role="region"
-                    aria-label="Selected structure clinical inspector"
+                    aria-label="Selected part information"
                     tabindex="0"
                   ></div>
 
@@ -670,11 +711,11 @@ export class AppHUD {
                       class="part-list-toggle-bar"
                       id="btn-toggle-part-list"
                       type="button"
-                      aria-label="Toggle 27-part anatomical layer list"
+                      aria-label="Toggle 27-part inner ear list"
                       aria-expanded="false"
                     >
-                      <span>27-Part Anatomical Layer Tree</span>
-                      <span class="part-list-chevron" id="part-list-chevron">▸ Show Parts</span>
+                      <span>All 27 Inner Ear Parts</span>
+                      <span class="part-list-chevron" id="part-list-chevron">▸ Show 27 Parts</span>
                     </button>
                     <div class="layer-tree-container collapsed" id="layer-tree-container"></div>
                   </div>
@@ -699,9 +740,9 @@ export class AppHUD {
 
         <!-- LOADING OVERLAY -->
         <div class="loading-overlay" id="loading-overlay">
-          <span class="brand-badge">LOADING IE-MAP v1.0.0 ATLAS</span>
+          <span class="brand-badge">LOADING INNER EAR 3D GUIDE</span>
           <div style="font-size:14px;font-weight:600;" id="loading-status-text">
-            Ingesting 27 RAS Meshes &amp; Sculpted Head Context...
+            Loading 3D Inner Ear &amp; Head Models...
           </div>
           <div class="loading-count-badge" id="loading-count-text">
             0 / 38 assets (0%)
@@ -715,7 +756,7 @@ export class AppHUD {
         <div class="welcome-overlay hidden" id="welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title">
           <div class="welcome-card">
             <div class="welcome-card-header">
-              <span class="brand-badge">GATE 3 · IE-MAP v1.0.0</span>
+              <span class="brand-badge">INNER EAR 3D GUIDE</span>
               <button
                 class="welcome-close-btn"
                 id="btn-close-welcome"
@@ -725,22 +766,22 @@ export class AppHUD {
               >✕</button>
             </div>
             <h2 class="welcome-title" id="welcome-modal-title">
-              Interactive Inner Ear 3D Anatomy &amp; Dissection Lab
+              Explore Your Inner Ear, Balance &amp; Vertigo (BPPV)
             </h2>
             <p class="welcome-subtitle">
-              Choose how you would like to start exploring the 27-mesh micro-CT inner ear atlas and BPPV canalithiasis simulator:
+              See how tiny balance crystals inside your ear cause spinning dizziness (vertigo) — and how gentle head movements guide them back into place:
             </p>
             <div class="welcome-options-grid">
               <button
                 class="welcome-option-btn"
                 type="button"
                 data-welcome-choice="guided_tour"
-                aria-label="Guided tour: Start the narrated 8-shot clinical audio tour"
+                aria-label="Watch Guided Tour: Start the narrated step-by-step walkthrough"
               >
-                <span class="welcome-opt-badge">AUDIO + 3D TOUR</span>
-                <span class="welcome-opt-title">Guided tour</span>
+                <span class="welcome-opt-badge">AUDIO + 3D WALKTHROUGH</span>
+                <span class="welcome-opt-title">Watch Guided Tour</span>
                 <span class="welcome-opt-desc">
-                  Start the narrated 8-shot clinical walkthrough of posterior canal BPPV and the Epley maneuver.
+                  Watch and listen to a step-by-step walkthrough of how loose ear crystals cause vertigo and how the Epley treatment clears them.
                 </span>
               </button>
 
@@ -748,12 +789,12 @@ export class AppHUD {
                 class="welcome-option-btn"
                 type="button"
                 data-welcome-choice="explore_atlas"
-                aria-label="Explore atlas: Open Mode 1 27-mesh anatomy atlas"
+                aria-label="Explore 3D Ear Anatomy: Open Mode 1 interactive ear model"
               >
-                <span class="welcome-opt-badge">MODE 1 · ANATOMY</span>
-                <span class="welcome-opt-title">Explore atlas</span>
+                <span class="welcome-opt-badge">1 · EAR ANATOMY</span>
+                <span class="welcome-opt-title">Explore 3D Ear Anatomy</span>
                 <span class="welcome-opt-desc">
-                  Inspect, peel, and isolate all 27 inner ear structures in the IE-Map micro-CT atlas.
+                  Look inside the balance loops and hearing snail, peel away outer bone layers, and click any part to learn what it does.
                 </span>
               </button>
 
@@ -761,12 +802,12 @@ export class AppHUD {
                 class="welcome-option-btn"
                 type="button"
                 data-welcome-choice="epley_lab"
-                aria-label="Epley lab: Open Mode 2 live BPPV and Epley physics lab"
+                aria-label="Try Epley Treatment Simulator: Open Mode 2 vertigo and Epley simulator"
               >
-                <span class="welcome-opt-badge">MODE 2 · PHYSICS</span>
-                <span class="welcome-opt-title">Epley lab</span>
+                <span class="welcome-opt-badge">2 · VERTIGO &amp; EPLEY</span>
+                <span class="welcome-opt-title">Try Epley Treatment Simulator</span>
                 <span class="welcome-opt-desc">
-                  Control 3D head orientation and watch real-time Stokes gravitational otoconia settling.
+                  Turn and tilt the 3D head or step through the Epley maneuver to watch gravity guide loose crystals out of the balance tube.
                 </span>
               </button>
             </div>
@@ -780,7 +821,7 @@ export class AppHUD {
         <div class="welcome-overlay hidden" id="about-disclaimer-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
           <div class="welcome-card about-modal-card">
             <div class="welcome-card-header">
-              <span class="brand-badge">ABOUT &amp; CREDIBILITY · IE-MAP v1.0.0</span>
+              <span class="brand-badge">ABOUT &amp; VERIFIED SOURCES · IE-MAP v1.0.0</span>
               <button
                 class="welcome-close-btn"
                 id="btn-close-about"
@@ -790,13 +831,13 @@ export class AppHUD {
               >✕</button>
             </div>
             <h2 class="welcome-title" id="about-modal-title">
-              Data Provenance, Verified Citations &amp; Educational Disclaimer
+              3D Atlas Data Sources, Citations &amp; Educational Disclaimer
             </h2>
             <div class="about-disclaimer-banner" id="about-disclaimer-banner">
-              <strong>Disclaimer:</strong> For education only, not for diagnosis. This interactive 3D inner ear atlas and BPPV canalithiasis physics model is intended solely for anatomical and biomechanical education and must not be used for clinical diagnosis or patient self-treatment.
+              <strong>Disclaimer:</strong> For education only, not for diagnosis. This interactive 3D inner ear guide and BPPV crystal-clearing simulator is intended solely for anatomical and patient/clinical education and must not be used for medical diagnosis or self-treatment without a qualified clinician.
             </div>
             <div class="clinical-field">
-              <div class="clinical-field-label">Verified 3D Atlas &amp; Micro-CT Sources (from iemap_Metadata.json)</div>
+              <div class="clinical-field-label">Verified 3D Micro-CT Atlas &amp; Clinical Literature Sources</div>
               <ul class="sources-list">
                 <li>
                   <strong>IE-Map Atlas (2021):</strong> Ahmadi et al., <em>Sci Rep</em> 11, 3293 (2021). <code>doi:10.1038/s41598-021-82716-0</code> · Zenodo Record <code>10625570</code> (Right Inner Ear RAS Template &amp; 27-Mesh Surface Segmentation).
@@ -805,7 +846,7 @@ export class AppHUD {
                   <strong>Membranous Labyrinth Reconstruction (2016):</strong> David et al., <em>Sci Rep</em> 6, 32772 (2016). <code>doi:10.1038/srep32772</code> (Human Membranous Labyrinth Micro-CT Source).
                 </li>
                 <li>
-                  <strong>Clinical &amp; Physiological Notes:</strong> Primary literature citations for individual BPPV clinical pearls and Steinhausen/Ewald physiological notes are marked with explicit <code>TODO</code> items in the structure ontology for author verification.
+                  <strong>Clinical Practice Guideline — BPPV &amp; Canalith Repositioning (2017):</strong> Bhattacharyya et al., <em>Otolaryngol Head Neck Surg</em> 156(3_suppl), S1–S47 (2017).
                 </li>
               </ul>
             </div>
@@ -842,7 +883,6 @@ export class AppHUD {
     this.leftPanelToggleBtn = this.root.querySelector('#btn-toggle-left-panel')!;
     this.rightDrawerEl = this.root.querySelector('#right-inspector-drawer')!;
     this.rightPanelToggleBtn = this.root.querySelector('#btn-toggle-right-panel')!;
-    this.infoCardToggleBtn = this.root.querySelector('#btn-toggle-info-card')!;
     this.partListToggleBtn = this.root.querySelector('#btn-toggle-part-list')!;
 
     this.epleySandboxBar = this.root.querySelector('#epley-sandbox-bar')!;
@@ -850,6 +890,13 @@ export class AppHUD {
     this.tourPlayBtn = this.root.querySelector('#btn-tour-play')!;
     this.epleyCaptionHeadline = this.root.querySelector('#epley-caption-headline')!;
     this.epleyCaptionSub = this.root.querySelector('#epley-caption-sub')!;
+    this.patientTelemetryGrid = this.root.querySelector('#patient-telemetry-grid')!;
+    this.technicalTelemetryGrid = this.root.querySelector('#technical-telemetry-grid')!;
+    this.patientClearanceText = this.root.querySelector('#patient-clearance-text')!;
+    this.patientClearanceFill = this.root.querySelector('#patient-clearance-fill')!;
+    this.patientSensationDot = this.root.querySelector('#patient-sensation-dot')!;
+    this.patientSensationText = this.root.querySelector('#patient-sensation-text')!;
+    this.patientLocationText = this.root.querySelector('#patient-location-text')!;
     this.telPhiArc = this.root.querySelector('#tel-phi-arc')!;
     this.telGravityDrive = this.root.querySelector('#tel-gravity-drive')!;
     this.telSpikeRate = this.root.querySelector('#tel-spike-rate')!;
@@ -882,13 +929,24 @@ export class AppHUD {
       const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-app-mode]');
       if (!btn) return;
       const nextMode = btn.dataset.appMode as LabAppMode;
-      if (nextMode === 'mode2_physics' && this.quizActive) {
-        this.quizActive = false;
-        this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
-      } else if (nextMode === 'mode1_atlas' && this.predictModeActive) {
-        this.predictModeActive = false;
+      if (nextMode === 'mode2_physics') {
+        if (this.quizActive) {
+          this.quizActive = false;
+          this.scene.setLockedSelectionMesh(null);
+          this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        }
+        this.leftPanelCollapsed = true;
+        this.partListCollapsed = true;
+        this.mobileDrawerExpanded = false;
+      } else if (nextMode === 'mode1_atlas') {
+        if (this.predictModeActive) {
+          this.predictModeActive = false;
+        }
+        this.leftPanelCollapsed = false;
       }
       this.scene.setAppMode(nextMode);
+      this.applyPanelStatesToDOM();
+      this.syncViewportRects();
     });
 
     const stepsStrip = this.root.querySelector('#epley-steps-strip')!;
@@ -990,6 +1048,15 @@ export class AppHUD {
     this.explodeInput.addEventListener('input', () => {
       this.scene.setSliders({ explodePercent: parseFloat(this.explodeInput.value) });
     });
+    const startPhiDrag = () => this.scene.setPhiSliderDragging(true);
+    const endPhiDrag = () => this.scene.setPhiSliderDragging(false);
+    this.canalithPhiInput.addEventListener('pointerdown', startPhiDrag);
+    this.canalithPhiInput.addEventListener('mousedown', startPhiDrag);
+    this.canalithPhiInput.addEventListener('touchstart', startPhiDrag, { passive: true });
+    this.canalithPhiInput.addEventListener('pointerup', endPhiDrag);
+    this.canalithPhiInput.addEventListener('mouseup', endPhiDrag);
+    this.canalithPhiInput.addEventListener('touchend', endPhiDrag, { passive: true });
+    this.canalithPhiInput.addEventListener('change', endPhiDrag);
     this.canalithPhiInput.addEventListener('input', () => {
       this.scene.setSliders({ canalithPhiDeg: parseFloat(this.canalithPhiInput.value) });
     });
@@ -1033,12 +1100,15 @@ export class AppHUD {
       this.scene.setOverlays({ labelMode: btn.dataset.labelMode as LabelDensityMode });
     });
 
-    this.pinsLayer.addEventListener('click', (ev) => {
+    const handlePinActivate = (ev: Event) => {
       const pinEl = (ev.target as HTMLElement).closest<HTMLElement>('[data-pin-mesh]');
       if (!pinEl) return;
       const meshName = pinEl.dataset.pinMesh!;
+      if (!meshName) return;
       this.scene.selectStructure(meshName, false);
-    });
+      this.handleStructurePickedForQuiz(meshName);
+    };
+    this.pinsLayer.addEventListener('click', handlePinActivate);
 
     // 6. Cross-Section Slicer
     this.root.querySelector('#clip-axis-group')!.addEventListener('click', (ev) => {
@@ -1095,7 +1165,8 @@ export class AppHUD {
           s.displayName.toLowerCase().includes(q) ||
           s.latinName.toLowerCase().includes(q) ||
           s.meshName.toLowerCase().includes(q) ||
-          s.clinicalPearl.toLowerCase().includes(q)
+          s.clinicalPearl.toLowerCase().includes(q) ||
+          s.patientSummary.toLowerCase().includes(q)
       );
 
       searchDropdown.innerHTML = matches
@@ -1105,7 +1176,11 @@ export class AppHUD {
           <div class="search-result-item" data-search-mesh="${m.meshName}">
             <div>
               <div class="search-result-name">${m.displayName}</div>
-              <div class="search-result-latin">${m.latinName}</div>
+              ${
+                this.audienceMode !== 'patient'
+                  ? `<div class="search-result-latin">${m.latinName}</div>`
+                  : ''
+              }
             </div>
             <span class="preset-badge">${SYSTEM_GROUPS[m.systemGroup].shortTitle}</span>
           </div>
@@ -1153,7 +1228,7 @@ export class AppHUD {
       }
     });
 
-    // 10. Phase 1: Collapsible Panels & Expandable Floating Info Card
+    // 10. Phase 1: Collapsible Panels & Single Expandable Floating Info Card Control
     this.leftPanelToggleBtn.addEventListener('click', () => {
       this.leftPanelCollapsed = !this.leftPanelCollapsed;
       this.writeStorageBool(AppHUD.LS_KEYS.leftCollapsed, this.leftPanelCollapsed);
@@ -1168,25 +1243,16 @@ export class AppHUD {
       this.syncViewportRects();
     });
 
-    this.infoCardToggleBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this.infoCardExpanded = !this.infoCardExpanded;
-      this.writeStorageBool(AppHUD.LS_KEYS.infoExpanded, this.infoCardExpanded);
-      if (this.infoCardExpanded && this.rightPanelCollapsed) {
-        this.rightPanelCollapsed = false;
-        this.writeStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
-      }
-      this.applyPanelStatesToDOM();
-    });
-
     this.inspectorContainer.addEventListener('click', (ev) => {
-      // Allow clicking interactive links/buttons inside expanded card without accidentally collapsing if needed,
-      // unless clicking the expand/collapse hint or clicking anywhere when compact.
       const target = ev.target as HTMLElement;
       if (target.closest('a')) return;
       if (!this.infoCardExpanded || target.closest('[data-toggle-info-card]')) {
         this.infoCardExpanded = !this.infoCardExpanded;
         this.writeStorageBool(AppHUD.LS_KEYS.infoExpanded, this.infoCardExpanded);
+        if (this.infoCardExpanded && this.rightPanelCollapsed) {
+          this.rightPanelCollapsed = false;
+          this.writeStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
+        }
         this.applyPanelStatesToDOM();
       }
     });
@@ -1217,6 +1283,10 @@ export class AppHUD {
     this.mobileDrawerHandleBtn.addEventListener('click', () => {
       this.mobileDrawerExpanded = !this.mobileDrawerExpanded;
       this.applyPanelStatesToDOM();
+      this.syncViewportRects();
+    });
+
+    this.workspacePanelsShell.addEventListener('transitionend', () => {
       this.syncViewportRects();
     });
 
@@ -1251,7 +1321,14 @@ export class AppHUD {
     );
 
     const togglePipInset = () => {
-      if (window.innerWidth <= 600) {
+      if (this.scene && this.scene.getSnapshot().layoutMode === 'split_50_50') {
+        this.scene.setOverlays({ layoutMode: 'labyrinth_main' });
+        if (window.innerWidth <= 600) {
+          this.pipInsetOpenMobile = false;
+        } else {
+          this.pipInsetOpenDesktop = false;
+        }
+      } else if (window.innerWidth <= 600) {
         this.pipInsetOpenMobile = !this.pipInsetOpenMobile;
       } else {
         this.pipInsetOpenDesktop = !this.pipInsetOpenDesktop;
@@ -1269,8 +1346,12 @@ export class AppHUD {
       this.writeStorageBool(AppHUD.LS_KEYS.advancedTools, this.advancedToolsEnabled);
       if (!this.advancedToolsEnabled) {
         const snap = this.scene.getSnapshot();
-        if (snap.toolMode !== 'inspect' || snap.showCanalPlanes) {
-          this.scene.setOverlays({ toolMode: 'inspect', showCanalPlanes: false });
+        if (snap.toolMode !== 'inspect' || snap.showCanalPlanes || snap.showFiducials) {
+          this.scene.setOverlays({
+            toolMode: 'inspect',
+            showCanalPlanes: false,
+            showFiducials: false,
+          });
         }
         if (snap.clipAxis !== 'none') {
           this.scene.setClippingPlane('none');
@@ -1310,39 +1391,55 @@ export class AppHUD {
       const choice = choiceBtn.dataset.welcomeChoice!;
       this.writeStorageString(AppHUD.LS_KEYS.welcomeChoice, choice);
       this.welcomeDismissed = true;
-      this.applyPanelStatesToDOM();
 
       if (choice === 'guided_tour') {
         if (this.quizActive) {
           this.quizActive = false;
+          this.scene.setLockedSelectionMesh(null);
           this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
         }
         this.predictModeActive = false;
+        this.leftPanelCollapsed = true;
+        this.partListCollapsed = true;
+        this.mobileDrawerExpanded = false;
         this.scene.setAppMode('mode2_physics');
         if (!this.scene.getSnapshot().tourPlaying) {
           this.scene.toggleGuidedTour();
         }
       } else if (choice === 'explore_atlas') {
         this.predictModeActive = false;
+        this.leftPanelCollapsed = false;
         this.scene.stopGuidedTour();
         this.scene.setAppMode('mode1_atlas');
       } else if (choice === 'epley_lab') {
         if (this.quizActive) {
           this.quizActive = false;
+          this.scene.setLockedSelectionMesh(null);
           this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
         }
+        this.leftPanelCollapsed = true;
+        this.partListCollapsed = true;
+        this.mobileDrawerExpanded = false;
         this.scene.stopGuidedTour();
         this.scene.setAppMode('mode2_physics');
       }
+      this.applyPanelStatesToDOM();
+      this.syncViewportRects();
     });
 
-    // 13. Phase 5: Audience Mode Selector (Student / Clinician / Patient)
+    // 13. Phase 5: Audience Mode Selector (Patient / Student / Clinician)
     this.root.querySelector('#audience-mode-group')!.addEventListener('click', (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-audience-mode]');
       if (!btn) return;
       const mode = btn.dataset.audienceMode as 'student' | 'clinician' | 'patient';
       this.audienceMode = mode;
       this.writeStorageString(AppHUD.LS_KEYS.audienceMode, mode);
+      if (this.quizActive) {
+        this.renderQuizPanel();
+      }
+      if (this.predictModeActive) {
+        this.renderPredictPanel();
+      }
       this.renderState(this.scene.getSnapshot());
     });
 
@@ -1356,7 +1453,9 @@ export class AppHUD {
         this.quizSavedLabelMode = this.scene.getSnapshot().labelMode;
         this.startNextQuizQuestion();
       } else {
+        this.scene.setLockedSelectionMesh(null);
         this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        this.renderState(this.scene.getSnapshot());
         this.applyPanelStatesToDOM();
       }
     });
@@ -1383,7 +1482,10 @@ export class AppHUD {
         if (this.quizLastCorrect) {
           this.quizCorrectCount += 1;
         }
+        this.scene.setLockedSelectionMesh(null);
+        this.scene.selectStructure(this.quizTargetMesh, false);
         this.renderQuizPanel();
+        this.renderState(this.scene.getSnapshot());
         return;
       }
 
@@ -1406,7 +1508,9 @@ export class AppHUD {
 
       if (target.closest('#btn-close-quiz')) {
         this.quizActive = false;
+        this.scene.setLockedSelectionMesh(null);
         this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        this.renderState(this.scene.getSnapshot());
         this.applyPanelStatesToDOM();
       }
     });
@@ -1498,16 +1602,27 @@ export class AppHUD {
   }
 
   private getQuizCandidateStructures() {
-    // Prefer visible membranous structures so 3D highlighting and clicking are clear
+    // For "Click Part in 3D" (and in Patient mode), use unobstructed surface landmarks
+    // so targets are never hidden inside outer ampulla walls or cochlear shells.
     const snap = this.scene.getSnapshot();
-    const visibleItems = IEMAP_STRUCTURES.filter(
-      (item) =>
-        item.systemGroup !== 'bony_capsule' &&
-        (snap.visibilityMap[item.meshName] ?? item.defaultState) === 'visible'
-    );
-    return visibleItems.length >= 6
-      ? visibleItems
-      : IEMAP_STRUCTURES.filter((item) => item.systemGroup !== 'bony_capsule');
+    const useUnobstructedPool =
+      this.quizType === 'click_in_3d' || this.audienceMode === 'patient';
+
+    const visibleItems = IEMAP_STRUCTURES.filter((item) => {
+      if (item.systemGroup === 'bony_capsule') return false;
+      if (useUnobstructedPool && !UNOBSTRUCTED_QUIZ_MESHES.has(item.meshName)) return false;
+      return (snap.visibilityMap[item.meshName] ?? item.defaultState) === 'visible';
+    });
+
+    if (visibleItems.length >= 6) {
+      return visibleItems;
+    }
+
+    return IEMAP_STRUCTURES.filter((item) => {
+      if (item.systemGroup === 'bony_capsule') return false;
+      if (useUnobstructedPool && !UNOBSTRUCTED_QUIZ_MESHES.has(item.meshName)) return false;
+      return true;
+    });
   }
 
   private startNextQuizQuestion(): void {
@@ -1520,11 +1635,42 @@ export class AppHUD {
     this.quizAnswered = false;
     this.quizLastCorrect = false;
 
-    // Build 4 multiple choice options (target + 3 distractors with distinct displayNames)
-    const distractorPool = IEMAP_STRUCTURES.filter(
-      (item) => item.meshName !== targetItem.meshName
-    );
-    const shuffledDistractors = [...distractorPool].sort(() => Math.random() - 0.5).slice(0, 3);
+    // Ensure the target structure is visible in 3D, and if it is an internal cupula or cochlear partition,
+    // ghost its enclosing outer shell so the glowing highlight is clearly visible.
+    const snap = this.scene.getSnapshot();
+    if ((snap.visibilityMap[this.quizTargetMesh] ?? targetItem.defaultState) !== 'visible') {
+      this.scene.setStructureVisibility(this.quizTargetMesh, 'visible');
+    }
+    const enclosingShellMap: Record<string, string> = {
+      ls_Hsapiens_Sp_Cup_Sp: 'ls_Hsapiens_Ap',
+      ls_Hsapiens_Sp_Cup_Ut: 'ls_Hsapiens_Ap',
+      ls_Hsapiens_Sa_Cup_Sa: 'ls_Hsapiens_Aa',
+      ls_Hsapiens_Sa_Cup_Ut: 'ls_Hsapiens_Aa',
+      ls_Hsapiens_Sl_Cup_Sl: 'ls_Hsapiens_Al',
+      ls_Hsapiens_Sl_Cup_Ut: 'ls_Hsapiens_Al',
+      seg_coch_inner_BM: 'mesh_david_cochlea',
+      seg_coch_inner_OC: 'mesh_david_cochlea',
+      seg_coch_inner_RM: 'mesh_david_cochlea',
+      seg_coch_inner_SL: 'mesh_david_cochlea',
+      seg_coch_inner_SM: 'mesh_david_cochlea',
+      seg_coch_inner_SV_ST: 'mesh_david_cochlea',
+    };
+    const enclosingShell = enclosingShellMap[this.quizTargetMesh];
+    if (enclosingShell && snap.visibilityMap[enclosingShell] === 'visible') {
+      this.scene.setStructureVisibility(enclosingShell, 'ghost');
+    }
+
+    // Build 4 multiple choice options (target + 3 distractors)
+    const distractorPool = pool.filter((item) => item.meshName !== targetItem.meshName);
+    const fallbackDistractors =
+      distractorPool.length >= 3
+        ? distractorPool
+        : IEMAP_STRUCTURES.filter(
+            (item) => item.systemGroup !== 'bony_capsule' && item.meshName !== targetItem.meshName
+          );
+    const shuffledDistractors = [...fallbackDistractors]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
     const options = [targetItem.meshName, ...shuffledDistractors.map((d) => d.meshName)].sort(
       () => Math.random() - 0.5
     );
@@ -1534,12 +1680,16 @@ export class AppHUD {
     this.scene.setOverlays({ labelMode: 'off' });
 
     if (this.quizType === 'name_highlighted') {
+      this.scene.setLockedSelectionMesh(null);
       this.scene.selectStructure(this.quizTargetMesh, true);
+      this.scene.setLockedSelectionMesh(this.quizTargetMesh);
     } else {
+      this.scene.setLockedSelectionMesh(null);
       this.scene.selectStructure(null, false);
     }
 
     this.renderQuizPanel();
+    this.renderState(this.scene.getSnapshot());
     this.applyPanelStatesToDOM();
   }
 
@@ -1551,12 +1701,15 @@ export class AppHUD {
     this.quizAnswered = true;
     this.quizTotalCount += 1;
     this.quizLastCorrect = meshName === this.quizTargetMesh;
+    this.scene.setLockedSelectionMesh(null);
     if (this.quizLastCorrect) {
       this.quizCorrectCount += 1;
+      this.scene.selectStructure(this.quizTargetMesh, false);
     } else {
       this.scene.selectStructure(this.quizTargetMesh, true);
     }
     this.renderQuizPanel();
+    this.renderState(this.scene.getSnapshot());
   }
 
   private renderQuizPanel(): void {
@@ -1565,12 +1718,13 @@ export class AppHUD {
     const pickedItem = this.quizSelectedChoice
       ? STRUCTURE_BY_MESH[this.quizSelectedChoice]
       : null;
+    const isPatient = this.audienceMode === 'patient';
 
     const choicesHtml =
       this.quizType === 'name_highlighted'
         ? `
           <div class="quiz-prompt-text">
-            Which highlighted 3D structure is currently selected in the labyrinth?
+            Which highlighted 3D part is currently glowing in the inner ear?
           </div>
           <div class="quiz-choices-grid">
             ${this.quizChoices
@@ -1592,7 +1746,11 @@ export class AppHUD {
                     ${this.quizAnswered ? 'disabled' : ''}
                   >
                     <span class="quiz-choice-title">${item.displayName}</span>
-                    <span class="quiz-choice-latin">${item.latinName}</span>
+                    ${
+                      !isPatient
+                        ? `<span class="quiz-choice-latin">${item.latinName}</span>`
+                        : ''
+                    }
                   </button>
                 `;
               })
@@ -1601,14 +1759,16 @@ export class AppHUD {
         `
         : `
           <div class="quiz-prompt-text">
-            Find &amp; click this structure directly in the 3D labyrinth:
+            Find &amp; click this part directly on the 3D ear model:
           </div>
           <div class="quiz-click-target-banner">
             <div class="quiz-target-name">${targetItem.displayName}</div>
-            <div class="quiz-target-sub">${targetItem.latinName} · ${targetGroup.shortTitle}</div>
+            <div class="quiz-target-sub">${
+              isPatient ? targetGroup.shortTitle : `${targetItem.latinName} · ${targetGroup.shortTitle}`
+            }</div>
           </div>
           <div class="quiz-click-actions">
-            <button class="seg-btn" type="button" id="btn-quiz-hint">Hint: Fly Camera Near</button>
+            <button class="seg-btn" type="button" id="btn-quiz-hint">Hint: Zoom Near Part</button>
             <button class="seg-btn" type="button" id="btn-quiz-next">Skip / Next Question →</button>
           </div>
         `;
@@ -1620,7 +1780,7 @@ export class AppHUD {
             ${
               this.quizLastCorrect
                 ? `✓ Correct! ${targetItem.displayName}`
-                : `✗ Incorrect (You selected: ${pickedItem?.displayName ?? 'Another part'} — Answer: ${targetItem.displayName})`
+                : `✗ Not quite (You picked: ${pickedItem?.displayName ?? 'Another part'} — Answer: ${targetItem.displayName})`
             }
           </div>
           <div class="quiz-feedback-sub">${targetItem.patientSummary}</div>
@@ -1634,7 +1794,7 @@ export class AppHUD {
     this.quizPanelEl.innerHTML = `
       <div class="quiz-panel-header">
         <div class="quiz-header-left">
-          <span class="brand-badge">MODE 1 QUIZ</span>
+          <span class="brand-badge">EAR ANATOMY QUIZ</span>
           <div class="layout-segmented" id="quiz-type-group" role="group" aria-label="Quiz question mode">
             <button
               class="seg-btn ${this.quizType === 'name_highlighted' ? 'active' : ''}"
@@ -1674,33 +1834,45 @@ export class AppHUD {
     nystagmusLabel: string;
     explanation: string;
   } {
+    const isPatient = this.audienceMode === 'patient';
     if (stepIdx <= 2) {
       return {
         motion: 'stationary',
-        motionLabel: 'Stationary at canal base (φ = -84°)',
+        motionLabel: isPatient
+          ? 'Stays settled at the bottom of the loop'
+          : 'Stationary at canal base (φ = -84°)',
         nystagmus: 'none',
-        nystagmusLabel: 'Baseline (None)',
-        explanation:
-          'While sitting upright and turning the head 45° right (Step 1), the otoconia remain settled at the gravity-dependent base of the posterior canal (φ = -84°) with no cupular deflection.',
+        nystagmusLabel: isPatient ? 'Calm (No Spinning)' : 'Baseline (None)',
+        explanation: isPatient
+          ? 'While sitting upright and turning your head 45° right (Step 1), the loose crystals stay resting at the bottom of the loop without pushing the balance sensor.'
+          : 'While sitting upright and turning the head 45° right (Step 1), the otoconia remain settled at the gravity-dependent base of the posterior canal (φ = -84°) with no cupular deflection.',
       };
     }
     if (stepIdx >= 3 && stepIdx <= 5) {
       return {
         motion: 'ampullofugal',
-        motionLabel: 'Ampullofugal — drains away from ampulla toward Common Crus',
+        motionLabel: isPatient
+          ? 'Slides away from the sensor toward the exit tube'
+          : 'Ampullofugal — drains away from ampulla toward Common Crus',
         nystagmus: 'upbeat_torsional',
-        nystagmusLabel: 'Excitatory Upbeat-Torsional (Ewald’s 3rd Law)',
-        explanation:
-          'During supine extension and contralateral leftward rotation (Steps 2–4), gravity pulls the otoconia ampullofugally away from the posterior cupula toward the apex and Common Crus, exciting CN VIII and driving upbeat-torsional nystagmus.',
+        nystagmusLabel: isPatient
+          ? 'Brief Spinning Sensation (Crystals Moving)'
+          : 'Excitatory Upbeat-Torsional (Ewald’s 3rd Law)',
+        explanation: isPatient
+          ? 'As you lie back and turn your head left (Steps 2–4), gravity pulls the loose crystals around the loop away from the balance sensor toward the exit tube, causing a brief wave of spinning until they settle.'
+          : 'During supine extension and contralateral leftward rotation (Steps 2–4), gravity pulls the otoconia ampullofugally away from the posterior cupula toward the apex and Common Crus, exciting CN VIII and driving upbeat-torsional nystagmus.',
       };
     }
     return {
       motion: 'enter_utricle',
-      motionLabel: 'Exits Common Crus & settles in Utricle (φ = +186°)',
+      motionLabel: isPatient
+        ? 'Drops out of the loop into the resting sac (Utricle)'
+        : 'Exits Common Crus & settles in Utricle (φ = +186°)',
       nystagmus: 'none',
-      nystagmusLabel: 'Baseline (None)',
-      explanation:
-        'Returning upright in Step 5 empties the otoconia out of the Common Crus into the utricular vestibule (φ = +186°), allowing the posterior cupula to return to neutral baseline.',
+      nystagmusLabel: isPatient ? 'Calm (No Spinning)' : 'Baseline (None)',
+      explanation: isPatient
+        ? 'Sitting back upright in Step 5 lets the crystals drop out of the exit tube into the large resting sac (utricle), where they no longer trigger spinning vertigo!'
+        : 'Returning upright in Step 5 empties the otoconia out of the Common Crus into the utricular vestibule (φ = +186°), allowing the posterior cupula to return to neutral baseline.',
     };
   }
 
@@ -1708,12 +1880,13 @@ export class AppHUD {
     const step = EPLEY_CLINICAL_STEPS[this.predictPendingStepIdx] ?? EPLEY_CLINICAL_STEPS[3];
     const expected = this.getExpectedStepOutcome(this.predictPendingStepIdx);
     const bothRight = this.predictLastMotionCorrect && this.predictLastNystagmusCorrect;
+    const isPatient = this.audienceMode === 'patient';
 
     this.predictPanelEl.innerHTML = `
       <div class="predict-panel-header">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="brand-badge">PREDICT MODE</span>
-          <span class="predict-step-target">Before playing <strong>${step.shortTitle}</strong> (${step.clinicalTitle}):</span>
+          <span class="brand-badge">PREDICT STEP</span>
+          <span class="predict-step-target">Before playing <strong>${step.shortTitle}</strong>:</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span class="quiz-score-badge" id="predict-score-badge">
@@ -1725,7 +1898,9 @@ export class AppHUD {
 
       <div class="predict-questions-row">
         <div class="predict-col">
-          <div class="predict-col-label">1. Predict Canalith Movement:</div>
+          <div class="predict-col-label">${
+            isPatient ? '1. What will the crystals do?' : '1. Predict Canalith Movement:'
+          }</div>
           <div class="predict-btn-group">
             <button
               class="seg-btn ${this.predictChoiceMotion === 'stationary' ? 'active' : ''}"
@@ -1733,7 +1908,7 @@ export class AppHUD {
               data-predict-motion="stationary"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Stationary at Base
+              ${isPatient ? 'Stay at Bottom' : 'Stationary at Base'}
             </button>
             <button
               class="seg-btn ${this.predictChoiceMotion === 'ampullofugal' ? 'active' : ''}"
@@ -1741,7 +1916,7 @@ export class AppHUD {
               data-predict-motion="ampullofugal"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Ampullofugal (Away from Ampulla)
+              ${isPatient ? 'Slide Along Loop' : 'Ampullofugal (Away from Ampulla)'}
             </button>
             <button
               class="seg-btn ${this.predictChoiceMotion === 'enter_utricle' ? 'active' : ''}"
@@ -1749,13 +1924,15 @@ export class AppHUD {
               data-predict-motion="enter_utricle"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Exits into Utricle
+              ${isPatient ? 'Clear into Resting Sac' : 'Exits into Utricle'}
             </button>
           </div>
         </div>
 
         <div class="predict-col">
-          <div class="predict-col-label">2. Predict VOR Nystagmus Direction:</div>
+          <div class="predict-col-label">${
+            isPatient ? '2. Spinning / Dizziness Sensation:' : '2. Predict VOR Nystagmus Direction:'
+          }</div>
           <div class="predict-btn-group">
             <button
               class="seg-btn ${this.predictChoiceNystagmus === 'none' ? 'active' : ''}"
@@ -1763,7 +1940,7 @@ export class AppHUD {
               data-predict-nystagmus="none"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Baseline (None)
+              ${isPatient ? 'Calm (None)' : 'Baseline (None)'}
             </button>
             <button
               class="seg-btn ${this.predictChoiceNystagmus === 'upbeat_torsional' ? 'active' : ''}"
@@ -1771,7 +1948,7 @@ export class AppHUD {
               data-predict-nystagmus="upbeat_torsional"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Excitatory Upbeat-Torsional
+              ${isPatient ? 'Spinning (Crystals Moving)' : 'Excitatory Upbeat-Torsional'}
             </button>
             <button
               class="seg-btn ${this.predictChoiceNystagmus === 'downbeat_inhibitory' ? 'active' : ''}"
@@ -1779,7 +1956,7 @@ export class AppHUD {
               data-predict-nystagmus="downbeat_inhibitory"
               ${this.predictRevealed ? 'disabled' : ''}
             >
-              Inhibitory Reversal
+              ${isPatient ? 'Reverse Spinning' : 'Inhibitory Reversal'}
             </button>
           </div>
         </div>
@@ -1788,10 +1965,10 @@ export class AppHUD {
           ${
             !this.predictRevealed
               ? `<button class="tour-play-btn" type="button" id="btn-play-and-reveal-prediction">
-                   ▶ Play Step &amp; Reveal Answer
+                   ▶ Play Step &amp; Check Answer
                  </button>`
               : `<button class="tour-play-btn" type="button" id="btn-predict-next-step">
-                   Predict Next Step →
+                   Next Step →
                  </button>`
           }
         </div>
@@ -1805,7 +1982,7 @@ export class AppHUD {
                 ${
                   bothRight
                     ? '✓ Both Predictions Correct!'
-                    : `Answer Revealed — Motion: ${this.predictLastMotionCorrect ? '✓' : '✗'} (${expected.motionLabel}) · Nystagmus: ${this.predictLastNystagmusCorrect ? '✓' : '✗'} (${expected.nystagmusLabel})`
+                    : `Answer — Crystals: ${this.predictLastMotionCorrect ? '✓' : '✗'} (${expected.motionLabel}) · Sensation: ${this.predictLastNystagmusCorrect ? '✓' : '✗'} (${expected.nystagmusLabel})`
                 }
               </div>
               <div class="quiz-feedback-sub">${expected.explanation}</div>
@@ -1827,22 +2004,40 @@ export class AppHUD {
   }
 
   private applyPanelStatesToDOM(): void {
+    const snap = this.scene ? this.scene.getSnapshot() : null;
+    const isMode1 = snap ? snap.appMode === 'mode1_atlas' : true;
+    const isMode2 = !isMode1;
+    const isSplit = Boolean(snap && snap.layoutMode === 'split_50_50');
+
     const labShell = this.root.querySelector('.lab-shell');
     if (labShell) {
       labShell.classList.toggle('advanced-tools-off', !this.advancedToolsEnabled);
+      labShell.classList.toggle('split-50-50', isSplit);
+      labShell.classList.toggle('mode2-active', isMode2);
     }
     this.advancedToolsCheckbox.checked = this.advancedToolsEnabled;
     this.welcomeOverlay.classList.toggle('hidden', this.welcomeDismissed);
     this.aboutModalEl.classList.toggle('hidden', !this.aboutModalOpen);
 
-    // Phase 5: Audience mode buttons
+    // Hide Mode 2 physics-only controls from Left Panel when in Mode 1 (unless Advanced tools is ON)
+    const mode2LeftControls = this.root.querySelector<HTMLElement>('#mode2-only-left-controls');
+    if (mode2LeftControls) {
+      mode2LeftControls.style.display = isMode2 || this.advancedToolsEnabled ? '' : 'none';
+    }
+
+    // Audience mode buttons
     this.root.querySelectorAll<HTMLButtonElement>('[data-audience-mode]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.audienceMode === this.audienceMode);
     });
 
+    // Mode 2 Telemetry: Patient visual cards vs Technical telemetry boxes
+    const showPatientTelemetry = this.audienceMode === 'patient' && !this.advancedToolsEnabled;
+    if (this.patientTelemetryGrid && this.technicalTelemetryGrid) {
+      this.patientTelemetryGrid.classList.toggle('hidden', !showPatientTelemetry);
+      this.technicalTelemetryGrid.classList.toggle('hidden', showPatientTelemetry);
+    }
+
     // Phase 5: Mode 1 Quiz Panel & Mode 2 Predict Panel visibility
-    const isMode1 = this.scene ? this.scene.getSnapshot().appMode === 'mode1_atlas' : true;
-    const isMode2 = !isMode1;
     this.quizToggleBtn.style.display = isMode1 ? '' : 'none';
     this.quizToggleBtn.classList.toggle('active', this.quizActive && isMode1);
     this.quizToggleBtn.setAttribute('aria-pressed', String(this.quizActive && isMode1));
@@ -1863,23 +2058,20 @@ export class AppHUD {
     this.rightDrawerEl.classList.toggle('collapsed', this.rightPanelCollapsed);
     this.rightPanelToggleBtn.setAttribute('aria-expanded', String(!this.rightPanelCollapsed));
     this.rightPanelToggleBtn.innerHTML = this.rightPanelCollapsed
-      ? `<span class="toggle-icon">◀</span><span class="toggle-label">Info &amp; Parts</span>`
+      ? `<span class="toggle-icon">◀</span><span class="toggle-label">Part Info</span>`
       : `<span class="toggle-icon">▶</span>`;
 
-    // Floating Info Card (compact vs expanded)
+    // Floating Info Card (compact vs expanded) with single expand button inside the card
     this.inspectorContainer.classList.toggle('compact', !this.infoCardExpanded);
     this.inspectorContainer.classList.toggle('expanded', this.infoCardExpanded);
     this.inspectorContainer.classList.toggle(
       'both-open',
       this.infoCardExpanded && !this.partListCollapsed
     );
-    this.infoCardToggleBtn.setAttribute('aria-expanded', String(this.infoCardExpanded));
-    this.infoCardToggleBtn.innerHTML = this.infoCardExpanded
-      ? `<span class="toggle-label">Compact Info ▴</span>`
-      : `<span class="toggle-label">Expand Info ▾</span>`;
-    const expandPillEl = this.inspectorContainer.querySelector('.inspector-expand-pill');
+    const expandPillEl = this.inspectorContainer.querySelector<HTMLElement>('#btn-toggle-info-card');
     if (expandPillEl) {
-      expandPillEl.textContent = this.infoCardExpanded ? '▴ Less' : '▾ Expand';
+      expandPillEl.setAttribute('aria-expanded', String(this.infoCardExpanded));
+      expandPillEl.textContent = this.infoCardExpanded ? '▴ Show Less' : '▾ Read More';
     }
 
     // 27-Part Layer Tree
@@ -1913,7 +2105,7 @@ export class AppHUD {
     this.rightDrawerEl.classList.toggle('pip-offset-none', !pipVis);
     this.pipToggleBtn.classList.toggle('active', pipVis);
     this.pipToggleBtn.setAttribute('aria-pressed', String(pipVis));
-    this.pipToggleBtn.textContent = pipVis ? 'Hide PiP' : 'Show PiP';
+    this.pipToggleBtn.textContent = pipVis ? 'Hide Head' : 'Show Head';
 
     // Adjust Mode 2 Epley bar horizontal margins based on panel collapse states
     this.epleySandboxBar.classList.toggle('left-collapsed', this.leftPanelCollapsed);
@@ -1925,19 +2117,58 @@ export class AppHUD {
   private syncViewportRects(): void {
     const w = this.canvasHost.clientWidth;
     const h = this.canvasHost.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    const isSmall = window.innerWidth <= 900;
+    let visibleH = h;
+    if (isSmall) {
+      const hostRect = this.canvasHost.getBoundingClientRect();
+      const drawerRect = this.workspacePanelsShell.getBoundingClientRect();
+      const targetDrawerRatio =
+        window.innerWidth <= 600
+          ? this.mobileDrawerExpanded
+            ? 0.78
+            : 0.42
+          : this.mobileDrawerExpanded
+          ? 0.5
+          : 0.36;
+      const expectedDrawerTop = Math.max(
+        hostRect.top + h * 0.22,
+        window.innerHeight * (1 - targetDrawerRatio) - hostRect.top
+      );
+      let bottomLimit =
+        drawerRect.height > 0 && drawerRect.top > hostRect.top
+          ? Math.min(drawerRect.top - hostRect.top, expectedDrawerTop)
+          : expectedDrawerTop;
+
+      const isMode2 = this.scene && this.scene.getSnapshot().appMode === 'mode2_physics';
+      if (isMode2 && this.epleySandboxBar) {
+        const epleyRect = this.epleySandboxBar.getBoundingClientRect();
+        if (epleyRect.height > 0 && epleyRect.top > hostRect.top) {
+          bottomLimit = Math.min(bottomLimit, epleyRect.top - hostRect.top);
+        }
+      } else if (!isMode2 && this.cameraPresetBar) {
+        const camRect = this.cameraPresetBar.getBoundingClientRect();
+        if (camRect.height > 0 && camRect.top > hostRect.top) {
+          bottomLimit = Math.min(bottomLimit, camRect.top - hostRect.top);
+        }
+      }
+      visibleH = Math.max(Math.min(h, Math.round(h * 0.22)), Math.round(bottomLimit));
+    }
+
     if (!this.isPipInsetVisible()) {
       this.scene.setViewportRects(
-        { left: 0, top: 0, width: w, height: h },
+        { left: 0, top: 0, width: w, height: visibleH },
         { left: 0, top: 0, width: 0, height: 0 }
       );
       return;
     }
-    const isSmall = window.innerWidth <= 900;
-    const pipW = isSmall ? 230 : 290;
-    const pipH = isSmall ? 175 : 215;
-    const pad = isSmall ? 12 : 14;
+
+    const pipW = isSmall ? 220 : 290;
+    const pipH = isSmall ? 168 : 215;
+    const pad = isSmall ? 10 : 14;
     this.scene.setViewportRects(
-      { left: 0, top: 0, width: w, height: h },
+      { left: 0, top: 0, width: w, height: visibleH },
       { left: Math.max(0, w - pipW - pad), top: pad, width: pipW, height: pipH }
     );
   }
@@ -1950,6 +2181,16 @@ export class AppHUD {
     this.headPitchInput.value = String(tel.thetaReclineDeg);
     this.headPitchVal.textContent = `${Math.round(tel.thetaReclineDeg)}°`;
 
+    // 1. Update Patient-friendly visual indicators
+    this.patientClearanceText.textContent = `${tel.clearancePercent}% Cleared`;
+    this.patientClearanceFill.style.width = `${tel.clearancePercent}%`;
+    this.patientSensationText.textContent = tel.patientSensation;
+    const isSpinning = tel.patientSensation.startsWith('Spinning');
+    this.patientSensationDot.classList.toggle('spinning', isSpinning);
+    this.patientSensationDot.classList.toggle('calm', !isSpinning);
+    this.patientLocationText.textContent = tel.patientLocation;
+
+    // 2. Update Clinical / Technical telemetry boxes
     this.telPhiArc.textContent = `${tel.phiDeg > 0 ? '+' : ''}${tel.phiDeg.toFixed(1)}° (${tel.arcMm.toFixed(2)} mm)`;
     const gSign = tel.gravityAlongCanal >= 0 ? '+' : '';
     const driveLabel =
@@ -1999,24 +2240,36 @@ export class AppHUD {
 
     // Update Mode 2 Step strip & caption
     this.tourPlayBtn.textContent = snap.tourPlaying
-      ? '⏸ Pause Clinical Tour'
-      : '▶ Play 8-Shot Audio Tour';
+      ? '⏸ Pause Audio Guide'
+      : '▶ Play Audio Guide';
+    const highlightedStepIdx =
+      this.predictModeActive && !this.predictRevealed
+        ? this.predictPendingStepIdx
+        : snap.activeEpleyStepIdx;
     this.root.querySelectorAll<HTMLButtonElement>('[data-epley-step]').forEach((btn) => {
       btn.classList.toggle(
         'active',
-        parseInt(btn.dataset.epleyStep!, 10) === snap.activeEpleyStepIdx
+        parseInt(btn.dataset.epleyStep!, 10) === highlightedStepIdx
       );
     });
     const curStep = EPLEY_CLINICAL_STEPS[snap.activeEpleyStepIdx] ?? EPLEY_CLINICAL_STEPS[0];
+    const usePatientCopy = this.audienceMode === 'patient' && !this.advancedToolsEnabled;
     if (this.predictModeActive && !this.predictRevealed) {
       const pendingStep =
         EPLEY_CLINICAL_STEPS[this.predictPendingStepIdx] ?? EPLEY_CLINICAL_STEPS[2];
-      this.epleyCaptionHeadline.textContent = `Predict Step Outcome: ${pendingStep.clinicalTitle}`;
+      this.epleyCaptionHeadline.textContent = `Predict Step Outcome: ${pendingStep.shortTitle}`;
       this.epleyCaptionSub.textContent =
-        'Select your prediction for canalith movement and VOR nystagmus direction above, then click "Play Step & Reveal Answer".';
+        'Choose your prediction for crystal movement and spinning sensation above, then click "Play Step & Check Answer".';
     } else {
-      this.epleyCaptionHeadline.textContent = curStep.headline;
-      this.epleyCaptionSub.textContent = curStep.caption;
+      this.epleyCaptionHeadline.textContent = usePatientCopy
+        ? curStep.patientHeadline
+        : curStep.headline;
+      this.epleyCaptionSub.textContent = usePatientCopy ? curStep.patientCaption : curStep.caption;
+    }
+
+    // Sync Telemetry snapshot
+    if (snap.telemetry) {
+      this.renderLiveTelemetry(snap.telemetry);
     }
 
     // Update Sliders & Values
@@ -2060,30 +2313,47 @@ export class AppHUD {
     if (snap.layoutMode === 'split_50_50') {
       this.pipHudFrame.classList.add('split-mode');
       this.rightDrawerEl.classList.add('split-layout-offset');
-      this.pipTitleEl.textContent = 'STAGE 1 (LEFT): 3D PATIENT HEAD & PETROUS CUTAWAY';
+      this.pipTitleEl.textContent = 'LEFT STAGE: 3D HEAD & EAR POSITION';
     } else {
       this.pipHudFrame.classList.remove('split-mode');
       this.rightDrawerEl.classList.remove('split-layout-offset');
       this.pipTitleEl.textContent =
         snap.layoutMode === 'labyrinth_main'
-          ? '3D PATIENT HEAD & RIGHT EAR CUTAWAY'
-          : '27-MESH IE-Map LABYRINTH STAGE';
+          ? '3D HEAD & EAR VIEW'
+          : 'INNER EAR PIP · HEAD CONTROLS';
     }
+
+    // Check if Quiz Mode is actively masking the structure name (both quiz types until answered)
+    const isQuizMaskActive = this.quizActive && !this.quizAnswered;
+    const quizMaskPrompt =
+      this.quizType === 'click_in_3d'
+        ? 'Quiz in progress — find & click the requested part in 3D'
+        : 'Quiz in progress — identify the highlighted part';
 
     // Render Interactive Breadcrumb Trail
     const activeMeshName = snap.hoveredMesh ?? snap.selectedMesh ?? 'ls_Hsapiens_Sp';
     const activeItem = STRUCTURE_BY_MESH[activeMeshName] ?? IEMAP_STRUCTURES[0];
     const sysGroup = SYSTEM_GROUPS[activeItem.systemGroup];
 
-    this.breadcrumbBar.innerHTML = `
-      <span class="crumb-item" data-crumb-action="reset">Right Inner Ear (RAS)</span>
-      <span class="crumb-sep">›</span>
-      <span class="crumb-item" data-crumb-group="${sysGroup.id}">${sysGroup.shortTitle}</span>
-      <span class="crumb-sep">›</span>
-      <span class="crumb-item" data-crumb-group="${sysGroup.id}">${activeItem.subGroup}</span>
-      <span class="crumb-sep">›</span>
-      <span class="crumb-item active" data-crumb-mesh="${activeItem.meshName}" title="${activeItem.displayName} (${activeItem.latinName}) · Raw ID: ${activeItem.meshName}">${activeItem.shortLabel}</span>
-    `;
+    if (isQuizMaskActive) {
+      this.breadcrumbBar.innerHTML = `
+        <span class="crumb-item" data-crumb-action="reset">Inner Ear</span>
+        <span class="crumb-sep">›</span>
+        <span class="crumb-item active">${quizMaskPrompt}</span>
+      `;
+    } else {
+      const crumbTitle =
+        this.audienceMode === 'patient'
+          ? activeItem.displayName
+          : `${activeItem.displayName} (${activeItem.latinName}) · Raw ID: ${activeItem.meshName}`;
+      this.breadcrumbBar.innerHTML = `
+        <span class="crumb-item" data-crumb-action="reset">Inner Ear</span>
+        <span class="crumb-sep">›</span>
+        <span class="crumb-item" data-crumb-group="${sysGroup.id}">${sysGroup.shortTitle}</span>
+        <span class="crumb-sep">›</span>
+        <span class="crumb-item active" data-crumb-mesh="${activeItem.meshName}" title="${crumbTitle}">${activeItem.shortLabel}</span>
+      `;
+    }
 
     this.breadcrumbBar.querySelectorAll<HTMLElement>('[data-crumb-action]').forEach((el) => {
       el.addEventListener('click', () => this.scene.snapCameraViewPreset('posterior_3_4'));
@@ -2100,161 +2370,220 @@ export class AppHUD {
       });
     });
 
-    // Render Selected Structure Clinical Inspector Card (Compact floating vs Expanded, Audience-aware)
+    // Render Selected Structure Clinical Inspector Card (Compact floating vs Expanded, Audience-aware & Quiz-masked)
     const inspectedItem =
       STRUCTURE_BY_MESH[snap.selectedMesh ?? 'ls_Hsapiens_Sp'] ?? IEMAP_STRUCTURES[0];
     const inspectedGroup = SYSTEM_GROUPS[inspectedItem.systemGroup];
-    const inspectorKey = `${inspectedItem.meshName}|${this.audienceMode}`;
+    const inspectorKey = `${inspectedItem.meshName}|${this.audienceMode}|${
+      isQuizMaskActive ? `masked-${this.quizType}` : 'open'
+    }`;
 
     if (inspectorKey !== this.lastRenderedInspectorKey) {
       this.lastRenderedInspectorKey = inspectorKey;
-      const compactPreviewText =
-        this.audienceMode === 'patient'
-          ? inspectedItem.patientSummary
-          : this.audienceMode === 'clinician'
-          ? inspectedItem.clinicalPearl
-          : inspectedItem.physiologicalFunction;
 
-      const expandedBodyHtml =
-        this.audienceMode === 'patient'
-          ? `
-            <div class="clinical-field">
-              <div class="clinical-field-label">Plain-Language Summary (Patient View)</div>
-              <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+      if (isQuizMaskActive) {
+        this.inspectorContainer.innerHTML = `
+          <div class="inspector-compact-header" data-toggle-info-card="true">
+            <div class="inspector-header-badges">
+              <span class="compartment-pill">QUIZ CHALLENGE</span>
             </div>
-
-            <div class="clinical-field">
-              <div class="clinical-field-label">Inner Ear System</div>
-              <div class="clinical-field-body">${inspectedGroup.title} — ${inspectedGroup.subtitle}</div>
-            </div>
-
-            <div class="clinical-pearl-box">
-              <strong>Why It Matters in BPPV &amp; Balance:</strong> ${inspectedItem.clinicalPearl}
-            </div>
-          `
-          : this.audienceMode === 'student'
-          ? `
-            <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-            <div class="clinical-field">
-              <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-              <div class="clinical-field-body">${inspectedItem.innervation}</div>
-            </div>
-
-            <div class="clinical-field">
-              <div class="clinical-field-label">Physiological Mechanism</div>
-              <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-            </div>
-
-            <div class="clinical-pearl-box">
-              <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
-            </div>
-          `
-          : `
-            <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-            <div class="telemetry-strip">
-              <div class="telemetry-cell">
-                <span class="telemetry-key">Mesh / Raw ID</span>
-                <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
+            <div class="inspector-title-row">
+              <div>
+                <div class="inspector-title">${quizMaskPrompt}</div>
               </div>
-              <div class="telemetry-cell">
-                <span class="telemetry-key">Geometry</span>
-                <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
-              </div>
-              <div class="telemetry-cell">
-                <span class="telemetry-key">RAS Center (mm)</span>
-                <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
-              </div>
+              <button
+                type="button"
+                class="inspector-expand-pill"
+                id="btn-toggle-info-card"
+                data-toggle-info-card="true"
+                aria-expanded="${this.infoCardExpanded}"
+              >
+                ${this.infoCardExpanded ? '▴ Show Less' : '▾ Read More'}
+              </button>
             </div>
+          </div>
 
-            <div class="clinical-field">
-              <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-              <div class="clinical-field-body">${inspectedItem.innervation}</div>
-            </div>
-
-            <div class="clinical-field">
-              <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
-              <div class="clinical-field-body">${inspectedItem.morphometry}</div>
-            </div>
-
-            <div class="clinical-field">
-              <div class="clinical-field-label">Physiological Mechanism</div>
-              <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-            </div>
-
-            <div class="clinical-pearl-box">
-              <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
-            </div>
-
-            <div class="clinical-field" style="margin-top:6px;">
-              <div class="clinical-field-label">Patient Counseling Summary</div>
-              <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
-            </div>
-          `;
-
-      const sourcesHtml =
-        inspectedItem.sources && inspectedItem.sources.length > 0
-          ? `
-            <div class="clinical-field inspector-sources-section">
-              <div class="clinical-field-label">Atlas &amp; Literature Sources</div>
-              <ul class="sources-list">
-                ${inspectedItem.sources
-                  .map((src) => `<li class="source-item">${src}</li>`)
-                  .join('')}
-              </ul>
-            </div>
-          `
-          : '';
-
-      this.inspectorContainer.innerHTML = `
-        <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
-          <div class="inspector-header-badges">
-            <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
-              ${inspectedGroup.shortTitle.toUpperCase()}
-            </span>
-            <span class="compartment-pill">
-              ${
-                this.audienceMode === 'patient'
-                  ? 'Patient Guide'
-                  : inspectedItem.fluidCompartment
-              }
-            </span>
+          <div class="inspector-compact-preview" data-toggle-info-card="true">
             ${
-              this.audienceMode !== 'patient'
-                ? `<span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
-                     ID: ${inspectedItem.meshName}
-                   </span>`
-                : ''
+              this.quizType === 'click_in_3d'
+                ? 'Click directly on the requested 3D ear part in the viewport. Full details will appear as soon as you answer!'
+                : 'Look at the glowing part in the 3D ear model and pick its name in the Quiz box above. Full details will appear as soon as you answer!'
             }
           </div>
-          <div class="inspector-title-row">
-            <div>
-              <div class="inspector-title">${inspectedItem.displayName}</div>
-              <div class="inspector-latin">${inspectedItem.latinName}</div>
+
+          <div class="inspector-expanded-details">
+            <div class="clinical-field">
+              <div class="clinical-field-label">Hidden During Quiz</div>
+              <div class="clinical-field-body">
+                Answer the current Quiz question to reveal this part’s name and how it works.
+              </div>
             </div>
-            <span class="inspector-expand-pill" data-toggle-info-card="true">
-              ${this.infoCardExpanded ? '▴ Less' : '▾ Expand'}
-            </span>
           </div>
-        </div>
+        `;
+      } else {
+        const compactPreviewText =
+          this.audienceMode === 'patient'
+            ? inspectedItem.patientSummary
+            : this.audienceMode === 'clinician'
+            ? inspectedItem.clinicalPearl
+            : inspectedItem.physiologicalFunction;
 
-        <div class="inspector-compact-preview" data-toggle-info-card="true">
-          ${compactPreviewText}
-        </div>
+        const patSysSummary = getPatientSystemSummary(inspectedItem.systemGroup);
+        const expandedBodyHtml =
+          this.audienceMode === 'patient'
+            ? `
+              <div class="clinical-field">
+                <div class="clinical-field-label">What This Part Does</div>
+                <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+              </div>
 
-        <div class="inspector-expanded-details">
-          ${expandedBodyHtml}
-          ${sourcesHtml}
-        </div>
-      `;
+              <div class="clinical-field">
+                <div class="clinical-field-label">Part of the Inner Ear</div>
+                <div class="clinical-field-body"><strong>${patSysSummary.title} (${patSysSummary.subtitle}):</strong> ${patSysSummary.roleNote}</div>
+              </div>
+            `
+            : this.audienceMode === 'student'
+            ? `
+              <div class="inspector-etymology">${inspectedItem.etymology}</div>
+
+              <div class="clinical-field">
+                <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+                <div class="clinical-field-body">${inspectedItem.innervation}</div>
+              </div>
+
+              <div class="clinical-field">
+                <div class="clinical-field-label">Physiological Mechanism</div>
+                <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+              </div>
+
+              <div class="clinical-pearl-box">
+                <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+              </div>
+            `
+            : `
+              <div class="inspector-etymology">${inspectedItem.etymology}</div>
+
+              <div class="telemetry-strip">
+                <div class="telemetry-cell">
+                  <span class="telemetry-key">Mesh / Raw ID</span>
+                  <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
+                </div>
+                <div class="telemetry-cell">
+                  <span class="telemetry-key">Geometry</span>
+                  <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
+                </div>
+                <div class="telemetry-cell">
+                  <span class="telemetry-key">RAS Center (mm)</span>
+                  <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+                </div>
+              </div>
+
+              <div class="clinical-field">
+                <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+                <div class="clinical-field-body">${inspectedItem.innervation}</div>
+              </div>
+
+              <div class="clinical-field">
+                <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
+                <div class="clinical-field-body">${inspectedItem.morphometry}</div>
+              </div>
+
+              <div class="clinical-field">
+                <div class="clinical-field-label">Physiological Mechanism</div>
+                <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+              </div>
+
+              <div class="clinical-pearl-box">
+                <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+              </div>
+
+              <div class="clinical-field" style="margin-top:6px;">
+                <div class="clinical-field-label">Patient Counseling Summary</div>
+                <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+              </div>
+            `;
+
+        const sourcesHtml =
+          this.audienceMode !== 'patient' &&
+          inspectedItem.sources &&
+          inspectedItem.sources.length > 0
+            ? `
+              <div class="clinical-field inspector-sources-section">
+                <div class="clinical-field-label">Atlas &amp; Literature Sources</div>
+                <ul class="sources-list">
+                  ${inspectedItem.sources
+                    .map((src) => `<li class="source-item">${src}</li>`)
+                    .join('')}
+                </ul>
+              </div>
+            `
+            : '';
+
+        const headerTitleAttr =
+          this.audienceMode === 'patient'
+            ? inspectedItem.displayName
+            : `Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})`;
+
+        this.inspectorContainer.innerHTML = `
+          <div class="inspector-compact-header" data-toggle-info-card="true" title="${headerTitleAttr}">
+            <div class="inspector-header-badges">
+              <span class="compartment-pill" style="border-color:${inspectedGroup.accentHex};color:${inspectedGroup.accentHex};">
+                ${inspectedGroup.shortTitle.toUpperCase()}
+              </span>
+              <span class="compartment-pill">
+                ${
+                  this.audienceMode === 'patient'
+                    ? 'Simple Guide'
+                    : inspectedItem.fluidCompartment
+                }
+              </span>
+              ${
+                this.audienceMode !== 'patient'
+                  ? `<span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
+                       ID: ${inspectedItem.meshName}
+                     </span>`
+                  : ''
+              }
+            </div>
+            <div class="inspector-title-row">
+              <div>
+                <div class="inspector-title">${inspectedItem.displayName}</div>
+                ${
+                  this.audienceMode !== 'patient'
+                    ? `<div class="inspector-latin">${inspectedItem.latinName}</div>`
+                    : ''
+                }
+              </div>
+              <button
+                type="button"
+                class="inspector-expand-pill"
+                id="btn-toggle-info-card"
+                data-toggle-info-card="true"
+                aria-expanded="${this.infoCardExpanded}"
+                aria-label="Expand or collapse part information"
+              >
+                ${this.infoCardExpanded ? '▴ Show Less' : '▾ Read More'}
+              </button>
+            </div>
+          </div>
+
+          <div class="inspector-compact-preview" data-toggle-info-card="true">
+            ${compactPreviewText}
+          </div>
+
+          <div class="inspector-expanded-details">
+            ${expandedBodyHtml}
+            ${sourcesHtml}
+          </div>
+        `;
+      }
     }
     this.applyPanelStatesToDOM();
 
-    // Render 5-System 27-Mesh Layer Tree (only rebuild when selectedMesh or visibilityMap changes)
-    const layerTreeKey = `${snap.selectedMesh ?? ''}|${IEMAP_STRUCTURES.map(
-      (s) => snap.visibilityMap[s.meshName] ?? s.defaultState
-    ).join(',')}`;
+    // Render 5-System 27-Mesh Layer Tree (only rebuild when selectedMesh, quiz mask, or visibilityMap changes)
+    const layerTreeKey = `${snap.selectedMesh ?? ''}|${this.audienceMode}|${
+      isQuizMaskActive ? 'masked' : 'open'
+    }|${IEMAP_STRUCTURES.map((s) => snap.visibilityMap[s.meshName] ?? s.defaultState).join(',')}`;
 
     if (layerTreeKey !== this.lastRenderedLayerTreeKey) {
       this.lastRenderedLayerTreeKey = layerTreeKey;
@@ -2274,12 +2603,16 @@ export class AppHUD {
           const rowsHtml = items
             .map((item) => {
               const st: VisibilityState = snap.visibilityMap[item.meshName] ?? item.defaultState;
-              const isSel = snap.selectedMesh === item.meshName;
+              const isSel = !isQuizMaskActive && snap.selectedMesh === item.meshName;
+              const rowTooltip =
+                this.audienceMode === 'patient'
+                  ? item.displayName
+                  : `${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}`;
               return `
-                <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
+                <div class="mesh-row ${isSel ? 'selected' : ''}" data-tree-select="${item.meshName}" title="${rowTooltip}">
                   <div class="mesh-row-left">
                     <span class="mesh-swatch" style="background:${item.colorHex};"></span>
-                    <span class="mesh-row-label" title="${item.displayName} (${item.latinName}) · Raw ID: ${item.meshName}">
+                    <span class="mesh-row-label" title="${rowTooltip}">
                       ${item.shortLabel}
                     </span>
                   </div>
@@ -2287,17 +2620,17 @@ export class AppHUD {
                     <button
                       class="mini-vis-btn ${st === 'visible' ? 'active-vis' : ''}"
                       data-mesh-vis="${item.meshName}:visible"
-                      title="Solid / Translucent Visible (${item.meshName})"
-                    >Vis</button>
+                      title="Show Solid (${item.shortLabel})"
+                    >Show</button>
                     <button
                       class="mini-vis-btn ${st === 'ghost' ? 'active-ghost' : ''}"
                       data-mesh-vis="${item.meshName}:ghost"
-                      title="Fresnel X-Ray Ghost (${item.meshName})"
-                    >X-Ray</button>
+                      title="See-Through Ghost (${item.shortLabel})"
+                    >Ghost</button>
                     <button
                       class="mini-vis-btn ${st === 'hidden' ? 'active-hide' : ''}"
                       data-mesh-vis="${item.meshName}:hidden"
-                      title="Peel / Hide Structure (${item.meshName})"
+                      title="Hide Part (${item.shortLabel})"
                     >Hide</button>
                   </div>
                 </div>
@@ -2313,8 +2646,8 @@ export class AppHUD {
                   <span>${gMeta.shortTitle} (${items.length})</span>
                 </div>
                 <div class="group-vis-btns">
-                  <button class="mini-vis-btn" data-sys-vis="${gId}:visible">All Vis</button>
-                  <button class="mini-vis-btn" data-sys-vis="${gId}:ghost">All X-Ray</button>
+                  <button class="mini-vis-btn" data-sys-vis="${gId}:visible">All Show</button>
+                  <button class="mini-vis-btn" data-sys-vis="${gId}:ghost">All Ghost</button>
                   <button class="mini-vis-btn" data-sys-vis="${gId}:hidden">Hide</button>
                 </div>
               </div>
@@ -2357,26 +2690,78 @@ export class AppHUD {
   }
 
   private renderProjectedPins(pins: ProjectedPin2D[]): void {
-    this.pinsLayer.innerHTML = pins
-      .filter((p) => p.visible)
-      .map(
-        (p) => `
-        <div
-          class="pin-pill ${p.category === 'structure' ? 'structure-pin' : ''} ${
-          p.occluded ? 'occluded' : ''
-        }"
-          style="left:${p.screenX.toFixed(1)}px;top:${p.screenY.toFixed(1)}px;border-color:${
-          p.colorHex
-        };"
-          title="${p.sublabel}"
-          data-raw-id="${p.rawId}"
-          ${p.meshName ? `data-pin-mesh="${p.meshName}"` : ''}
-        >
-          <span class="pin-dot" style="background:${p.colorHex};"></span>
-          <span>${p.label}</span>
-        </div>
-      `
-      )
-      .join('');
+    const activeIds = new Set<string>();
+    const isPatient = this.audienceMode === 'patient';
+
+    for (const p of pins) {
+      activeIds.add(p.id);
+      let el = this.pinElements.get(p.id);
+
+      if (!p.visible) {
+        if (el && el.style.display !== 'none') {
+          el.style.display = 'none';
+        }
+        continue;
+      }
+
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'pin-pill';
+        const dot = document.createElement('span');
+        dot.className = 'pin-dot';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'pin-label-text';
+        el.appendChild(dot);
+        el.appendChild(labelSpan);
+        this.pinsLayer.appendChild(el);
+        this.pinElements.set(p.id, el);
+      }
+
+      if (el.style.display !== 'flex') {
+        el.style.display = 'flex';
+      }
+      el.style.left = `${p.screenX.toFixed(1)}px`;
+      el.style.top = `${p.screenY.toFixed(1)}px`;
+      el.style.borderColor = p.colorHex;
+
+      el.classList.toggle('structure-pin', p.category === 'structure');
+      el.classList.toggle('occluded', p.occluded);
+
+      const tooltip = isPatient
+        ? p.meshName && STRUCTURE_BY_MESH[p.meshName]
+          ? STRUCTURE_BY_MESH[p.meshName].displayName
+          : p.label
+        : p.sublabel;
+      if (el.title !== tooltip) {
+        el.title = tooltip;
+      }
+      if (el.dataset.rawId !== p.rawId) {
+        el.dataset.rawId = p.rawId;
+      }
+      const targetMesh = p.meshName ?? '';
+      if ((el.dataset.pinMesh ?? '') !== targetMesh) {
+        if (targetMesh) {
+          el.dataset.pinMesh = targetMesh;
+        } else {
+          delete el.dataset.pinMesh;
+        }
+      }
+
+      const dotEl = el.firstElementChild as HTMLElement | null;
+      if (dotEl && dotEl.style.background !== p.colorHex) {
+        dotEl.style.background = p.colorHex;
+      }
+      const textEl = el.lastElementChild as HTMLElement | null;
+      if (textEl && textEl.textContent !== p.label) {
+        textEl.textContent = p.label;
+      }
+    }
+
+    for (const [id, el] of this.pinElements.entries()) {
+      if (!activeIds.has(id)) {
+        el.remove();
+        this.pinElements.delete(id);
+      }
+    }
   }
 }

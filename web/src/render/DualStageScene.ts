@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   DISSECTION_PRESETS,
+  getFiducialMeshName,
   getHumanReadableLabel,
   IEMAP_STRUCTURES,
   KEY_FIDUCIAL_IDS,
@@ -111,6 +112,7 @@ export class DualStageScene {
   private headControls: OrbitControls;
   private headPivotGroup: THREE.Group;
   private headSkinMaterial!: THREE.ShaderMaterial;
+  private headOriginAxes?: THREE.AxesHelper;
 
   private meshEntries: Map<string, MeshEntry> = new Map();
   private pickableMeshes: THREE.Mesh[] = [];
@@ -141,6 +143,10 @@ export class DualStageScene {
     phiCapMax: number;
     isStep3Assist: boolean;
   } | null = null;
+  private activeStepPhiCapMax: number | null = null;
+  private isDraggingPhiSlider = false;
+  private manualPhiHoldActive = false;
+  private lockedSelectionMesh: string | null = null;
 
   // Audio Element for Guided 8-Shot Tour
   private tourAudio: HTMLAudioElement | null = null;
@@ -173,7 +179,7 @@ export class DualStageScene {
     clipAxis: 'none',
     clipOffsetMm: 0.0,
     clipFlip: false,
-    showFiducials: true,
+    showFiducials: false,
     labelMode: 'key',
     showCanalPlanes: false,
     showSplineAndCanaliths: true,
@@ -534,8 +540,9 @@ export class DualStageScene {
       })
     );
 
-    const headOriginAxes = new THREE.AxesHelper(22);
-    this.headPivotGroup.add(headOriginAxes);
+    this.headOriginAxes = new THREE.AxesHelper(22);
+    this.headOriginAxes.visible = false;
+    this.headPivotGroup.add(this.headOriginAxes);
 
     // 3. Load 3D Slicer Fiducials (.fcsv) & Posterior Canal Centerline Spline
     const [fiducials, canalPath] = await Promise.all([
@@ -950,6 +957,9 @@ export class DualStageScene {
     this.fiducialsGroup.visible =
       this.state.showFiducials && this.state.labelMode !== 'off';
     this.canalPlanesGroup.visible = this.state.showCanalPlanes;
+    if (this.headOriginAxes) {
+      this.headOriginAxes.visible = this.state.showFiducials || this.state.showCanalPlanes;
+    }
     this.splineGroup.visible = this.state.showSplineAndCanaliths;
     this.vectorsGroup.visible =
       this.state.appMode === 'mode2_physics' && this.state.showPhysicsVectors;
@@ -965,9 +975,15 @@ export class DualStageScene {
     if (mode === 'mode2_physics') {
       this.state.livePhysicsEnabled = true;
       this.state.showSplineAndCanaliths = true;
+      this.activeStepPhiCapMax = 188.0;
+      this.manualPhiHoldActive = false;
       this.applyDissectionPreset('gate3_bppv_pathway');
       if (this.simulator) {
         this.simulator.setPhiDeg(this.state.canalithPhiDeg);
+        this.state.telemetry = this.simulator.computeTelemetrySnapshot(
+          this.state.headYawDeg,
+          this.state.headPitchDeg
+        );
       }
     } else {
       this.stopGuidedTour();
@@ -983,6 +999,9 @@ export class DualStageScene {
     const step = EPLEY_CLINICAL_STEPS[clampedIdx];
     this.state.activeEpleyStepIdx = clampedIdx;
     this.state.livePhysicsEnabled = true;
+    this.activeStepPhiCapMax = step.phiCapMax;
+    this.isDraggingPhiSlider = false;
+    this.manualPhiHoldActive = false;
 
     // Set initial phi just before transition so particles sediment naturally during the step
     if (this.simulator) {
@@ -1325,6 +1344,10 @@ export class DualStageScene {
 
   public resetAllDissection(): void {
     this.stopGuidedTour();
+    this.poseTransition = null;
+    this.activeStepPhiCapMax = 188.0;
+    this.isDraggingPhiSlider = false;
+    this.manualPhiHoldActive = false;
     this.undoStack = [];
     this.state.canUndo = false;
     this.state.headYawDeg = 0;
@@ -1332,9 +1355,23 @@ export class DualStageScene {
     this.state.canalithPhiDeg = -84.0;
     if (this.simulator) {
       this.simulator.setPhiDeg(-84.0);
+      this.state.telemetry = this.simulator.computeTelemetrySnapshot(0, 0);
     }
     this.state.toolMode = 'inspect';
     this.applyDissectionPreset('full_atlas_xray');
+  }
+
+  public setLockedSelectionMesh(meshName: string | null): void {
+    this.lockedSelectionMesh = meshName;
+  }
+
+  public setPhiSliderDragging(dragging: boolean): void {
+    this.isDraggingPhiSlider = dragging;
+    if (dragging) {
+      this.poseTransition = null;
+      this.activeStepPhiCapMax = 188.0;
+      this.manualPhiHoldActive = true;
+    }
   }
 
   public setSliders(params: {
@@ -1365,17 +1402,32 @@ export class DualStageScene {
       this.state.headCutawayOpacity = params.headCutawayOpacity;
     }
     if (params.canalithPhiDeg !== undefined) {
+      this.poseTransition = null;
+      this.activeStepPhiCapMax = 188.0;
+      this.manualPhiHoldActive = true;
       this.state.canalithPhiDeg = params.canalithPhiDeg;
       if (this.simulator) {
         this.simulator.setPhiDeg(params.canalithPhiDeg);
+        const snap = this.simulator.computeTelemetrySnapshot(
+          this.state.headYawDeg,
+          this.state.headPitchDeg
+        );
+        this.state.telemetry = snap;
+        for (const cb of this.onTelemetryCallbacks) {
+          cb(snap);
+        }
       }
     }
     if (params.headYawDeg !== undefined) {
       this.poseTransition = null;
+      this.activeStepPhiCapMax = 188.0;
+      this.manualPhiHoldActive = false;
       this.state.headYawDeg = params.headYawDeg;
     }
     if (params.headPitchDeg !== undefined) {
       this.poseTransition = null;
+      this.activeStepPhiCapMax = 188.0;
+      this.manualPhiHoldActive = false;
       this.state.headPitchDeg = params.headPitchDeg;
     }
     this.applySceneStateToMeshes();
@@ -1418,8 +1470,12 @@ export class DualStageScene {
       this.state.showSplineAndCanaliths = params.showSplineAndCanaliths;
     if (params.showPhysicsVectors !== undefined)
       this.state.showPhysicsVectors = params.showPhysicsVectors;
-    if (params.livePhysicsEnabled !== undefined)
+    if (params.livePhysicsEnabled !== undefined) {
       this.state.livePhysicsEnabled = params.livePhysicsEnabled;
+      if (params.livePhysicsEnabled) {
+        this.manualPhiHoldActive = false;
+      }
+    }
     if (params.syncCameras !== undefined) this.state.syncCameras = params.syncCameras;
     if (params.layoutMode !== undefined) this.state.layoutMode = params.layoutMode;
     if (params.toolMode !== undefined) this.state.toolMode = params.toolMode;
@@ -1501,14 +1557,16 @@ export class DualStageScene {
       } else if (this.state.toolMode === 'scalpel_ghost') {
         this.setStructureVisibility(hitMesh, 'ghost');
       } else {
-        this.selectStructure(hitMesh, false);
+        if (!this.lockedSelectionMesh) {
+          this.selectStructure(hitMesh, false);
+        }
         this.notifyStructurePicked(hitMesh);
       }
     });
 
     dom.addEventListener('dblclick', (ev) => {
       const hitMesh = this.raycastLabyrinthAtScreen(ev.clientX, ev.clientY);
-      if (hitMesh) {
+      if (hitMesh && !this.lockedSelectionMesh) {
         this.selectStructure(hitMesh, true);
       }
     });
@@ -1635,7 +1693,7 @@ export class DualStageScene {
   // PROJECT 3D FIDUCIAL & STRUCTURE PINS TO 2D OVERLAY (PHASE 4)
   // ===========================================================================
   private computeProjectedPins(): ProjectedPin2D[] {
-    if (this.state.labelMode === 'off') {
+    if (this.state.labelMode === 'off' || this.state.layoutMode === 'head_main') {
       return [];
     }
 
@@ -1644,14 +1702,25 @@ export class DualStageScene {
 
     const camDist = this.labyrinthCamera.position.distanceTo(this.labyrinthControls.target);
     const isAllMode = this.state.labelMode === 'all';
+    const checkPipOverlap =
+      this.state.layoutMode === 'labyrinth_main' &&
+      this.pipRect.width > 10 &&
+      this.pipRect.height > 10;
 
     const projectWorldPoint = (worldPt: THREE.Vector3) => {
       const v = worldPt.clone().project(this.labyrinthCamera);
       const sx = labRect.left + (v.x * 0.5 + 0.5) * labRect.width;
       const sy = labRect.top + (-v.y * 0.5 + 0.5) * labRect.height;
+      const inPipBox =
+        checkPipOverlap &&
+        sx >= this.pipRect.left - 36 &&
+        sx <= this.pipRect.left + this.pipRect.width + 24 &&
+        sy >= this.pipRect.top - 10 &&
+        sy <= this.pipRect.top + this.pipRect.height + 24;
       const inFrustum =
         v.z >= -1 &&
         v.z <= 1 &&
+        !inPipBox &&
         sx >= labRect.left + 20 &&
         sx <= labRect.left + labRect.width - 20 &&
         sy >= labRect.top + 28 &&
@@ -1681,7 +1750,7 @@ export class DualStageScene {
         const proj = projectWorldPoint(pt);
         candidates.push({
           pin: {
-            id: `sel_${ontology.meshName}`,
+            id: `struct_${ontology.meshName}`,
             rawId: ontology.meshName,
             label: ontology.shortLabel,
             sublabel: `${ontology.displayName} (${ontology.latinName}) · Raw ID: ${ontology.meshName} / ${ontology.structureId}`,
@@ -1787,6 +1856,7 @@ export class DualStageScene {
             screenY: proj.sy,
             visible: proj.inFrustum,
             occluded: proj.depth > 0.985,
+            meshName: getFiducialMeshName(f.label, f.canalGroup),
           },
           priority,
           maxDist,
@@ -1869,11 +1939,14 @@ export class DualStageScene {
         this.applyHeadRotationMatrixToRoots(this.state.headYawDeg, this.state.headPitchDeg);
         if (u >= 1.0) {
           this.poseTransition.active = false;
+          this.poseTransition = null;
         }
       }
 
       // 2. Step Real-Time Stokes Otoconia Sedimentation Physics
-      if (this.simulator && this.state.livePhysicsEnabled) {
+      const isPausedByManualPhi =
+        this.isDraggingPhiSlider || this.manualPhiHoldActive;
+      if (this.simulator && this.state.livePhysicsEnabled && !isPausedByManualPhi) {
         const isGuidedStep = this.poseTransition !== null;
         const tel = this.simulator.stepPhysics(
           dt,
@@ -1881,7 +1954,10 @@ export class DualStageScene {
           this.state.headPitchDeg,
           {
             allowBackwardSlide: !isGuidedStep,
-            phiCapMax: this.poseTransition ? this.poseTransition.phiCapMax : 188.0,
+            phiCapMax:
+              (this.poseTransition
+                ? this.poseTransition.phiCapMax
+                : this.activeStepPhiCapMax) ?? undefined,
             isStep3Assist: Boolean(this.poseTransition?.isStep3Assist),
           }
         );

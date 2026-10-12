@@ -55,15 +55,16 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 12px;
   z-index: 30;
-  gap: 12px;
+  gap: 8px;
+  max-width: 100vw;
 }
 
 .brand-cluster {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -72,11 +73,12 @@ body,
   border: 1px solid var(--border-bright);
   color: var(--cyan);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 5px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .brand-title {
@@ -92,26 +94,28 @@ body,
   font-family: var(--font-mono);
 }
 
-/* Interactive Breadcrumb Bar */
+/* Interactive Breadcrumb Bar (inside Right Drawer) */
 .breadcrumb-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(15, 25, 31, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 5px 11px;
-  border-radius: 7px;
-  font-size: 12px;
+  gap: 4px;
+  background: rgba(12, 21, 27, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 10px;
+  font-size: 11px;
   overflow: hidden;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .crumb-item {
   color: var(--text-muted);
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   transition: all 0.15s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crumb-item:hover {
@@ -128,19 +132,23 @@ body,
 .crumb-sep {
   color: var(--text-dim);
   font-size: 11px;
+  flex-shrink: 0;
 }
 
 /* Search & Layout Header Right */
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .search-wrapper {
   position: relative;
-  width: 230px;
+  width: clamp(120px, 14vw, 195px);
+  flex-shrink: 1;
+  min-width: 105px;
 }
 
 .search-input {
@@ -148,9 +156,9 @@ body,
   background: rgba(14, 23, 29, 0.9);
   border: 1px solid rgba(82, 220, 242, 0.24);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   color: var(--text-main);
-  font-size: 12px;
+  font-size: 11.5px;
   font-family: var(--font-sans);
   outline: none;
   transition: border-color 0.15s ease;
@@ -213,17 +221,20 @@ body,
   border-radius: 6px;
   padding: 2px;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .seg-btn {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 5px 9px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 
@@ -235,6 +246,23 @@ body,
   background: var(--cyan-dim);
   color: var(--cyan);
   border: 1px solid rgba(82, 220, 242, 0.35);
+}
+
+@media (max-width: 1240px) and (min-width: 901px) {
+  .lab-header .brand-badge {
+    display: none;
+  }
+  .search-wrapper {
+    width: 135px;
+  }
+  .mode-tab-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .seg-btn {
+    padding: 4px 6px;
+    font-size: 10.5px;
+  }
 }
 
 /* Main Body Area */
@@ -657,11 +685,25 @@ body,
   backdrop-filter: blur(14px);
 }
 
+.lab-shell.split-50-50 .left-tool-dock {
+  top: 46px;
+  max-height: calc(100% - 156px);
+  transition: width 0.2s ease;
+}
+
+.lab-shell.split-50-50 .camera-preset-bar {
+  left: calc(50% + 14px);
+  max-width: calc(50% - 28px);
+  overflow-x: auto;
+}
+
 .cam-label {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-muted);
   margin-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .cam-btn {
@@ -673,6 +715,8 @@ body,
   padding: 4px 8px;
   border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.14s ease;
 }
 
@@ -704,7 +748,7 @@ body,
 .right-inspector-drawer.split-layout-offset,
 .right-inspector-drawer.pip-offset-none {
   top: 14px;
-  max-height: calc(100% - 28px);
+  max-height: calc(100% - 76px);
 }
 
 .right-inspector-drawer.collapsed {
@@ -1160,6 +1204,10 @@ body,
   right: 14px;
 }
 
+.lab-shell.split-50-50 .epley-sandbox-bar {
+  bottom: 68px;
+}
+
 .epley-sandbox-bar.visible {
   display: flex;
 }
@@ -1243,6 +1291,89 @@ body,
   color: var(--text-main);
 }
 
+/* Mode 2 Patient-Friendly Progress & Sensation Bar */
+.epley-patient-telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.epley-patient-telemetry.hidden,
+.epley-telemetry-grid.hidden {
+  display: none !important;
+}
+
+.patient-tel-card {
+  background: rgba(8, 15, 19, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.patient-tel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.patient-tel-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.patient-tel-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.patient-progress-track {
+  width: 100%;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.patient-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--warm), var(--sage));
+  border-radius: 99px;
+  transition: width 0.2s ease;
+}
+
+.patient-sensation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sensation-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sensation-dot.calm {
+  background: var(--sage);
+  box-shadow: 0 0 6px var(--sage);
+}
+
+.sensation-dot.spinning {
+  background: var(--warm);
+  box-shadow: 0 0 8px var(--warm);
+}
+
 .epley-telemetry-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1274,7 +1405,7 @@ body,
 }
 
 /* ============================================================================
-   PHASE 2: RESPONSIVE LAYOUT (<= 900px Bottom Tabbed Drawer, <= 600px Half-Height & PiP)
+   PHASE 2: RESPONSIVE LAYOUT (<= 900px Bottom Tabbed Drawer, <= 600px Compact Mobile)
    ============================================================================ */
 .workspace-panels-shell {
   display: contents;
@@ -1296,50 +1427,59 @@ body,
 @media (max-width: 900px) {
   .lab-header {
     height: auto;
-    min-height: 54px;
+    min-height: 48px;
     flex-wrap: wrap;
-    padding: 6px 10px;
-    gap: 6px;
+    padding: 5px 10px;
+    gap: 5px;
     max-width: 100vw;
     overflow-x: hidden;
   }
 
   .brand-cluster {
     width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: space-between;
     gap: 6px;
     min-width: 0;
   }
 
   .mode-switch-pill {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     min-width: 0;
     max-width: 100%;
+    flex: 1;
+  }
+
+  .mode-tab-btn {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .header-controls {
     width: 100%;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
   }
 
-  .breadcrumb-bar {
-    display: none;
-  }
-
   .search-wrapper {
-    width: 170px;
-    flex: 1 1 160px;
+    width: 160px;
+    flex: 1 1 140px;
     min-width: 0;
   }
 
   .pip-frame-hud:not(.split-mode) {
-    top: 12px;
-    right: 12px;
-    width: 230px;
-    height: 175px;
+    top: 10px;
+    right: 10px;
+    width: 220px;
+    height: 168px;
+  }
+
+  .pip-frame-hud.split-mode {
+    height: 58%;
   }
 
   /* Bottom Tabbed Drawer Container */
@@ -1351,8 +1491,8 @@ body,
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 44%;
-    max-height: 46%;
+    height: 40%;
+    max-height: 42%;
     background: rgba(10, 19, 25, 0.97);
     border-top: 1.5px solid var(--border-bright);
     border-radius: 14px 14px 0 0;
@@ -1363,9 +1503,14 @@ body,
     transition: height 0.22s ease, max-height 0.22s ease;
   }
 
+  .lab-shell.mode2-active .workspace-panels-shell:not(.drawer-expanded) {
+    height: 30%;
+    max-height: 32%;
+  }
+
   .workspace-panels-shell.drawer-expanded {
-    height: 76%;
-    max-height: 78%;
+    height: 74%;
+    max-height: 76%;
   }
 
   .mobile-drawer-header {
@@ -1378,7 +1523,7 @@ body,
 
   .mobile-drawer-handle {
     width: 100%;
-    min-height: 44px;
+    min-height: 40px;
     background: transparent;
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -1391,7 +1536,7 @@ body,
     justify-content: center;
     gap: 3px;
     cursor: pointer;
-    padding: 4px 12px;
+    padding: 3px 12px;
   }
 
   .mobile-drawer-handle:hover,
@@ -1419,16 +1564,16 @@ body,
 
   .drawer-tab-btn {
     flex: 1;
-    min-width: 64px;
-    min-height: 44px;
+    min-width: 56px;
+    min-height: 40px;
     background: transparent;
     border: none;
     border-bottom: 2.5px solid transparent;
     color: var(--text-muted);
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 6px 8px;
+    padding: 4px 6px;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.14s ease;
@@ -1513,6 +1658,10 @@ body,
     border-bottom: none;
   }
 
+  .workspace-panels-shell[data-active-tab='info'] #breadcrumb-bar {
+    display: flex !important;
+  }
+
   .workspace-panels-shell[data-active-tab='info'] .inspector-expanded-details {
     display: block !important;
   }
@@ -1536,39 +1685,44 @@ body,
   }
 
   /* Position Camera Preset Bar & Mode 2 Epley Bar above bottom drawer */
-  .camera-preset-bar {
+  .camera-preset-bar,
+  .lab-shell.split-50-50 .camera-preset-bar {
     left: 10px;
     right: 10px;
-    bottom: calc(44% + 10px);
+    max-width: none;
+    bottom: calc(40% + 8px);
     overflow-x: auto;
     justify-content: flex-start;
   }
 
   .camera-preset-bar.drawer-expanded-offset {
-    bottom: calc(76% + 8px);
+    bottom: calc(74% + 8px);
   }
 
   .epley-sandbox-bar,
   .epley-sandbox-bar.left-collapsed,
-  .epley-sandbox-bar.right-collapsed {
+  .epley-sandbox-bar.right-collapsed,
+  .lab-shell.split-50-50 .epley-sandbox-bar {
     left: 10px;
     right: 10px;
-    bottom: calc(44% + 10px);
+    bottom: calc(30% + 8px);
     padding: 8px 10px;
     max-height: 36vh;
     overflow-y: auto;
   }
 
-  .epley-sandbox-bar.drawer-expanded-offset {
-    bottom: calc(76% + 8px);
+  .epley-sandbox-bar.drawer-expanded-offset,
+  .lab-shell.split-50-50 .epley-sandbox-bar.drawer-expanded-offset {
+    bottom: calc(74% + 8px);
   }
 
-  .epley-telemetry-grid {
+  .epley-telemetry-grid,
+  .epley-patient-telemetry {
     grid-template-columns: repeat(3, 1fr);
     gap: 5px;
   }
 
-  /* Guarantee >= 44px touch tap targets on responsive screens */
+  /* Touch tap targets on responsive screens (label rows >= 44px, checkboxes normal 18x18px) */
   .mode-tab-btn,
   .seg-btn,
   .preset-btn,
@@ -1584,15 +1738,16 @@ body,
   .search-input,
   .epley-mute-label,
   .pip-sync-label,
-  .advanced-tools-bar {
+  .advanced-tools-bar,
+  .inline-flip-label {
     min-height: 44px;
     min-width: 44px;
   }
 
   .lab-range,
   .pip-slider-row input[type='range'] {
-    min-height: 44px;
-    height: 44px;
+    min-height: 36px;
+    height: 36px;
   }
 
   .toggle-row input[type='checkbox'],
@@ -1600,8 +1755,11 @@ body,
   #sync-cam-checkbox,
   #chk-mute-audio,
   #clip-flip-checkbox {
-    min-width: 44px;
-    min-height: 44px;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    flex-shrink: 0;
   }
 
   .mini-vis-btn {
@@ -1613,8 +1771,49 @@ body,
 }
 
 @media (max-width: 600px) {
-  .brand-title {
-    display: none;
+  .brand-title,
+  .lab-header .brand-badge,
+  #layout-mode-group {
+    display: none !important;
+  }
+
+  .lab-header {
+    padding: 4px 8px;
+    gap: 4px;
+    min-height: 0;
+  }
+
+  .lab-header .mode-switch-pill {
+    padding: 2px;
+  }
+
+  .lab-header .mode-tab-btn {
+    min-height: 30px;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .lab-header .header-controls {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 4px;
+    padding-bottom: 1px;
+  }
+
+  .lab-header .search-wrapper {
+    flex: 1 1 110px;
+    min-width: 95px;
+  }
+
+  .lab-header .layout-segmented {
+    padding: 1px;
+  }
+
+  .lab-header .search-input,
+  .lab-header .seg-btn {
+    min-height: 30px;
+    padding: 3px 6px;
+    font-size: 10.5px;
   }
 
   .workspace-panels-shell {
@@ -1622,35 +1821,53 @@ body,
     left: 0;
     right: 0;
     bottom: 0;
-    height: 50vh;
-    max-height: 50vh;
+    height: 38vh;
+    max-height: 38vh;
+  }
+
+  .lab-shell.mode2-active .workspace-panels-shell:not(.drawer-expanded) {
+    height: 26vh;
+    max-height: 26vh;
   }
 
   .workspace-panels-shell.drawer-expanded {
-    height: 82vh;
-    max-height: 82vh;
+    height: 78vh;
+    max-height: 78vh;
   }
 
-  .camera-preset-bar {
-    bottom: calc(50vh + 8px);
+  .camera-preset-bar,
+  .lab-shell.split-50-50 .camera-preset-bar {
+    bottom: calc(38vh + 6px);
+    padding: 4px 8px;
+  }
+
+  .camera-preset-bar .cam-btn {
+    min-height: 36px;
+    padding: 4px 8px;
   }
 
   .camera-preset-bar.drawer-expanded-offset {
-    bottom: calc(82vh + 6px);
+    bottom: calc(78vh + 6px);
   }
 
   .epley-sandbox-bar,
   .epley-sandbox-bar.left-collapsed,
   .epley-sandbox-bar.right-collapsed {
-    bottom: calc(50vh + 8px);
+    bottom: calc(26vh + 6px);
+    max-height: 40vh;
   }
 
   .epley-sandbox-bar.drawer-expanded-offset {
-    bottom: calc(82vh + 6px);
+    bottom: calc(78vh + 6px);
   }
 
   .epley-telemetry-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .epley-patient-telemetry {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 
@@ -1721,12 +1938,6 @@ body,
 
 .lab-shell.advanced-tools-off .advanced-tool-item {
   display: none !important;
-}
-
-@media (max-width: 900px) {
-  .lab-shell.advanced-tools-off .workspace-panels-shell[data-active-tab='slicer'] #ras-slicer-section {
-    display: block !important;
-  }
 }
 
 /* First-Visit Welcome Overlay */

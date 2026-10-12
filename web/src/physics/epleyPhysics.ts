@@ -1,4 +1,4 @@
-import { PosteriorCanalPathData } from '../data/fcsvParser';
+import type { PosteriorCanalPathData } from '../data/fcsvParser';
 
 export interface EpleyStepPreset {
   stepIndex: number;
@@ -14,6 +14,8 @@ export interface EpleyStepPreset {
   audioUrl: string;
   headline: string;
   caption: string;
+  patientHeadline: string;
+  patientCaption: string;
 }
 
 export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
@@ -21,8 +23,8 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepIndex: 0,
     stepId: 'locate',
     sceneId: 'scene1_locate',
-    badge: 'SHOT 1 · ANATOMY',
-    shortTitle: '1. Locate Canal',
+    badge: 'INTRO · ANATOMY',
+    shortTitle: 'Intro',
     clinicalTitle: 'Anatomical Location — Right Posterior Canal in Temporal Bone',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -32,13 +34,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Right Posterior-Canal BPPV: Displaced Otoconia',
     caption:
       'In posterior-canal BPPV, displaced otoconia enter the right posterior semicircular canal, which arches 45° posterolaterally behind the utricle.',
+    patientHeadline: 'Intro: Where the Inner Ear Balance Loops Sit',
+    patientCaption:
+      'Deep inside your right ear are three fluid-filled balance loops. Vertigo (BPPV) most often happens in the back balance loop when tiny calcium crystals slip out of their resting sac.',
   },
   {
     stepIndex: 1,
     stepId: 'intro',
     sceneId: 'scene2_pathology',
-    badge: 'SHOT 2 · PATHOLOGY',
-    shortTitle: '2. Pathology',
+    badge: 'CAUSE · LOOSE CRYSTALS',
+    shortTitle: 'Cause',
     clinicalTitle: 'Pathology — Loose Otoconia Settled Near Posterior Ampulla',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -48,13 +53,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Pathology: Loose Otoconia Near the Posterior Ampulla (φ = -84°)',
     caption:
       'Dense calcium carbonate otoconia settle at the gravity-dependent base of the posterior canal just distal to the posterior cupula.',
+    patientHeadline: 'Cause of Vertigo: Loose Crystals Trapped at the Bottom of the Loop',
+    patientCaption:
+      'Five tiny orange ear crystals have settled at the lowest point of the back balance loop right next to the balance motion sensor. Because the sensor flap blocks the short way out, we must guide them around the loop.',
   },
   {
     stepIndex: 2,
     stepId: 'step1',
     sceneId: 'scene3_step1',
-    badge: 'STEP 1 OF 5 · 45° RIGHT',
-    shortTitle: '3. Step 1 (45° R)',
+    badge: 'STEP 1 OF 5 · TURN RIGHT',
+    shortTitle: 'Step 1: Turn Right',
     clinicalTitle: 'Step 1 of 5 — Sit Upright & Rotate Head 45° Right',
     targetYawDeg: -45.0,
     targetReclineDeg: 0.0,
@@ -64,13 +72,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 1: Sit Upright & Turn Head 45° Right (ψ = -45°, θ = 0°)',
     caption:
       'Turning the head 45° toward the affected right ear aligns the right posterior semicircular canal with the sagittal plane of the examination table.',
+    patientHeadline: 'Step 1: Sit Upright & Turn Your Head 45° to the Right',
+    patientCaption:
+      'Turning your head 45° toward the affected right ear lines up the back balance loop so that when you lie back next, the crystals will roll cleanly around the loop.',
   },
   {
     stepIndex: 3,
     stepId: 'step2',
     sceneId: 'scene4_step2',
-    badge: 'STEP 2 OF 5 · SUPINE 30° EXT',
-    shortTitle: '4. Step 2 (Recline)',
+    badge: 'STEP 2 OF 5 · LIE BACK',
+    shortTitle: 'Step 2: Lie Back',
     clinicalTitle: 'Step 2 of 5 — Recline to Supine with 30° Neck Extension',
     targetYawDeg: -45.0,
     targetReclineDeg: 120.0,
@@ -80,13 +91,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 2: Supine + 30° Neck Extension (ψ = -45°, θ = 120° → φ = +30°)',
     caption:
       'Gravity pulls the otoconia ampullofugally away from the cupula around the posterior canal arch toward the apex. Hold 30–60 seconds.',
+    patientHeadline: 'Step 2: Lie Back with Head Tilted Slightly Back (Hold 30–60s)',
+    patientCaption:
+      'Lying back with your head tilted slightly over a pillow lets gravity pull the loose crystals away from the sensor and halfway around the balance loop. Wait 30–60 seconds until the spinning feeling stops.',
   },
   {
     stepIndex: 4,
     stepId: 'step3',
     sceneId: 'scene5_step3',
-    badge: 'STEP 3 OF 5 · 90° LEFT TURN',
-    shortTitle: '5. Step 3 (45° L)',
+    badge: 'STEP 3 OF 5 · TURN LEFT',
+    shortTitle: 'Step 3: Turn Left',
     clinicalTitle: 'Step 3 of 5 — Rotate Head 90° Left (Facing 45° Left)',
     targetYawDeg: 45.0,
     targetReclineDeg: 120.0,
@@ -96,13 +110,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 3: Rotate 90° Left While Extended (ψ = +45°, θ = 120° → φ = +110°)',
     caption:
       'Without raising the head, rotate 90° left. Gravity guides the otoconia across the superior arch into the Common Crus entry.',
+    patientHeadline: 'Step 3: Turn Your Head 90° to the Left Without Lifting It',
+    patientCaption:
+      'Keeping your head tilted back on the bed, turn 90° to the left. Gravity guides the crystals over the top arch of the loop into the shared exit tube (Common Crus). Hold 30–60 seconds.',
   },
   {
     stepIndex: 5,
     stepId: 'step4',
     sceneId: 'scene6_step4',
-    badge: 'STEP 4 OF 5 · SHOULDER ROLL',
-    shortTitle: '6. Step 4 (Roll 135° L)',
+    badge: 'STEP 4 OF 5 · ROLL ON SIDE',
+    shortTitle: 'Step 4: Roll on Side',
     clinicalTitle: 'Step 4 of 5 — Roll Onto Left Shoulder, Nose 45° Down',
     targetYawDeg: 135.0,
     targetReclineDeg: 90.0,
@@ -112,13 +129,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 4: Left Shoulder Roll, Nose 45° Down (ψ = +135°, θ = 90° → φ = +165°)',
     caption:
       'The Common Crus now points steeply downward, allowing gravity to drain the otoconia through the shared limb to the utricular orifice.',
+    patientHeadline: 'Step 4: Roll Onto Your Left Side (Looking Slightly Downward)',
+    patientCaption:
+      'Roll your body onto your left shoulder so your nose points 45° toward the floor. This points the shared exit tube straight down so the crystals slide to the doorway of the resting sac.',
   },
   {
     stepIndex: 6,
     stepId: 'step5',
     sceneId: 'scene7_step5',
-    badge: 'STEP 5 OF 5 · SIT UPRIGHT',
-    shortTitle: '7. Step 5 (Sit Up)',
+    badge: 'STEP 5 OF 5 · SIT UP',
+    shortTitle: 'Step 5: Sit Up',
     clinicalTitle: 'Step 5 of 5 — Return Slowly to Upright Sitting',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -128,13 +148,16 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 5: Return to Upright Sitting (ψ = 0°, θ = 0° → φ = +186° Utricle)',
     caption:
       'Keeping the chin tucked, return the patient upright. Otoconia exit into the utricular vestibule where dark cells reabsorb them.',
+    patientHeadline: 'Step 5: Sit Back Up Slowly — Crystals Return to the Resting Sac!',
+    patientCaption:
+      'Keeping your chin slightly tucked, sit upright. The crystals drop harmlessly back into the main resting sac (utricle), where they no longer trigger spinning dizziness and your body naturally dissolves them.',
   },
   {
     stepIndex: 7,
     stepId: 'outro',
     sceneId: 'scene8_summary',
-    badge: 'SHOT 8 · CLINICAL SUMMARY',
-    shortTitle: '8. Summary',
+    badge: 'SUMMARY · CLEARED',
+    shortTitle: 'Cleared!',
     clinicalTitle: 'Clinical Summary — Three Keys to Epley Execution',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -144,6 +167,9 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Clinical Summary: 30° Extension · No Head Lift in Step 3 · 30–60s Holds',
     caption:
       '1. Use a shoulder pillow for 20–30° neck extension; 2. Never lift the head during the Step 3 turn; 3. Hold each step 30–60s until particles settle.',
+    patientHeadline: 'Cleared! Three Simple Tips for a Successful Epley Treatment',
+    patientCaption:
+      '1. Place a pillow under your shoulders so your head tilts back gently; 2. Do not lift your head when turning left in Step 3; 3. Pause 30–60 seconds in each step so the crystals finish sliding.',
   },
 ];
 
@@ -158,6 +184,9 @@ export interface PhysicsTelemetryState {
   afferentSpikesPerSec: number;
   nystagmusState: 'Baseline (None)' | 'Excitatory Upbeat-Torsional' | 'Inhibitory Reversal';
   anatomicalRegion: string;
+  clearancePercent: number;
+  patientSensation: 'Calm' | 'Spinning — Crystals Moving' | 'Spinning — Crystals Sliding Back';
+  patientLocation: 'Trapped in Bottom Loop' | 'Moving Through Tube' | 'Back in Resting Sac';
   centerRAS: [number, number, number];
   tangentRAS: [number, number, number];
   tangentWorld: [number, number, number];
@@ -237,6 +266,7 @@ export class RealtimeEpleySimulator {
   public setPhiDeg(phi: number): void {
     this.phiDeg = Math.max(-108.0, Math.min(192.0, phi));
     this.velocityDegPerSec = 0.0;
+    this.cupulaDeflection = 0.0;
   }
 
   public getPhiDeg(): number {
@@ -250,6 +280,31 @@ export class RealtimeEpleySimulator {
     if (phiDeg < 112.0) return 'Posterior Canal (Superior Arch)';
     if (phiDeg < 172.0) return 'Common Crus (Shared Drainage Limb)';
     return 'Utricular Vestibule (Cleared!)';
+  }
+
+  public static computeClearancePercent(phiDeg: number): number {
+    return Math.round(Math.max(0, Math.min(100, ((phiDeg - -84.0) / (186.0 - -84.0)) * 100)));
+  }
+
+  public static classifyPatientLocation(
+    phiDeg: number
+  ): PhysicsTelemetryState['patientLocation'] {
+    if (phiDeg < -45.0) return 'Trapped in Bottom Loop';
+    if (phiDeg < 172.0) return 'Moving Through Tube';
+    return 'Back in Resting Sac';
+  }
+
+  public static classifyPatientSensation(
+    velocityDegPerSec: number,
+    cupulaDeflection: number
+  ): PhysicsTelemetryState['patientSensation'] {
+    if (cupulaDeflection > 0.12 || velocityDegPerSec > 1.2) {
+      return 'Spinning — Crystals Moving';
+    }
+    if (cupulaDeflection < -0.12 || velocityDegPerSec < -1.2) {
+      return 'Spinning — Crystals Sliding Back';
+    }
+    return 'Calm';
   }
 
   public interpolateAtPhi(phi: number): {
@@ -289,7 +344,11 @@ export class RealtimeEpleySimulator {
 
     const arc = s0.arc_length_mm + (s1.arc_length_mm - s0.arc_length_mm) * t;
     const pos = lerp3(s0.position_ras, s1.position_ras);
-    const tan = normalize3(lerp3(s0.tangent_ras, s1.tangent_ras));
+    const rawTan = lerp3(s0.tangent_ras, s1.tangent_ras);
+    // At the dependent floor of the posterior canal (phi <= -84°), the canal floor is horizontal in upright sitting (tanZ = 0)
+    const floorRamp = smoothstep(-84.0, -70.0, clamped);
+    const adjustedTanZ = rawTan[2] > 0 ? rawTan[2] * floorRamp : rawTan[2];
+    const tan = normalize3([rawTan[0], rawTan[1], adjustedTanZ]);
     const rawNrm = lerp3(s0.normal_ras, s1.normal_ras);
     const dotTN = rawNrm[0] * tan[0] + rawNrm[1] * tan[1] + rawNrm[2] * tan[2];
     const nrm = normalize3([
@@ -326,6 +385,52 @@ export class RealtimeEpleySimulator {
     return pts;
   }
 
+  public computeTelemetrySnapshot(
+    psiYawDeg: number,
+    thetaReclineDeg: number
+  ): PhysicsTelemetryState {
+    const R = computeHeadRotationMatrix(psiYawDeg, thetaReclineDeg);
+    const sample = this.interpolateAtPhi(this.phiDeg);
+    const tanWorld = matVecMul(R, sample.tan);
+    const particlesRAS = this.computeParticlesRAS(this.phiDeg);
+    const baselineSpikes = 90;
+    const afferentSpikesPerSec = Math.round(
+      Math.max(10, Math.min(310, baselineSpikes + this.cupulaDeflection * 175))
+    );
+    let nystagmusState: PhysicsTelemetryState['nystagmusState'] = 'Baseline (None)';
+    if (this.cupulaDeflection > 0.12) {
+      nystagmusState = 'Excitatory Upbeat-Torsional';
+    } else if (this.cupulaDeflection < -0.12) {
+      nystagmusState = 'Inhibitory Reversal';
+    }
+    const rawGravityDrive = -tanWorld[2];
+    const settledOnFloor =
+      (this.phiDeg <= -84.0 && rawGravityDrive < 0.0) ||
+      (this.phiDeg >= 182.0 && Math.abs(this.velocityDegPerSec) < 0.2);
+    return {
+      psiYawDeg,
+      thetaReclineDeg,
+      phiDeg: this.phiDeg,
+      arcMm: sample.arc,
+      velocityDegPerSec: this.velocityDegPerSec,
+      gravityAlongCanal: settledOnFloor ? 0.0 : rawGravityDrive,
+      cupulaDeflectionNormalized: this.cupulaDeflection,
+      afferentSpikesPerSec,
+      nystagmusState,
+      anatomicalRegion: RealtimeEpleySimulator.classifyRegion(this.phiDeg),
+      clearancePercent: RealtimeEpleySimulator.computeClearancePercent(this.phiDeg),
+      patientSensation: RealtimeEpleySimulator.classifyPatientSensation(
+        this.velocityDegPerSec,
+        this.cupulaDeflection
+      ),
+      patientLocation: RealtimeEpleySimulator.classifyPatientLocation(this.phiDeg),
+      centerRAS: sample.pos,
+      tangentRAS: sample.tan,
+      tangentWorld: tanWorld,
+      particlesRAS,
+    };
+  }
+
   /**
    * Advance the overdamped Stokes sedimentation ODE by `dt` seconds.
    */
@@ -342,7 +447,7 @@ export class RealtimeEpleySimulator {
   ): PhysicsTelemetryState {
     const clampedDt = Math.min(0.05, Math.max(0.0, dt));
     const R = computeHeadRotationMatrix(psiYawDeg, thetaReclineDeg);
-    const { arc, pos, tan } = this.interpolateAtPhi(this.phiDeg);
+    const { tan } = this.interpolateAtPhi(this.phiDeg);
     const tanWorld = matVecMul(R, tan);
 
     // Downward world gravity g_world = (0, 0, -1) dotted with canal tangent T_world
@@ -350,37 +455,70 @@ export class RealtimeEpleySimulator {
     const gProj = -tanWorld[2];
 
     let effectiveDrive = gProj;
-    if (options?.isStep3Assist && this.phiDeg >= 96.0 && this.phiDeg <= 112.0) {
-      effectiveDrive = Math.max(gProj, 0.18 * (1.0 - (this.phiDeg - 96.0) / 16.0));
+
+    // Head-orientation-based Step 3 superior-arch gravity assist:
+    // Works both during guided Step 3 animation AND when manually dragging Turn Head (ψ ≈ +45°) & Tilt Head (θ ≈ 120°) sliders
+    const inStep3HeadPose =
+      Boolean(options?.isStep3Assist) ||
+      (psiYawDeg >= 15.0 && psiYawDeg <= 80.0 && thetaReclineDeg >= 65.0);
+    const inStep4RollPose = psiYawDeg > 80.0 && thetaReclineDeg >= 50.0;
+    const inStep5UprightDrain = thetaReclineDeg <= 65.0 && this.phiDeg >= 115.0;
+
+    if (inStep3HeadPose && this.phiDeg >= 90.0 && this.phiDeg <= 112.5) {
+      if (this.phiDeg < 110.0) {
+        effectiveDrive = Math.max(
+          gProj,
+          0.08 + 0.20 * (1.0 - Math.max(0.0, this.phiDeg - 94.0) / 16.0)
+        );
+      } else {
+        // Hold at Common Crus entry (+110°) during Step 3 without backward reflux or premature overshoot
+        effectiveDrive = 0.0;
+      }
+    } else if (inStep4RollPose && this.phiDeg >= 90.0) {
+      if (this.phiDeg < 165.0) {
+        // Smoothly bridge the Common Crus bifurcation and drain to the utricular orifice (+165°) in Step 4
+        effectiveDrive = Math.max(gProj, 0.36);
+      } else {
+        effectiveDrive = 0.0;
+      }
+    } else if (inStep5UprightDrain && this.phiDeg < 186.0) {
+      // Smoothly drain out the utricular orifice into the resting utricle (+186°) when sitting upright in Step 5
+      effectiveDrive = Math.max(gProj, 0.28);
     }
 
     const mobility = options?.mobility ?? 48.0;
     const allowBack = options?.allowBackwardSlide ?? true;
-    const phiCapMax = options?.phiCapMax ?? 188.0;
+    const phiCapMax = options?.phiCapMax ?? 186.0;
 
     let dphiDt = 0.0;
     if (allowBack) {
-      // Deadzone of |gProj| < 0.04 for static viscous stiction on canal floor
-      if (Math.abs(effectiveDrive) > 0.04) {
+      // Deadzone of |gProj| < 0.045 for static viscous stiction on canal floor
+      if (Math.abs(effectiveDrive) > 0.045) {
         dphiDt = mobility * effectiveDrive;
       }
     } else {
       dphiDt = mobility * Math.max(0.0, effectiveDrive);
     }
 
-    // Once particles enter the utricular vestibule (phi >= 182°), they drop onto the utricular floor and do not reflux back up the common crus
-    if (this.phiDeg >= 182.0 && dphiDt < 0.0) {
+    // Dependent base floor at phi = -84° prevents spontaneous backward slide into the posterior ampulla when sitting upright
+    if (this.phiDeg <= -84.0 && dphiDt < 0.0) {
       dphiDt = 0.0;
     }
-    // Cupula barrier at phi = -94° prevents movement through the sealed posterior ampulla
-    if (this.phiDeg <= -94.0 && dphiDt < 0.0) {
+    // Once particles have descended into the Common Crus (phi >= 115°) or utricular vestibule (phi >= 182°),
+    // prevent retrograde reflux over the superior arch while the user transitions head sliders between Step 4 and Step 5
+    if (this.phiDeg >= 115.0 && dphiDt < 0.0) {
       dphiDt = 0.0;
     }
     if (this.phiDeg >= phiCapMax && dphiDt > 0.0) {
       dphiDt = 0.0;
     }
 
-    this.phiDeg = Math.max(-94.0, Math.min(phiCapMax, this.phiDeg + dphiDt * clampedDt));
+    const minAllowedPhi = Math.min(-84.0, this.phiDeg);
+    const maxAllowedPhi = Math.max(phiCapMax, this.phiDeg);
+    this.phiDeg = Math.max(
+      minAllowedPhi,
+      Math.min(maxAllowedPhi, this.phiDeg + dphiDt * clampedDt)
+    );
     this.velocityDegPerSec = dphiDt;
 
     // Steinhausen Cupula Plunger coupling:
@@ -407,6 +545,10 @@ export class RealtimeEpleySimulator {
     const updatedSample = this.interpolateAtPhi(this.phiDeg);
     const updatedTanWorld = matVecMul(R, updatedSample.tan);
     const particlesRAS = this.computeParticlesRAS(this.phiDeg);
+    const rawUpdatedDrive = -updatedTanWorld[2];
+    const settledAfterStep =
+      (this.phiDeg <= -84.0 && rawUpdatedDrive < 0.0) ||
+      (this.phiDeg >= 182.0 && Math.abs(this.velocityDegPerSec) < 0.2);
 
     return {
       psiYawDeg,
@@ -414,11 +556,17 @@ export class RealtimeEpleySimulator {
       phiDeg: this.phiDeg,
       arcMm: updatedSample.arc,
       velocityDegPerSec: this.velocityDegPerSec,
-      gravityAlongCanal: -updatedTanWorld[2],
+      gravityAlongCanal: settledAfterStep ? 0.0 : rawUpdatedDrive,
       cupulaDeflectionNormalized: this.cupulaDeflection,
       afferentSpikesPerSec,
       nystagmusState,
       anatomicalRegion: RealtimeEpleySimulator.classifyRegion(this.phiDeg),
+      clearancePercent: RealtimeEpleySimulator.computeClearancePercent(this.phiDeg),
+      patientSensation: RealtimeEpleySimulator.classifyPatientSensation(
+        this.velocityDegPerSec,
+        this.cupulaDeflection
+      ),
+      patientLocation: RealtimeEpleySimulator.classifyPatientLocation(this.phiDeg),
       centerRAS: updatedSample.pos,
       tangentRAS: updatedSample.tan,
       tangentWorld: updatedTanWorld,
@@ -426,3 +574,4 @@ export class RealtimeEpleySimulator {
     };
   }
 }
+

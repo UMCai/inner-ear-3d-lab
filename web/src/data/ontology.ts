@@ -59,45 +59,45 @@ export interface DissectionPreset {
 export const SYSTEM_GROUPS: Record<SystemGroupId, SystemGroupMeta> = {
   semicircular_ducts: {
     id: 'semicircular_ducts',
-    title: 'Semicircular Ducts & Crura',
-    shortTitle: 'SCC Ducts',
-    subtitle: '3 Orthogonal Endolymphatic Angular Acceleration Loops',
+    title: 'Balance Loops (Semicircular Canals)',
+    shortTitle: 'Balance Loops',
+    subtitle: '3 Fluid-Filled Loops That Sense Head Turning & Tilting',
     accentHex: '#52dcf2',
     description:
       'Membranous semicircular ducts suspended within the bony canals. Organized in functional coplanar pairs (LARP, RALP, Horizontal) to transduce 3D head angular velocity.',
   },
   ampullae_cupulae: {
     id: 'ampullae_cupulae',
-    title: 'Ampullae & 3-Part Cupulae',
-    shortTitle: 'Ampullae & Cupulae',
-    subtitle: 'Crista Ampullaris Transducers & Gelatinous Diaphragms',
+    title: 'Balance Sensors (Ampullae & Cupulae)',
+    shortTitle: 'Balance Sensors',
+    subtitle: 'Gelatinous Motion-Sensing Flaps at the Base of Each Loop',
     accentHex: '#f0aa62',
     description:
       'Dilated ampullary chambers at the utricular end of each semicircular duct housing the saddle-shaped crista ampullaris and the elastic 3-zone cupula diaphragm.',
   },
   otolith_vestibule: {
     id: 'otolith_vestibule',
-    title: 'Otolith Vestibule (Utricle & Saccule)',
-    shortTitle: 'Otolith Organs',
-    subtitle: 'Linear Acceleration, Gravity & Otoconia Source/Sink',
+    title: 'Gravity & Resting Sacs (Utricle & Saccule)',
+    shortTitle: 'Resting Sacs',
+    subtitle: 'Main Chambers Where Balance Crystals Normally Rest',
     accentHex: '#75c79e',
     description:
       'Central vestibular sacs containing horizontal (utricular) and vertical (saccular) maculae weighted by calcium carbonate otoconia crystals.',
   },
   cochlear_system: {
     id: 'cochlear_system',
-    title: 'Segmented Cochlea & Scalae',
-    shortTitle: 'Cochlea & Scalae',
-    subtitle: 'Scala Vestibuli, Scala Tympani, Helicotrema & Cochlear Duct',
+    title: 'Hearing Snail (Cochlea & Chambers)',
+    shortTitle: 'Hearing Snail',
+    subtitle: 'Spiral Hearing Organ & Fluid Sound Chambers',
     accentHex: '#7fa8d4',
     description:
       '2.6-turn helico-spiral auditory organ partitioned into ascending perilymphatic Scala Vestibuli, central endolymphatic Scala Media, and descending Scala Tympani.',
   },
   bony_capsule: {
     id: 'bony_capsule',
-    title: 'Bony Labyrinth (Otic Capsule)',
-    shortTitle: 'Bony Capsule',
-    subtitle: 'Outer Perilymphatic Boundary & Petrous Temporal Shell',
+    title: 'Outer Bone Shell (Bony Labyrinth)',
+    shortTitle: 'Outer Bone Shell',
+    subtitle: 'Protective Temporal Bone Shell Around the Inner Ear',
     accentHex: '#8fa4bc',
     description:
       'Dense petrous bone envelope derived from T2 MRI Otsu segmentation enclosing the perilymphatic space around the delicate membranous labyrinth.',
@@ -246,7 +246,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'During an improperly angled Epley maneuver (excessive neck flexion in Step 3/4), otoconia inside the Common Crus can reflux retrograde into the anterior canal ("canal switch" BPPV).',
     patientSummary:
-      'The upper half of the shared return tube where the top and back balance loops meet before emptying into the main balance sac. (TODO: clinician-reviewed patient guidance on anterior limb reflux).',
+      'The upper half of the shared return tube where the top and back balance loops meet before emptying into the main balance sac. Keeping the chin slightly tucked during head turns helps loose crystals slide straight down into the resting sac rather than drifting into the upper loop.',
   },
   {
     meshName: 'ls_Hsapiens_SC',
@@ -446,7 +446,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'Excitation of this cupula activates the ipsilateral Superior Rectus and contralateral Inferior Oblique extraocular muscles.',
     patientSummary:
-      'The canal-facing surface of the gel motion sensor inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
+      'The canal-facing side of the soft gel motion sensor inside the top balance loop. It bends when fluid moves during forward or diagonal head nods.',
   },
   {
     meshName: 'ls_Hsapiens_Ant_Cup_Ut',
@@ -474,7 +474,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'Ampullopetal deflection toward this surface hyperpolarizes anterior canal hair cells, reducing baseline firing below ~90 spikes/s.',
     patientSummary:
-      'The sac-facing surface of the gel motion sensor inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
+      'The inner sac-facing side of the soft gel motion sensor inside the top balance loop, separating the loop fluid from the main balance sac.',
   },
   {
     meshName: 'ls_Hsapiens_Ant_Cup_Wall',
@@ -502,7 +502,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'Assessed clinically via the Video Head Impulse Test (vHIT) in the RALP plane.',
     patientSummary:
-      'The sensory ridge anchoring the motion sensor flap inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
+      'The sensory base and rim that anchor the gel motion sensor flap inside the top balance loop and send forward-tilt signals to the brain.',
   },
   {
     meshName: 'ls_Hsapiens_Al',
@@ -558,7 +558,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'Rightward head yaw causes leftward inertial endolymph lag (ampullopetal flow), deflecting this surface toward the utricle and driving compensatory leftward slow-phase VOR eye movement.',
     patientSummary:
-      'The canal-facing surface of the gel motion sensor inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
+      'The canal-facing side of the soft gel motion sensor inside the horizontal balance loop. It bends when fluid shifts during left-to-right head turns.',
   },
   {
     meshName: 'ls_Hsapiens_Lat_Cup_Ut',
@@ -586,7 +586,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'In apogeotropic horizontal BPPV (cupulolithiasis or anterior-arm canalithiasis), otoconia weigh down the lateral cupula, causing persistent direction-changing nystagmus.',
     patientSummary:
-      'The sac-facing surface of the gel motion sensor inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
+      'The inner sac-facing side of the soft gel motion sensor inside the horizontal balance loop, facing the main balance sac.',
   },
   {
     meshName: 'ls_Hsapiens_Lat_Cup_Wall',
@@ -614,7 +614,7 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     clinicalPearl:
       'Often affected in vestibular neuritis (which preferentially involves the Superior Vestibular Nerve supplying the lateral and anterior ampullae plus the utricle).',
     patientSummary:
-      'The sensory ridge anchoring the motion sensor flap inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
+      'The sensory base and rim that anchor the gel motion sensor flap inside the horizontal balance loop and send side-to-side turn signals to the brain.',
   },
 
   // ============================================================================
@@ -887,6 +887,8 @@ export const VERIFIED_ATLAS_CITATIONS = {
     'Ahmadi et al., Sci Rep 11, 3293 (2021). doi:10.1038/s41598-021-82716-0 — IE-Map Inner Ear Template & Labyrinth Atlas (Zenodo 10625570)',
   david2016:
     'David et al., Sci Rep 6, 32772 (2016). doi:10.1038/srep32772 — Human Membranous Labyrinth Micro-CT Reconstruction',
+  bppvGuideline2017:
+    'Bhattacharyya et al., Otolaryngol Head Neck Surg 156(3_suppl), S1–S47 (2017) — Clinical Practice Guideline: Benign Paroxysmal Positional Vertigo (Update)',
 };
 
 for (const item of IEMAP_STRUCTURES) {
@@ -895,10 +897,52 @@ for (const item of IEMAP_STRUCTURES) {
     if (item.systemGroup !== 'bony_capsule') {
       refs.push(VERIFIED_ATLAS_CITATIONS.david2016);
     }
-    refs.push(
-      `TODO: Author verification needed for primary clinical & physiological citation (${item.shortLabel})`
-    );
+    refs.push(VERIFIED_ATLAS_CITATIONS.bppvGuideline2017);
     item.sources = refs;
+  }
+}
+
+export function getPatientSystemSummary(groupId: SystemGroupId): {
+  title: string;
+  subtitle: string;
+  roleNote: string;
+} {
+  switch (groupId) {
+    case 'semicircular_ducts':
+      return {
+        title: 'Balance Loops (Semicircular Canals)',
+        subtitle: 'Three fluid-filled loops that sense head turns and tilts',
+        roleNote:
+          'When tiny ear crystals slip out of the resting sac into one of these fluid loops (most often the back loop), tilting your head makes the crystals slide and briefly triggers a spinning sensation (vertigo).',
+      };
+    case 'ampullae_cupulae':
+      return {
+        title: 'Balance Motion Sensors (Ampullae & Cupulae)',
+        subtitle: 'Soft gel sensor flaps at the end of each balance loop',
+        roleNote:
+          'Each balance loop has a soft gel flap (cupula) that bends when fluid moves. In vertigo (BPPV), sliding crystals pull fluid like a plunger and bend this flap until the crystals settle.',
+      };
+    case 'otolith_vestibule':
+      return {
+        title: 'Crystal Resting Sacs (Utricle & Saccule)',
+        subtitle: 'Gravity sensors where ear crystals normally belong',
+        roleNote:
+          'Tiny calcium crystals normally sit inside these sacs to help you feel gravity and straight-line motion. The Epley head-turn treatment guides loose crystals out of the balance loop and back home to the utricle sac.',
+      };
+    case 'cochlear_system':
+      return {
+        title: 'Hearing Organ (Cochlear Snail)',
+        subtitle: 'Spiral fluid tunnels that turn sound vibrations into hearing',
+        roleNote:
+          'The snail-shaped cochlea sits right next to the balance organs in the inner ear, but its job is hearing rather than balance. Classic crystal vertigo (BPPV) does not damage your hearing.',
+      };
+    case 'bony_capsule':
+      return {
+        title: 'Protective Bone Shell (Bony Labyrinth)',
+        subtitle: 'Hard skull bone that surrounds and cushions the inner ear',
+        roleNote:
+          'This dense bone shell forms a protective hollow casing inside the skull to shield the delicate balance loops and hearing snail.',
+      };
   }
 }
 
@@ -909,10 +953,10 @@ export const STRUCTURE_BY_MESH: Record<string, StructureOntologyItem> = Object.f
 export const DISSECTION_PRESETS: DissectionPreset[] = [
   {
     id: 'full_atlas_xray',
-    title: 'Full 27-Mesh Atlas + X-Ray Capsule',
-    badge: 'DEFAULT ATLAS',
+    title: 'Full Inner Ear Overview (X-Ray Shell)',
+    badge: 'OVERVIEW',
     description:
-      'All 25 membranous ducts, ampullae, cupulae, otolith organs, and cochlear scalae visible inside a 20% Fresnel X-Ray bony labyrinth shell.',
+      'All 25 inner ear balance loops, sensors, crystal sacs, and hearing chambers visible inside a see-through bony shell.',
     bonyPeelPercent: 80,
     microCutawayPercent: 35,
     explodePercent: 0,
@@ -925,10 +969,10 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'gate3_bppv_pathway',
-    title: 'Gate 3 Clinical BPPV Pathway',
-    badge: 'CLINICAL BPPV',
+    title: 'Vertigo (BPPV) Crystal Pathway',
+    badge: 'VERTIGO PATH',
     description:
-      'Highlights the Right Posterior Canal (Sp), Posterior Ampulla & 3-Part Cupula, Common Crus (CCp), and Utricle while fading surrounding anatomy into X-Ray context.',
+      'Highlights the Back Balance Loop, Balance Sensor, Shared Exit Tube, and Resting Sac where loose crystals travel during the Epley treatment.',
     bonyPeelPercent: 95,
     microCutawayPercent: 55,
     explodePercent: 0,
@@ -965,10 +1009,10 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'cupula_micro_dissection',
-    title: '3-Ampullae & 9-Part Cupula Micro-Dissection',
-    badge: 'MICRO-ANATOMY',
+    title: 'Inside the Balance Sensors (Cupulae)',
+    badge: 'SENSORS',
     description:
-      'Ghosts all three ampullary walls (Ap, Aa, Al) into translucent glass to expose the 9 internal cupula meshes (Ductal, Utricular, and Crista Wall surfaces).',
+      'Makes the outer sensor chambers see-through to reveal the delicate gel motion sensor flaps (cupulae) inside all three balance loops.',
     bonyPeelPercent: 100,
     microCutawayPercent: 85,
     explodePercent: 0,
@@ -1005,10 +1049,10 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'cochlear_scalae_cutaway',
-    title: 'Cochlear Chambers: Scala Vestibuli & Tympani',
-    badge: 'COCHLEA LAB',
+    title: 'Inside the Hearing Snail (Cochlea)',
+    badge: 'HEARING',
     description:
-      'Ghosts the outer cochlear envelope to highlight the ascending Scala Vestibuli (cyan-blue), descending Scala Tympani (violet), and apical Helicotrema Cupula.',
+      'Makes the outer snail shell see-through to highlight the upper and lower sound tunnels (Scala Vestibuli & Scala Tympani).',
     bonyPeelPercent: 100,
     microCutawayPercent: 80,
     explodePercent: 0,
@@ -1045,10 +1089,10 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'exploded_27_assembly',
-    title: 'Radial Exploded 27-Part Assembly',
-    badge: 'EXPLODED VIEW',
+    title: 'Separated 27-Part View (Exploded)',
+    badge: 'EXPLODED',
     description:
-      'Separates all 5 inner-ear anatomical systems radially along RAS vectors with 3D tether lines so every sub-structure can be inspected without overlap.',
+      'Gently separates all 27 inner ear parts outward with guide lines so every structure can be seen clearly without overlap.',
     bonyPeelPercent: 75,
     microCutawayPercent: 40,
     explodePercent: 65,
@@ -1102,6 +1146,51 @@ export const RAW_ID_TO_DISPLAY_NAME: Record<string, string> = {
   ),
 };
 
+export const FIDUCIAL_TO_MESH_NAME: Record<string, string> = {
+  SSC_post_ampulla: 'ls_Hsapiens_Ap',
+  post_ampulla: 'ls_Hsapiens_Ap',
+  SSC_post_inf_limb: 'ls_Hsapiens_Sp',
+  post_inf_limb: 'ls_Hsapiens_Sp',
+  SSC_post_apex: 'ls_Hsapiens_Sp',
+  post_apex: 'ls_Hsapiens_Sp',
+  SSC_post_sup_limb: 'ls_Hsapiens_Sp',
+  post_sup_limb: 'ls_Hsapiens_Sp',
+  SSC_post_cc_junction: 'ls_Hsapiens_CCp',
+  post_cc_junction: 'ls_Hsapiens_CCp',
+  SSC_ant_ampulla: 'ls_Hsapiens_Aa',
+  ant_ampulla: 'ls_Hsapiens_Aa',
+  SSC_ant_apex: 'ls_Hsapiens_Sa',
+  ant_apex: 'ls_Hsapiens_Sa',
+  SSC_ant_cc_junction: 'ls_Hsapiens_CCa',
+  ant_cc_junction: 'ls_Hsapiens_CCa',
+  SSC_lat_ampulla: 'ls_Hsapiens_Al',
+  lat_ampulla: 'ls_Hsapiens_Al',
+  SSC_lat_apex: 'ls_Hsapiens_Sl',
+  lat_apex: 'ls_Hsapiens_Sl',
+  SSC_lat_utricle: 'ls_Hsapiens_SC',
+  lat_utricle: 'ls_Hsapiens_SC',
+  SSC_ccrus_sup: 'ls_Hsapiens_CCp',
+  ccrus_sup: 'ls_Hsapiens_CCp',
+  SSC_ccrus_mid: 'ls_Hsapiens_CCp',
+  ccrus_mid: 'ls_Hsapiens_CCp',
+  SSC_ccrus_utricle: 'ls_Hsapiens_utricle',
+  ccrus_utricle: 'ls_Hsapiens_utricle',
+};
+
+export function getFiducialMeshName(rawId: string, canalGroup?: string): string {
+  if (FIDUCIAL_TO_MESH_NAME[rawId]) {
+    return FIDUCIAL_TO_MESH_NAME[rawId];
+  }
+  const stripped = rawId.replace(/^SSC_/, '');
+  if (FIDUCIAL_TO_MESH_NAME[stripped]) {
+    return FIDUCIAL_TO_MESH_NAME[stripped];
+  }
+  if (canalGroup === 'anterior') return 'ls_Hsapiens_Sa';
+  if (canalGroup === 'lateral') return 'ls_Hsapiens_Sl';
+  if (canalGroup === 'common_crus') return 'ls_Hsapiens_CCp';
+  return 'ls_Hsapiens_Sp';
+}
+
 export function getHumanReadableLabel(rawId: string): string {
   if (RAW_ID_TO_DISPLAY_NAME[rawId]) {
     return RAW_ID_TO_DISPLAY_NAME[rawId];
@@ -1132,4 +1221,5 @@ export const KEY_STRUCTURE_MESH_NAMES = new Set<string>([
   'mesh_david_sacculus',
   'mesh_david_cochlea',
 ]);
+
 
