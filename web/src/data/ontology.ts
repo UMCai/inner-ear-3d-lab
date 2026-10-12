@@ -39,6 +39,7 @@ export interface StructureOntologyItem {
   morphometry: string;
   physiologicalFunction: string;
   clinicalPearl: string;
+  patientSummary: string;
 }
 
 export interface DissectionPreset {
@@ -131,6 +132,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Senses angular acceleration in the pitch-roll LARP plane (coplanar with the contralateral Left Anterior canal). Ampullofugal endolymph flow (away from ampulla) depolarizes hair cells (Ewald’s 3rd Law).',
     clinicalPearl:
       'Accountable for 85–90% of all BPPV cases because its inferior ampullary limb sits at the most gravity-dependent point of the labyrinth in both upright and supine postures.',
+    patientSummary:
+      'The back balance loop of the inner ear that senses when you tip your head backward or lie down. Loose crystals most often collect here in BPPV ("ear crystal vertigo") because it sits at the lowest point of the inner ear.',
   },
   {
     meshName: 'ls_Hsapiens_Sa',
@@ -157,6 +160,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Detects forward/diagonal pitch rotations in the RALP plane (paired with the Left Posterior canal). Ampullofugal flow causes excitation and upward/torsional VOR slow-phase eye movement.',
     clinicalPearl:
       'Thinning of the overlying petrous bone causes Superior Semicircular Canal Dehiscence Syndrome (SCDS), creating a pathologic "third mobile window" with Tullio phenomenon and autophony.',
+    patientSummary:
+      'The top balance loop of the inner ear that senses forward nodding movements. Because it sits at the highest point of the balance system, loose crystals rarely stay trapped here.',
   },
   {
     meshName: 'ls_Hsapiens_Sl',
@@ -183,6 +188,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Primary sensor for horizontal head yaw rotation. Follows Ewald’s 2nd Law: ampullopetal flow (toward the utricle/ampulla) depolarizes hair cells because kinocilia face the utricular side.',
     clinicalPearl:
       'Involved in ~10% of BPPV (geotropic or apogeotropic horizontal nystagmus on Supine Roll Test, treated with the BBQ / Lempert 360° roll or Gufoni maneuver) and caloric testing (requiring 60° supine head elevation to make this canal vertical).',
+    patientSummary:
+      'The side-to-side balance loop that senses when you turn your head left or right (such as rolling over in bed). It is the second most common loop affected by loose ear crystals.',
   },
   {
     meshName: 'ls_Hsapiens_CCp',
@@ -209,6 +216,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Forms the posterior half of the shared non-ampullated return trunk uniting the posterior and anterior semicircular ducts before entering the superior utricle.',
     clinicalPearl:
       'Critical escape chute during Steps 3 and 4 of the Epley maneuver: contralateral 45° left head turn and shoulder roll orient CCp downward so canaliths drain cleanly into the utricle.',
+    patientSummary:
+      'The shared exit tube that connects the back balance loop to the main resting sac (utricle). During the Epley head-turning maneuver, loose crystals slide down through this chute to exit the balance loop.',
   },
   {
     meshName: 'ls_Hsapiens_CCa',
@@ -235,6 +244,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Provides low-resistance endolymphatic continuity between the non-ampullated limb of the anterior duct and the utricular vestibule.',
     clinicalPearl:
       'During an improperly angled Epley maneuver (excessive neck flexion in Step 3/4), otoconia inside the Common Crus can reflux retrograde into the anterior canal ("canal switch" BPPV).',
+    patientSummary:
+      'The upper half of the shared return tube where the top and back balance loops meet before emptying into the main balance sac. (TODO: clinician-reviewed patient guidance on anterior limb reflux).',
   },
   {
     meshName: 'ls_Hsapiens_SC',
@@ -261,6 +272,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Completes the closed fluid torus of the horizontal semicircular duct by returning endolymph directly into the utricular cistern.',
     clinicalPearl:
       'Exit pathway for geotropic horizontal canalithiasis during the Lempert (BBQ) 360° roll maneuver.',
+    patientSummary:
+      'The back return end of the horizontal balance loop where fluid flows back into the main resting sac.',
   },
 
   // ============================================================================
@@ -291,6 +304,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Houses the posterior crista ampullaris and cupula. Acts as a hydraulic pressure-amplifying chamber at the base of the posterior canal.',
     clinicalPearl:
       'In Posterior-Canal BPPV, otoconia settle just distal to this ampulla (at phi = -84°). Use the "Ampulla Micro-Cutaway" slider to ghost this outer wall and inspect the 3-part cupula inside!',
+    patientSummary:
+      'A small sensor chamber at the bottom of the back balance loop. It contains the motion sensor (cupula) that tells your brain whether your head is tilting.',
   },
   {
     meshName: 'ls_Hsapiens_Post_Cup_Duct',
@@ -317,6 +332,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Receives direct hydrodynamic piston drag when otoconia sediment away from (`ampullofugal`) or toward (`ampullopetal`) the posterior ampulla.',
     clinicalPearl:
       'During the Dix-Hallpike test, otoconia falling away from this surface pull endolymph like a plunger, deflecting the cupula toward the duct and triggering upbeat-torsional nystagmus.',
+    patientSummary:
+      'The canal-facing side of the soft gel flap (cupula) inside the back balance sensor. When loose crystals slide through the canal, they pull fluid away from this flap, bending it and causing a brief spinning sensation.',
   },
   {
     meshName: 'ls_Hsapiens_Post_Cup_Ut',
@@ -343,6 +360,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Forms an impermeable fluid seal across the ampulla while deflecting elastically with a Steinhausen return time constant of ~7–12 seconds.',
     clinicalPearl:
       'Forms a physical barrier (`phi = -112°`) preventing long-arm posterior canaliths from taking a shortcut directly through the ampulla into the utricle.',
+    patientSummary:
+      'The inner side of the gel sensor flap that blocks crystals from taking a shortcut straight into the resting sac—which is why the Epley maneuver guides crystals the long way around the loop.',
   },
   {
     meshName: 'ls_Hsapiens_Post_Cup_Wall',
@@ -369,6 +388,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Embeds the stereocilia and kinocilia bundles of ~7,000 vestibular hair cells; shear displacement gates mechanosensitive TMC1/TMC2 K+ channels.',
     clinicalPearl:
       'In Cupulolithiasis (heavy cupula), otoconia adhere directly to this cupular structure, producing persistent positional nystagmus without latency or rapid fatigue.',
+    patientSummary:
+      'The base of the gel sensor where tiny sensory hairs detect bending and send balance signals to the brain.',
   },
   {
     meshName: 'ls_Hsapiens_Aa',
@@ -395,6 +416,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Contains the anterior crista ampullaris and cupula; transduces diagonal pitch-roll rotations in the RALP plane.',
     clinicalPearl:
       'Anterior canal BPPV is rare (<2% of cases) because this ampulla sits high and anterior, allowing self-clearance of debris during normal upright head posture.',
+    patientSummary:
+      'The small sensor chamber at the front end of the top balance loop that detects forward head nodding.',
   },
   {
     meshName: 'ls_Hsapiens_Ant_Cup_Duct',
@@ -421,6 +444,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Deflects during ampullofugal flow (excitation) when the head pitches forward and to the right.',
     clinicalPearl:
       'Excitation of this cupula activates the ipsilateral Superior Rectus and contralateral Inferior Oblique extraocular muscles.',
+    patientSummary:
+      'The canal-facing surface of the gel motion sensor inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
   },
   {
     meshName: 'ls_Hsapiens_Ant_Cup_Ut',
@@ -447,6 +472,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Transmits differential endolymph pressure between the utricular vestibule and the anterior duct.',
     clinicalPearl:
       'Ampullopetal deflection toward this surface hyperpolarizes anterior canal hair cells, reducing baseline firing below ~90 spikes/s.',
+    patientSummary:
+      'The sac-facing surface of the gel motion sensor inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
   },
   {
     meshName: 'ls_Hsapiens_Ant_Cup_Wall',
@@ -473,6 +500,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Anchors the gelatinous cupula across the anterior ampullary lumen.',
     clinicalPearl:
       'Assessed clinically via the Video Head Impulse Test (vHIT) in the RALP plane.',
+    patientSummary:
+      'The sensory ridge anchoring the motion sensor flap inside the top balance loop. (TODO: specialized sub-surface; see Anterior Ampulla for general patient overview).',
   },
   {
     meshName: 'ls_Hsapiens_Al',
@@ -499,6 +528,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Contains the horizontal crista ampullaris and cupula for yaw angular velocity transduction.',
     clinicalPearl:
       'Because it lies closest to the medial wall of the middle ear (tympanic cavity / epitympanic recess), it is the primary structure stimulated during bithermal caloric irrigation.',
+    patientSummary:
+      'The sensor chamber at the front of the horizontal balance loop that detects left-and-right head turns.',
   },
   {
     meshName: 'ls_Hsapiens_Lat_Cup_Duct',
@@ -525,6 +556,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Receives endolymph pressure during yaw head rotations; ampullopetal push from this side toward the utricle excites the nerve.',
     clinicalPearl:
       'Rightward head yaw causes leftward inertial endolymph lag (ampullopetal flow), deflecting this surface toward the utricle and driving compensatory leftward slow-phase VOR eye movement.',
+    patientSummary:
+      'The canal-facing surface of the gel motion sensor inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
   },
   {
     meshName: 'ls_Hsapiens_Lat_Cup_Ut',
@@ -551,6 +584,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Faces the kinociliary pole of the horizontal crista hair cells.',
     clinicalPearl:
       'In apogeotropic horizontal BPPV (cupulolithiasis or anterior-arm canalithiasis), otoconia weigh down the lateral cupula, causing persistent direction-changing nystagmus.',
+    patientSummary:
+      'The sac-facing surface of the gel motion sensor inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
   },
   {
     meshName: 'ls_Hsapiens_Lat_Cup_Wall',
@@ -577,6 +612,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Drives the horizontal vestibulo-ocular reflex (Mist/Medial Rectus & Lateral Rectus coupling via CN III and CN VI).',
     clinicalPearl:
       'Often affected in vestibular neuritis (which preferentially involves the Superior Vestibular Nerve supplying the lateral and anterior ampullae plus the utricle).',
+    patientSummary:
+      'The sensory ridge anchoring the motion sensor flap inside the horizontal balance loop. (TODO: specialized sub-surface; see Lateral Ampulla for general patient overview).',
   },
 
   // ============================================================================
@@ -607,6 +644,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Contains the horizontally oriented Macula Utriculi (weighted by CaCO3 otoconia with hair cells polarized toward the curved central striola) to sense horizontal linear acceleration and static head tilt.',
     clinicalPearl:
       'Both the SOURCE and the DESTINATION of BPPV: otoconia detach from the utricular macula to cause BPPV, and the Epley maneuver returns them via the Common Crus back into the utricle where dark cells reabsorb them.',
+    patientSummary:
+      'The main balance sac where tiny calcium crystals (otoconia) normally live and help you sense gravity. BPPV happens when crystals slip out of this sac into a balance loop, and the Epley maneuver guides them safely back home here.',
   },
   {
     meshName: 'ls_Hsapiens_UCp',
@@ -633,6 +672,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Funnels endolymph between the main utricular vestibule and the posterior ampullary opening.',
     clinicalPearl:
       'When sleep or head trauma dislodges otoconia from the utricular macula, gravity funnels them through this posterior sinus into the adjacent posterior canal.',
+    patientSummary:
+      'The lower back pocket of the main balance sac (utricle) leading toward the back balance loop.',
   },
   {
     meshName: 'mesh_david_sacculus',
@@ -659,6 +700,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Houses the parasagittally (vertically) oriented Macula Sacculi (hair cells polarized away from the striola) to detect vertical linear acceleration (elevator motion) and gravity.',
     clinicalPearl:
       'Directly tested by Cervical Vestibular Evoked Myogenic Potentials (cVEMP), which measure sternocleidomastoid relaxation in response to loud clicks/tone bursts stimulating the saccule and Inferior Vestibular Nerve.',
+    patientSummary:
+      'The second crystal-weighted balance sac that senses up-and-down movement, like riding in an elevator.',
   },
 
   // ============================================================================
@@ -689,6 +732,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Performs real-time mechanical Fourier frequency analysis via the Greenwood tonotopic map: high frequencies (20 kHz) resonate at the stiff base, low frequencies (20 Hz) at the compliant apex.',
     clinicalPearl:
       'Peel or ghost this envelope using the "Ampulla & Cochlea Micro-Cutaway" slider to reveal the internal Scala Vestibuli, Scala Tympani, and Helicotrema Cupula!',
+    patientSummary:
+      'The snail-shaped hearing organ of the inner ear. While it shares fluid pathways with the balance system next door, its job is turning sound vibrations into hearing signals.',
   },
   {
     meshName: 'seg_coch_inner_scala_vestibuli',
@@ -715,6 +760,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Transmits acoustic hydraulic pressure waves generated by the stapes footplate up the cochlear spiral, deflecting Reissner’s membrane and the basilar membrane.',
     clinicalPearl:
       'Continuous with the perilymph of the vestibule; in otosclerosis, stapes fixation at the oval window blocks acoustic energy entry into the Scala Vestibuli.',
+    patientSummary:
+      'The upper fluid tunnel inside the snail-shaped hearing organ that carries incoming sound waves upward toward its tip.',
   },
   {
     meshName: 'seg_coch_inner_scala_tympani',
@@ -741,6 +788,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Provides incompressible fluid pressure relief at the Round Window and communicates with subarachnoid CSF via the Cochlear Aqueduct.',
     clinicalPearl:
       'Surgical target for Cochlear Implantation: electrode arrays are inserted via the Round Window niche directly into the Scala Tympani to stimulate spiral ganglion neurons tonotopically.',
+    patientSummary:
+      'The lower fluid tunnel inside the snail-shaped hearing organ; this is also the pathway where cochlear implant electrodes are gently placed to restore hearing.',
   },
   {
     meshName: 'seg_coch_inner_cupula',
@@ -767,6 +816,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Contains the Helicotrema—the apical orifice where perilymph of the ascending Scala Vestibuli meets the descending Scala Tympani, and where low-frequency bass tones (20–100 Hz) peak.',
     clinicalPearl:
       'Acts as a hydraulic high-pass filter protecting the Organ of Corti from static barometric pressure shifts.',
+    patientSummary:
+      'The very tip of the snail-shaped hearing spiral where the upper and lower fluid tunnels meet and deep bass sounds are detected.',
   },
 
   // ============================================================================
@@ -797,6 +848,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Hardest bone in the human body; shields the suspended membranous labyrinth and maintains the perilymphatic fluid cushion.',
     clinicalPearl:
       'Adjust the "Bony Capsule Peel" slider to transition this shell between solid bone, Fresnel X-Ray glass, and fully peeled dissection!',
+    patientSummary:
+      'The protective shell of hard skull bone that surrounds and cushions the delicate inner ear tubes.',
   },
   {
     meshName: 'seg_coch_outer_T2',
@@ -823,6 +876,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Forms the rigid acoustic boundary around the cochlear spiral.',
     clinicalPearl:
       'In cochlear otosclerosis (otospongiosis), demineralization of this capsule causes mixed conductive and sensorineural hearing loss ("halo sign" on temporal bone CT).',
+    patientSummary:
+      'The outer protective bone shell surrounding the snail-shaped hearing organ.',
   },
 ];
 

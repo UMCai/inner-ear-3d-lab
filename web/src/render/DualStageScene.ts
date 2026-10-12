@@ -201,6 +201,7 @@ export class DualStageScene {
   private onStateChangeCallbacks: Array<(snap: LabSceneSnapshot) => void> = [];
   private onPinsUpdateCallbacks: Array<(pins: ProjectedPin2D[]) => void> = [];
   private onTelemetryCallbacks: Array<(tel: PhysicsTelemetryState) => void> = [];
+  private onStructurePickedCallbacks: Array<(meshName: string) => void> = [];
 
   private raycaster = new THREE.Raycaster();
   private pointerDownPos = new THREE.Vector2();
@@ -322,6 +323,16 @@ export class DualStageScene {
 
   public onTelemetryUpdate(cb: (tel: PhysicsTelemetryState) => void): void {
     this.onTelemetryCallbacks.push(cb);
+  }
+
+  public onStructurePicked(cb: (meshName: string) => void): void {
+    this.onStructurePickedCallbacks.push(cb);
+  }
+
+  public notifyStructurePicked(meshName: string): void {
+    for (const cb of this.onStructurePickedCallbacks) {
+      cb(meshName);
+    }
   }
 
   public getSnapshot(): LabSceneSnapshot {
@@ -1491,6 +1502,7 @@ export class DualStageScene {
         this.setStructureVisibility(hitMesh, 'ghost');
       } else {
         this.selectStructure(hitMesh, false);
+        this.notifyStructurePicked(hitMesh);
       }
     });
 

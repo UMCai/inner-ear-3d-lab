@@ -90,6 +90,34 @@ export class AppHUD {
   private welcomeDismissed = false;
   private advancedToolsEnabled = false;
 
+  // Phase 5: Audience mode, Mode 1 Quiz mode, Mode 2 Predict mode
+  private audienceMode: 'student' | 'clinician' | 'patient' = 'student';
+  private quizActive = false;
+  private quizType: 'name_highlighted' | 'click_in_3d' = 'name_highlighted';
+  private quizTargetMesh = 'ls_Hsapiens_Sp';
+  private quizChoices: string[] = [];
+  private quizSelectedChoice: string | null = null;
+  private quizAnswered = false;
+  private quizLastCorrect = false;
+  private quizCorrectCount = 0;
+  private quizTotalCount = 0;
+  private quizSavedLabelMode: LabelDensityMode = 'key';
+  private quizPanelEl!: HTMLElement;
+  private quizToggleBtn!: HTMLButtonElement;
+
+  private predictModeActive = false;
+  private predictPendingStepIdx = 3;
+  private predictChoiceMotion: 'stationary' | 'ampullofugal' | 'enter_utricle' = 'ampullofugal';
+  private predictChoiceNystagmus: 'none' | 'upbeat_torsional' | 'downbeat_inhibitory' =
+    'upbeat_torsional';
+  private predictRevealed = false;
+  private predictLastMotionCorrect = false;
+  private predictLastNystagmusCorrect = false;
+  private predictCorrectCount = 0;
+  private predictTotalCount = 0;
+  private predictPanelEl!: HTMLElement;
+  private predictToggleBtn!: HTMLButtonElement;
+
   private leftPanelCollapsed = false;
   private rightPanelCollapsed = false;
   private infoCardExpanded = false;
@@ -102,6 +130,7 @@ export class AppHUD {
     partsCollapsed: 'gate3_part_list_collapsed',
     welcomeChoice: 'gate3_welcome_choice',
     advancedTools: 'gate3_advanced_tools',
+    audienceMode: 'gate3_audience_mode',
   };
 
   constructor(root: HTMLElement) {
@@ -113,6 +142,7 @@ export class AppHUD {
     this.scene.onStateChange((snap) => this.renderState(snap));
     this.scene.onPinsUpdate((pins) => this.renderProjectedPins(pins));
     this.scene.onTelemetryUpdate((tel) => this.renderLiveTelemetry(tel));
+    this.scene.onStructurePicked((meshName) => this.handleStructurePickedForQuiz(meshName));
 
     window.addEventListener('resize', () => {
       this.applyPanelStatesToDOM();
@@ -167,6 +197,11 @@ export class AppHUD {
     const savedWelcome = this.readStorageString(AppHUD.LS_KEYS.welcomeChoice);
     this.welcomeDismissed = Boolean(savedWelcome);
     this.advancedToolsEnabled = this.readStorageBool(AppHUD.LS_KEYS.advancedTools, false);
+    // Phase 5: Audience mode (Student / Clinician / Patient)
+    const savedAud = this.readStorageString(AppHUD.LS_KEYS.audienceMode);
+    if (savedAud === 'student' || savedAud === 'clinician' || savedAud === 'patient') {
+      this.audienceMode = savedAud;
+    }
   }
 
   public async init(): Promise<void> {
@@ -224,6 +259,17 @@ export class AppHUD {
                 All
               </button>
             </div>
+
+            <button
+              class="seg-btn pip-toggle-header-btn"
+              id="btn-toggle-quiz"
+              type="button"
+              aria-label="Toggle Mode 1 3D Anatomy Quiz"
+              aria-pressed="false"
+              title="Open or close Mode 1 interactive 3D Anatomy Quiz"
+            >
+              Quiz Mode
+            </button>
 
             <button
               class="seg-btn pip-toggle-header-btn"
@@ -296,6 +342,9 @@ export class AppHUD {
               </div>
             </div>
 
+            <!-- PHASE 5: MODE 1 INTERACTIVE 3D ANATOMY QUIZ PANEL -->
+            <div class="quiz-mode-panel hidden" id="quiz-mode-panel" role="region" aria-label="Mode 1 3D Anatomy Quiz"></div>
+
             <!-- Bottom RAS Anatomical ViewCube / Camera Orientation Bar -->
             <div class="camera-preset-bar" id="camera-preset-bar">
               <span class="cam-label">RAS CAMERA:</span>
@@ -313,10 +362,23 @@ export class AppHUD {
               <div class="epley-top-row">
                 <button class="tour-play-btn" id="btn-tour-play">▶ Play 8-Shot Audio Tour</button>
                 <div class="epley-steps-strip" id="epley-steps-strip"></div>
+                <button
+                  class="seg-btn predict-toggle-btn"
+                  id="btn-toggle-predict"
+                  type="button"
+                  aria-label="Toggle Epley Step Predict Mode"
+                  aria-pressed="false"
+                  title="Predict canalith motion and nystagmus direction before playing each Epley step"
+                >
+                  Predict Mode
+                </button>
                 <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;">
                   <input type="checkbox" id="chk-mute-audio" /> Mute Audio
                 </label>
               </div>
+
+              <!-- PHASE 5: MODE 2 EPLEY STEP PREDICTION PANEL -->
+              <div class="epley-predict-panel hidden" id="epley-predict-panel" role="region" aria-label="Predict Epley Step Outcome"></div>
 
               <div class="epley-caption-banner">
                 <div class="epley-caption-headline" id="epley-caption-headline">
@@ -554,6 +616,22 @@ export class AppHUD {
                 </div>
 
                 <div class="right-drawer-body" id="right-drawer-body">
+                  <!-- Phase 5: Audience Depth Selector (Student / Clinician / Patient) -->
+                  <div class="audience-selector-bar" id="audience-selector-bar" data-tab-pane="info">
+                    <span class="audience-bar-label">Audience:</span>
+                    <div class="layout-segmented audience-segmented" id="audience-mode-group" role="group" aria-label="Info card audience depth">
+                      <button class="seg-btn active" type="button" data-audience-mode="student" title="Student: Core anatomy, innervation, physiology, and clinical pearls">
+                        Student
+                      </button>
+                      <button class="seg-btn" type="button" data-audience-mode="clinician" title="Clinician: Full RAS morphometry, mesh telemetry, and diagnostic pearls">
+                        Clinician
+                      </button>
+                      <button class="seg-btn" type="button" data-audience-mode="patient" title="Patient: Plain-language explanation of balance and hearing structures">
+                        Patient
+                      </button>
+                    </div>
+                  </div>
+
                   <!-- Floating Info Card (Compact by default, expands on click) -->
                   <div
                     class="inspector-card compact"
@@ -675,6 +753,10 @@ export class AppHUD {
     this.loadingCountText = this.root.querySelector('#loading-count-text')!;
     this.welcomeOverlay = this.root.querySelector('#welcome-overlay')!;
     this.advancedToolsCheckbox = this.root.querySelector('#chk-advanced-tools')!;
+    this.quizPanelEl = this.root.querySelector('#quiz-mode-panel')!;
+    this.quizToggleBtn = this.root.querySelector('#btn-toggle-quiz')!;
+    this.predictPanelEl = this.root.querySelector('#epley-predict-panel')!;
+    this.predictToggleBtn = this.root.querySelector('#btn-toggle-predict')!;
 
     this.workspacePanelsShell = this.root.querySelector('#workspace-panels-shell')!;
     this.mobileDrawerHeader = this.root.querySelector('#mobile-drawer-header')!;
@@ -741,6 +823,12 @@ export class AppHUD {
       if (!btn) return;
       const idx = parseInt(btn.dataset.epleyStep!, 10);
       this.scene.stopGuidedTour();
+      if (this.predictModeActive) {
+        this.predictPendingStepIdx = idx;
+        this.predictRevealed = false;
+        this.renderPredictPanel();
+        return;
+      }
       this.scene.jumpToEpleyStep(idx, true);
     });
 
@@ -1128,6 +1216,464 @@ export class AppHUD {
         this.scene.setAppMode('mode2_physics');
       }
     });
+
+    // 13. Phase 5: Audience Mode Selector (Student / Clinician / Patient)
+    this.root.querySelector('#audience-mode-group')!.addEventListener('click', (ev) => {
+      const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-audience-mode]');
+      if (!btn) return;
+      const mode = btn.dataset.audienceMode as 'student' | 'clinician' | 'patient';
+      this.audienceMode = mode;
+      this.writeStorageString(AppHUD.LS_KEYS.audienceMode, mode);
+      this.renderState(this.scene.getSnapshot());
+    });
+
+    // 14. Phase 5: Mode 1 Anatomy Quiz Toggle & Panel Events
+    this.quizToggleBtn.addEventListener('click', () => {
+      this.quizActive = !this.quizActive;
+      if (this.quizActive) {
+        if (this.scene.getSnapshot().appMode !== 'mode1_atlas') {
+          this.scene.setAppMode('mode1_atlas');
+        }
+        this.quizSavedLabelMode = this.scene.getSnapshot().labelMode;
+        this.startNextQuizQuestion();
+      } else {
+        this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        this.applyPanelStatesToDOM();
+      }
+    });
+
+    this.quizPanelEl.addEventListener('click', (ev) => {
+      const target = ev.target as HTMLElement;
+      const typeBtn = target.closest<HTMLButtonElement>('[data-quiz-type]');
+      if (typeBtn) {
+        const nextType = typeBtn.dataset.quizType as 'name_highlighted' | 'click_in_3d';
+        if (this.quizType !== nextType) {
+          this.quizType = nextType;
+          this.startNextQuizQuestion();
+        }
+        return;
+      }
+
+      const choiceBtn = target.closest<HTMLButtonElement>('[data-quiz-choice]');
+      if (choiceBtn && !this.quizAnswered && this.quizType === 'name_highlighted') {
+        const chosenMesh = choiceBtn.dataset.quizChoice!;
+        this.quizSelectedChoice = chosenMesh;
+        this.quizAnswered = true;
+        this.quizTotalCount += 1;
+        this.quizLastCorrect = chosenMesh === this.quizTargetMesh;
+        if (this.quizLastCorrect) {
+          this.quizCorrectCount += 1;
+        }
+        this.renderQuizPanel();
+        return;
+      }
+
+      if (target.closest('#btn-quiz-next')) {
+        this.startNextQuizQuestion();
+        return;
+      }
+
+      if (target.closest('#btn-quiz-hint')) {
+        this.scene.flyToStructure(this.quizTargetMesh);
+        return;
+      }
+
+      if (target.closest('#btn-quiz-reset-score')) {
+        this.quizCorrectCount = 0;
+        this.quizTotalCount = 0;
+        this.startNextQuizQuestion();
+        return;
+      }
+
+      if (target.closest('#btn-close-quiz')) {
+        this.quizActive = false;
+        this.scene.setOverlays({ labelMode: this.quizSavedLabelMode });
+        this.applyPanelStatesToDOM();
+      }
+    });
+
+    // 15. Phase 5: Mode 2 Epley Step Predict Mode Toggle & Panel Events
+    this.predictToggleBtn.addEventListener('click', () => {
+      this.predictModeActive = !this.predictModeActive;
+      if (this.predictModeActive) {
+        this.scene.stopGuidedTour();
+        const curIdx = this.scene.getSnapshot().activeEpleyStepIdx;
+        this.predictPendingStepIdx =
+          curIdx < 2 ? 3 : Math.min(EPLEY_CLINICAL_STEPS.length - 1, curIdx + 1);
+        this.predictRevealed = false;
+        this.renderPredictPanel();
+      }
+      this.applyPanelStatesToDOM();
+    });
+
+    this.predictPanelEl.addEventListener('click', (ev) => {
+      const target = ev.target as HTMLElement;
+      const motionBtn = target.closest<HTMLButtonElement>('[data-predict-motion]');
+      if (motionBtn && !this.predictRevealed) {
+        this.predictChoiceMotion = motionBtn.dataset.predictMotion as
+          | 'stationary'
+          | 'ampullofugal'
+          | 'enter_utricle';
+        this.renderPredictPanel();
+        return;
+      }
+
+      const nysBtn = target.closest<HTMLButtonElement>('[data-predict-nystagmus]');
+      if (nysBtn && !this.predictRevealed) {
+        this.predictChoiceNystagmus = nysBtn.dataset.predictNystagmus as
+          | 'none'
+          | 'upbeat_torsional'
+          | 'downbeat_inhibitory';
+        this.renderPredictPanel();
+        return;
+      }
+
+      if (target.closest('#btn-play-and-reveal-prediction') && !this.predictRevealed) {
+        const expected = this.getExpectedStepOutcome(this.predictPendingStepIdx);
+        this.predictLastMotionCorrect = this.predictChoiceMotion === expected.motion;
+        this.predictLastNystagmusCorrect = this.predictChoiceNystagmus === expected.nystagmus;
+        this.predictTotalCount += 1;
+        if (this.predictLastMotionCorrect && this.predictLastNystagmusCorrect) {
+          this.predictCorrectCount += 1;
+        }
+        this.predictRevealed = true;
+        this.scene.jumpToEpleyStep(this.predictPendingStepIdx, true);
+        this.renderPredictPanel();
+        return;
+      }
+
+      if (target.closest('#btn-predict-next-step')) {
+        const nextIdx = (this.predictPendingStepIdx + 1) % EPLEY_CLINICAL_STEPS.length;
+        this.predictPendingStepIdx = nextIdx < 2 ? 3 : nextIdx;
+        this.predictRevealed = false;
+        this.renderPredictPanel();
+        return;
+      }
+
+      if (target.closest('#btn-close-predict')) {
+        this.predictModeActive = false;
+        this.applyPanelStatesToDOM();
+      }
+    });
+  }
+
+  private getQuizCandidateStructures() {
+    // Prefer visible membranous structures so 3D highlighting and clicking are clear
+    const snap = this.scene.getSnapshot();
+    const visibleItems = IEMAP_STRUCTURES.filter(
+      (item) =>
+        item.systemGroup !== 'bony_capsule' &&
+        (snap.visibilityMap[item.meshName] ?? item.defaultState) === 'visible'
+    );
+    return visibleItems.length >= 6
+      ? visibleItems
+      : IEMAP_STRUCTURES.filter((item) => item.systemGroup !== 'bony_capsule');
+  }
+
+  private startNextQuizQuestion(): void {
+    const pool = this.getQuizCandidateStructures();
+    const otherCandidates = pool.filter((item) => item.meshName !== this.quizTargetMesh);
+    const chosenPool = otherCandidates.length > 0 ? otherCandidates : pool;
+    const targetItem = chosenPool[Math.floor(Math.random() * chosenPool.length)] ?? IEMAP_STRUCTURES[0];
+    this.quizTargetMesh = targetItem.meshName;
+    this.quizSelectedChoice = null;
+    this.quizAnswered = false;
+    this.quizLastCorrect = false;
+
+    // Build 4 multiple choice options (target + 3 distractors with distinct displayNames)
+    const distractorPool = IEMAP_STRUCTURES.filter(
+      (item) => item.meshName !== targetItem.meshName
+    );
+    const shuffledDistractors = [...distractorPool].sort(() => Math.random() - 0.5).slice(0, 3);
+    const options = [targetItem.meshName, ...shuffledDistractors.map((d) => d.meshName)].sort(
+      () => Math.random() - 0.5
+    );
+    this.quizChoices = options;
+
+    // Hide 3D labels while question is active so labels don't give away the answer
+    this.scene.setOverlays({ labelMode: 'off' });
+
+    if (this.quizType === 'name_highlighted') {
+      this.scene.selectStructure(this.quizTargetMesh, true);
+    } else {
+      this.scene.selectStructure(null, false);
+    }
+
+    this.renderQuizPanel();
+    this.applyPanelStatesToDOM();
+  }
+
+  private handleStructurePickedForQuiz(meshName: string): void {
+    if (!this.quizActive || this.quizType !== 'click_in_3d' || this.quizAnswered) {
+      return;
+    }
+    this.quizSelectedChoice = meshName;
+    this.quizAnswered = true;
+    this.quizTotalCount += 1;
+    this.quizLastCorrect = meshName === this.quizTargetMesh;
+    if (this.quizLastCorrect) {
+      this.quizCorrectCount += 1;
+    } else {
+      this.scene.selectStructure(this.quizTargetMesh, true);
+    }
+    this.renderQuizPanel();
+  }
+
+  private renderQuizPanel(): void {
+    const targetItem = STRUCTURE_BY_MESH[this.quizTargetMesh] ?? IEMAP_STRUCTURES[0];
+    const targetGroup = SYSTEM_GROUPS[targetItem.systemGroup];
+    const pickedItem = this.quizSelectedChoice
+      ? STRUCTURE_BY_MESH[this.quizSelectedChoice]
+      : null;
+
+    const choicesHtml =
+      this.quizType === 'name_highlighted'
+        ? `
+          <div class="quiz-prompt-text">
+            Which highlighted 3D structure is currently selected in the labyrinth?
+          </div>
+          <div class="quiz-choices-grid">
+            ${this.quizChoices
+              .map((meshName) => {
+                const item = STRUCTURE_BY_MESH[meshName] ?? IEMAP_STRUCTURES[0];
+                let stateClass = '';
+                if (this.quizAnswered) {
+                  if (meshName === this.quizTargetMesh) {
+                    stateClass = 'quiz-choice-correct';
+                  } else if (meshName === this.quizSelectedChoice) {
+                    stateClass = 'quiz-choice-wrong';
+                  }
+                }
+                return `
+                  <button
+                    class="quiz-choice-btn ${stateClass}"
+                    type="button"
+                    data-quiz-choice="${meshName}"
+                    ${this.quizAnswered ? 'disabled' : ''}
+                  >
+                    <span class="quiz-choice-title">${item.displayName}</span>
+                    <span class="quiz-choice-latin">${item.latinName}</span>
+                  </button>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+        : `
+          <div class="quiz-prompt-text">
+            Find &amp; click this structure directly in the 3D labyrinth:
+          </div>
+          <div class="quiz-click-target-banner">
+            <div class="quiz-target-name">${targetItem.displayName}</div>
+            <div class="quiz-target-sub">${targetItem.latinName} · ${targetGroup.shortTitle}</div>
+          </div>
+          <div class="quiz-click-actions">
+            <button class="seg-btn" type="button" id="btn-quiz-hint">Hint: Fly Camera Near</button>
+            <button class="seg-btn" type="button" id="btn-quiz-next">Skip / Next Question →</button>
+          </div>
+        `;
+
+    const feedbackHtml = this.quizAnswered
+      ? `
+        <div class="quiz-feedback-box ${this.quizLastCorrect ? 'correct' : 'incorrect'}" id="quiz-feedback-box">
+          <div class="quiz-feedback-headline">
+            ${
+              this.quizLastCorrect
+                ? `✓ Correct! ${targetItem.displayName}`
+                : `✗ Incorrect (You selected: ${pickedItem?.displayName ?? 'Another part'} — Answer: ${targetItem.displayName})`
+            }
+          </div>
+          <div class="quiz-feedback-sub">${targetItem.patientSummary}</div>
+          <div style="margin-top:6px;display:flex;justify-content:flex-end;">
+            <button class="tour-play-btn" type="button" id="btn-quiz-next">Next Question →</button>
+          </div>
+        </div>
+      `
+      : '';
+
+    this.quizPanelEl.innerHTML = `
+      <div class="quiz-panel-header">
+        <div class="quiz-header-left">
+          <span class="brand-badge">MODE 1 QUIZ</span>
+          <div class="layout-segmented" id="quiz-type-group" role="group" aria-label="Quiz question mode">
+            <button
+              class="seg-btn ${this.quizType === 'name_highlighted' ? 'active' : ''}"
+              type="button"
+              data-quiz-type="name_highlighted"
+            >
+              Name Highlighted Part
+            </button>
+            <button
+              class="seg-btn ${this.quizType === 'click_in_3d' ? 'active' : ''}"
+              type="button"
+              data-quiz-type="click_in_3d"
+            >
+              Click Part in 3D
+            </button>
+          </div>
+        </div>
+        <div class="quiz-header-right">
+          <span class="quiz-score-badge" id="quiz-score-badge">
+            Score: ${this.quizCorrectCount} / ${this.quizTotalCount}
+          </span>
+          <button class="pip-btn" type="button" id="btn-quiz-reset-score" title="Reset session quiz score">Reset</button>
+          <button class="pip-btn" type="button" id="btn-close-quiz" aria-label="Close quiz mode" title="Close Quiz Mode">✕</button>
+        </div>
+      </div>
+      <div class="quiz-panel-body" id="quiz-question-body">
+        ${choicesHtml}
+        ${feedbackHtml}
+      </div>
+    `;
+  }
+
+  private getExpectedStepOutcome(stepIdx: number): {
+    motion: 'stationary' | 'ampullofugal' | 'enter_utricle';
+    motionLabel: string;
+    nystagmus: 'none' | 'upbeat_torsional' | 'downbeat_inhibitory';
+    nystagmusLabel: string;
+    explanation: string;
+  } {
+    if (stepIdx <= 2) {
+      return {
+        motion: 'stationary',
+        motionLabel: 'Stationary at canal base (φ = -84°)',
+        nystagmus: 'none',
+        nystagmusLabel: 'Baseline (None)',
+        explanation:
+          'While sitting upright and turning the head 45° right (Step 1), the otoconia remain settled at the gravity-dependent base of the posterior canal (φ = -84°) with no cupular deflection.',
+      };
+    }
+    if (stepIdx >= 3 && stepIdx <= 5) {
+      return {
+        motion: 'ampullofugal',
+        motionLabel: 'Ampullofugal — drains away from ampulla toward Common Crus',
+        nystagmus: 'upbeat_torsional',
+        nystagmusLabel: 'Excitatory Upbeat-Torsional (Ewald’s 3rd Law)',
+        explanation:
+          'During supine extension and contralateral leftward rotation (Steps 2–4), gravity pulls the otoconia ampullofugally away from the posterior cupula toward the apex and Common Crus, exciting CN VIII and driving upbeat-torsional nystagmus.',
+      };
+    }
+    return {
+      motion: 'enter_utricle',
+      motionLabel: 'Exits Common Crus & settles in Utricle (φ = +186°)',
+      nystagmus: 'none',
+      nystagmusLabel: 'Baseline (None)',
+      explanation:
+        'Returning upright in Step 5 empties the otoconia out of the Common Crus into the utricular vestibule (φ = +186°), allowing the posterior cupula to return to neutral baseline.',
+    };
+  }
+
+  private renderPredictPanel(): void {
+    const step = EPLEY_CLINICAL_STEPS[this.predictPendingStepIdx] ?? EPLEY_CLINICAL_STEPS[3];
+    const expected = this.getExpectedStepOutcome(this.predictPendingStepIdx);
+    const bothRight = this.predictLastMotionCorrect && this.predictLastNystagmusCorrect;
+
+    this.predictPanelEl.innerHTML = `
+      <div class="predict-panel-header">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="brand-badge">PREDICT MODE</span>
+          <span class="predict-step-target">Before playing <strong>${step.shortTitle}</strong> (${step.clinicalTitle}):</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="quiz-score-badge" id="predict-score-badge">
+            Predictions: ${this.predictCorrectCount} / ${this.predictTotalCount}
+          </span>
+          <button class="pip-btn" type="button" id="btn-close-predict" aria-label="Close predict mode">✕</button>
+        </div>
+      </div>
+
+      <div class="predict-questions-row">
+        <div class="predict-col">
+          <div class="predict-col-label">1. Predict Canalith Movement:</div>
+          <div class="predict-btn-group">
+            <button
+              class="seg-btn ${this.predictChoiceMotion === 'stationary' ? 'active' : ''}"
+              type="button"
+              data-predict-motion="stationary"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Stationary at Base
+            </button>
+            <button
+              class="seg-btn ${this.predictChoiceMotion === 'ampullofugal' ? 'active' : ''}"
+              type="button"
+              data-predict-motion="ampullofugal"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Ampullofugal (Away from Ampulla)
+            </button>
+            <button
+              class="seg-btn ${this.predictChoiceMotion === 'enter_utricle' ? 'active' : ''}"
+              type="button"
+              data-predict-motion="enter_utricle"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Exits into Utricle
+            </button>
+          </div>
+        </div>
+
+        <div class="predict-col">
+          <div class="predict-col-label">2. Predict VOR Nystagmus Direction:</div>
+          <div class="predict-btn-group">
+            <button
+              class="seg-btn ${this.predictChoiceNystagmus === 'none' ? 'active' : ''}"
+              type="button"
+              data-predict-nystagmus="none"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Baseline (None)
+            </button>
+            <button
+              class="seg-btn ${this.predictChoiceNystagmus === 'upbeat_torsional' ? 'active' : ''}"
+              type="button"
+              data-predict-nystagmus="upbeat_torsional"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Excitatory Upbeat-Torsional
+            </button>
+            <button
+              class="seg-btn ${this.predictChoiceNystagmus === 'downbeat_inhibitory' ? 'active' : ''}"
+              type="button"
+              data-predict-nystagmus="downbeat_inhibitory"
+              ${this.predictRevealed ? 'disabled' : ''}
+            >
+              Inhibitory Reversal
+            </button>
+          </div>
+        </div>
+
+        <div class="predict-action-col">
+          ${
+            !this.predictRevealed
+              ? `<button class="tour-play-btn" type="button" id="btn-play-and-reveal-prediction">
+                   ▶ Play Step &amp; Reveal Answer
+                 </button>`
+              : `<button class="tour-play-btn" type="button" id="btn-predict-next-step">
+                   Predict Next Step →
+                 </button>`
+          }
+        </div>
+      </div>
+
+      ${
+        this.predictRevealed
+          ? `
+            <div class="quiz-feedback-box ${bothRight ? 'correct' : 'incorrect'}" id="predict-result-banner">
+              <div class="quiz-feedback-headline">
+                ${
+                  bothRight
+                    ? '✓ Both Predictions Correct!'
+                    : `Answer Revealed — Motion: ${this.predictLastMotionCorrect ? '✓' : '✗'} (${expected.motionLabel}) · Nystagmus: ${this.predictLastNystagmusCorrect ? '✓' : '✗'} (${expected.nystagmusLabel})`
+                }
+              </div>
+              <div class="quiz-feedback-sub">${expected.explanation}</div>
+            </div>
+          `
+          : ''
+      }
+    `;
   }
 
   private isPipInsetVisible(): boolean {
@@ -1144,6 +1690,23 @@ export class AppHUD {
     }
     this.advancedToolsCheckbox.checked = this.advancedToolsEnabled;
     this.welcomeOverlay.classList.toggle('hidden', this.welcomeDismissed);
+
+    // Phase 5: Audience mode buttons
+    this.root.querySelectorAll<HTMLButtonElement>('[data-audience-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.audienceMode === this.audienceMode);
+    });
+
+    // Phase 5: Mode 1 Quiz Panel & Mode 2 Predict Panel visibility
+    const isMode1 = this.scene ? this.scene.getSnapshot().appMode === 'mode1_atlas' : true;
+    const isMode2 = !isMode1;
+    this.quizToggleBtn.style.display = isMode1 ? '' : 'none';
+    this.quizToggleBtn.classList.toggle('active', this.quizActive && isMode1);
+    this.quizToggleBtn.setAttribute('aria-pressed', String(this.quizActive && isMode1));
+    this.quizPanelEl.classList.toggle('hidden', !(this.quizActive && isMode1));
+
+    this.predictToggleBtn.classList.toggle('active', this.predictModeActive && isMode2);
+    this.predictToggleBtn.setAttribute('aria-pressed', String(this.predictModeActive && isMode2));
+    this.predictPanelEl.classList.toggle('hidden', !(this.predictModeActive && isMode2));
 
     // Left control dock
     this.leftDockEl.classList.toggle('collapsed', this.leftPanelCollapsed);
@@ -1369,10 +1932,95 @@ export class AppHUD {
       });
     });
 
-    // Render Selected Structure Clinical Inspector Card (Compact floating vs Expanded)
+    // Render Selected Structure Clinical Inspector Card (Compact floating vs Expanded, Audience-aware)
     const inspectedItem =
       STRUCTURE_BY_MESH[snap.selectedMesh ?? 'ls_Hsapiens_Sp'] ?? IEMAP_STRUCTURES[0];
     const inspectedGroup = SYSTEM_GROUPS[inspectedItem.systemGroup];
+
+    const compactPreviewText =
+      this.audienceMode === 'patient'
+        ? inspectedItem.patientSummary
+        : this.audienceMode === 'clinician'
+        ? inspectedItem.clinicalPearl
+        : inspectedItem.physiologicalFunction;
+
+    const expandedBodyHtml =
+      this.audienceMode === 'patient'
+        ? `
+          <div class="clinical-field">
+            <div class="clinical-field-label">Plain-Language Summary (Patient View)</div>
+            <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+          </div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Inner Ear System</div>
+            <div class="clinical-field-body">${inspectedGroup.title} — ${inspectedGroup.subtitle}</div>
+          </div>
+
+          <div class="clinical-pearl-box">
+            <strong>Why It Matters in BPPV &amp; Balance:</strong> ${inspectedItem.clinicalPearl}
+          </div>
+        `
+        : this.audienceMode === 'student'
+        ? `
+          <div class="inspector-etymology">${inspectedItem.etymology}</div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+            <div class="clinical-field-body">${inspectedItem.innervation}</div>
+          </div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Physiological Mechanism</div>
+            <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+          </div>
+
+          <div class="clinical-pearl-box">
+            <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+          </div>
+        `
+        : `
+          <div class="inspector-etymology">${inspectedItem.etymology}</div>
+
+          <div class="telemetry-strip">
+            <div class="telemetry-cell">
+              <span class="telemetry-key">Mesh / Raw ID</span>
+              <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-key">Geometry</span>
+              <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
+            </div>
+            <div class="telemetry-cell">
+              <span class="telemetry-key">RAS Center (mm)</span>
+              <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
+            </div>
+          </div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
+            <div class="clinical-field-body">${inspectedItem.innervation}</div>
+          </div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
+            <div class="clinical-field-body">${inspectedItem.morphometry}</div>
+          </div>
+
+          <div class="clinical-field">
+            <div class="clinical-field-label">Physiological Mechanism</div>
+            <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
+          </div>
+
+          <div class="clinical-pearl-box">
+            <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
+          </div>
+
+          <div class="clinical-field" style="margin-top:6px;">
+            <div class="clinical-field-label">Patient Counseling Summary</div>
+            <div class="clinical-field-body">${inspectedItem.patientSummary}</div>
+          </div>
+        `;
 
     this.inspectorContainer.innerHTML = `
       <div class="inspector-compact-header" data-toggle-info-card="true" title="Raw ID: ${inspectedItem.meshName} (${inspectedItem.structureId})">
@@ -1381,11 +2029,19 @@ export class AppHUD {
             ${inspectedGroup.shortTitle.toUpperCase()}
           </span>
           <span class="compartment-pill">
-            ${inspectedItem.fluidCompartment}
+            ${
+              this.audienceMode === 'patient'
+                ? 'Patient Guide'
+                : inspectedItem.fluidCompartment
+            }
           </span>
-          <span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
-            ID: ${inspectedItem.meshName}
-          </span>
+          ${
+            this.audienceMode !== 'patient'
+              ? `<span class="compartment-pill" title="Raw Mesh &amp; Ontology ID: ${inspectedItem.meshName} / ${inspectedItem.structureId}">
+                   ID: ${inspectedItem.meshName}
+                 </span>`
+              : ''
+          }
         </div>
         <div class="inspector-title-row">
           <div>
@@ -1399,45 +2055,11 @@ export class AppHUD {
       </div>
 
       <div class="inspector-compact-preview" data-toggle-info-card="true">
-        ${inspectedItem.physiologicalFunction}
+        ${compactPreviewText}
       </div>
 
       <div class="inspector-expanded-details">
-        <div class="inspector-etymology">${inspectedItem.etymology}</div>
-
-        <div class="telemetry-strip">
-          <div class="telemetry-cell">
-            <span class="telemetry-key">Mesh / Raw ID</span>
-            <span class="telemetry-val" title="${inspectedItem.structureId}">${inspectedItem.meshName}</span>
-          </div>
-          <div class="telemetry-cell">
-            <span class="telemetry-key">Geometry</span>
-            <span class="telemetry-val">${inspectedItem.verticesCount.toLocaleString()}v / ${inspectedItem.facesCount.toLocaleString()}f</span>
-          </div>
-          <div class="telemetry-cell">
-            <span class="telemetry-key">RAS Center (mm)</span>
-            <span class="telemetry-val">(${inspectedItem.centroidRAS.map((n) => n.toFixed(1)).join(', ')})</span>
-          </div>
-        </div>
-
-        <div class="clinical-field">
-          <div class="clinical-field-label">Cranial Nerve VIII Innervation</div>
-          <div class="clinical-field-body">${inspectedItem.innervation}</div>
-        </div>
-
-        <div class="clinical-field">
-          <div class="clinical-field-label">Anatomical Morphometry (RAS)</div>
-          <div class="clinical-field-body">${inspectedItem.morphometry}</div>
-        </div>
-
-        <div class="clinical-field">
-          <div class="clinical-field-label">Physiological Mechanism</div>
-          <div class="clinical-field-body">${inspectedItem.physiologicalFunction}</div>
-        </div>
-
-        <div class="clinical-pearl-box">
-          <strong>Clinical &amp; Diagnostic Pearl:</strong> ${inspectedItem.clinicalPearl}
-        </div>
+        ${expandedBodyHtml}
       </div>
     `;
     this.applyPanelStatesToDOM();
@@ -1535,6 +2157,7 @@ export class AppHUD {
         row.addEventListener('click', () => {
           const meshName = row.dataset.treeSelect!;
           this.scene.selectStructure(meshName, true);
+          this.handleStructurePickedForQuiz(meshName);
         });
       });
   }
