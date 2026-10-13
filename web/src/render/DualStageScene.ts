@@ -110,8 +110,14 @@ export class DualStageScene {
 
   private raycaster = new THREE.Raycaster();
   private pointerDownPos = new THREE.Vector2();
+  private activePointers = new Set<number>();
+  private isMultiTouch = false;
   private animationFrameId = 0;
   private lastFrameTime = performance.now();
+
+  public getSelectedMesh(): string | null {
+    return this.state.selectedMesh;
+  }
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -379,9 +385,12 @@ export class DualStageScene {
       new THREE.Vector3(4.5, 1.5, 0.2),
       500
     );
-    this.state.selectedMesh = null;
     this.state.isIsolated = false;
+    const prevSelected = this.state.selectedMesh;
     this.applyDissectionPreset('overview', false);
+    if (prevSelected) {
+      this.state.selectedMesh = prevSelected;
+    }
     this.emitState();
   }
 
@@ -407,8 +416,15 @@ export class DualStageScene {
 
   public selectStructure(meshName: string | null, flyCamera = false): void {
     this.state.selectedMesh = meshName;
-    if (meshName && this.state.visibilityMap[meshName] === 'hidden') {
-      this.state.visibilityMap[meshName] = 'visible';
+    if (meshName) {
+      if (this.state.isIsolated) {
+        for (const item of IEMAP_STRUCTURES) {
+          this.state.visibilityMap[item.meshName] =
+            item.meshName === meshName ? 'visible' : 'hidden';
+        }
+      } else if (this.state.visibilityMap[meshName] === 'hidden') {
+        this.state.visibilityMap[meshName] = 'visible';
+      }
     }
     this.applySceneStateToMeshes();
     if (meshName && flyCamera) {
@@ -454,11 +470,16 @@ export class DualStageScene {
   }
 
   public restoreAllVisibility(): void {
-    this.pushUndoState();
+    const prev = this.undoStack.pop();
     this.state.isIsolated = false;
-    for (const item of IEMAP_STRUCTURES) {
-      this.state.visibilityMap[item.meshName] = item.defaultState;
+    if (prev) {
+      this.state.visibilityMap = prev;
+    } else {
+      for (const item of IEMAP_STRUCTURES) {
+        this.state.visibilityMap[item.meshName] = item.defaultState;
+      }
     }
+    this.state.canUndo = this.undoStack.length > 0;
     this.applySceneStateToMeshes();
     this.emitState();
   }
@@ -566,22 +587,36 @@ export class DualStageScene {
     dom.addEventListener(
       'pointerdown',
       (ev) => {
+        this.activePointers.add(ev.pointerId);
+        if (this.activePointers.size > 1) {
+          this.isMultiTouch = true;
+        }
         this.pointerDownPos.set(ev.clientX, ev.clientY);
       },
       { capture: true }
     );
 
     dom.addEventListener('pointermove', (ev) => {
+      // Skip hover raycasting during touch interaction or when orbiting (mouse button held down)
+      if (ev.pointerType === 'touch' || ev.buttons > 0) {
+        return;
+      }
       const hitMesh = this.raycastLabyrinthAtScreen(ev.clientX, ev.clientY);
       if (hitMesh !== this.state.hoveredMesh) {
         this.state.hoveredMesh = hitMesh;
         dom.style.cursor = hitMesh ? 'pointer' : 'grab';
         this.applySceneStateToMeshes();
-        this.emitState();
       }
     });
 
     dom.addEventListener('pointerup', (ev) => {
+      const wasMultiTouch = this.isMultiTouch;
+      this.activePointers.delete(ev.pointerId);
+      if (this.activePointers.size === 0) {
+        this.isMultiTouch = false;
+      }
+      if (wasMultiTouch) return;
+
       const moveDist = Math.hypot(
         ev.clientX - this.pointerDownPos.x,
         ev.clientY - this.pointerDownPos.y
@@ -592,6 +627,13 @@ export class DualStageScene {
       if (hitMesh) {
         this.selectStructure(hitMesh, true);
         this.notifyStructurePicked(hitMesh);
+      }
+    });
+
+    dom.addEventListener('pointercancel', (ev) => {
+      this.activePointers.delete(ev.pointerId);
+      if (this.activePointers.size === 0) {
+        this.isMultiTouch = false;
       }
     });
 
@@ -656,28 +698,27 @@ export class DualStageScene {
   // ===========================================================================
   // 3D LABELS PROJECTION TO 2D OVERLAY
   // ===========================================================================
-  private computeProjectedPins(): ProjectedPin2D[] {
+  private computeProjectedPins(width: number, height: number): ProjectedPin2D[] {
     if (this.state.labelMode === 'off') {
       return [];
     }
 
-    const bounds = this.renderer.domElement.getBoundingClientRect();
-    if (bounds.width <= 10 || bounds.height <= 10) return [];
+    if (width <= 10 || height <= 10) return [];
 
     const camDist = this.camera.position.distanceTo(this.controls.target);
     const isAllMode = this.state.labelMode === 'all';
 
     const projectWorldPoint = (worldPt: THREE.Vector3) => {
       const v = worldPt.clone().project(this.camera);
-      const sx = (v.x * 0.5 + 0.5) * bounds.width;
-      const sy = (-(v.y * 0.5) + 0.5) * bounds.height;
+      const sx = (v.x * 0.5 + 0.5) * width;
+      const sy = (-(v.y * 0.5) + 0.5) * height;
       const inFrustum =
         v.z > -1.0 &&
         v.z < 1.0 &&
         sx >= 10 &&
-        sx <= bounds.width - 10 &&
+        sx <= width - 10 &&
         sy >= 10 &&
-        sy <= bounds.height - 10;
+        sy <= height - 10;
       return { sx, sy, inFrustum, depth: v.z };
     };
 
@@ -816,7 +857,7 @@ export class DualStageScene {
       this.renderer.render(this.scene, this.camera);
 
       if (this.onPinsUpdateCallbacks.length > 0) {
-        const pins = this.computeProjectedPins();
+        const pins = this.computeProjectedPins(canvasW, canvasH);
         for (const cb of this.onPinsUpdateCallbacks) {
           cb(pins);
         }

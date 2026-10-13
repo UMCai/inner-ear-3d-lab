@@ -55,6 +55,10 @@ export class AppHUD {
 
   private activeReadingDepth: ReadingDepth = 'simple';
   private activeLabelMode: LabelDensityMode = 'key';
+  private lastRenderedMesh: string | null = '__init__';
+  private lastRenderedDepth: ReadingDepth | null = null;
+  private lastRenderedIsolated: boolean | null = null;
+  private activeSearchIndex = -1;
 
   private static readonly STORAGE_KEYS = {
     labelMode: 'gate3_label_mode',
@@ -381,17 +385,45 @@ export class AppHUD {
     this.searchInput.addEventListener('input', () => {
       const query = this.searchInput.value.trim().toLowerCase();
       this.searchClearBtn.style.display = query.length > 0 ? 'block' : 'none';
+      this.activeSearchIndex = -1;
       this.renderSearchResults(query);
     });
 
+    this.searchInput.addEventListener('focus', () => {
+      const query = this.searchInput.value.trim().toLowerCase();
+      if (query.length > 0) {
+        this.renderSearchResults(query);
+      }
+    });
+
     this.searchInput.addEventListener('keydown', (ev) => {
+      const items = Array.from(
+        this.searchDropdown.querySelectorAll<HTMLElement>('.search-result-item')
+      );
       if (ev.key === 'Escape') {
         this.closeSearchDropdown();
         this.searchInput.blur();
+      } else if (ev.key === 'ArrowDown') {
+        if (items.length > 0) {
+          ev.preventDefault();
+          this.activeSearchIndex = (this.activeSearchIndex + 1) % items.length;
+          items.forEach((it, idx) => it.classList.toggle('highlighted', idx === this.activeSearchIndex));
+          items[this.activeSearchIndex].scrollIntoView({ block: 'nearest' });
+        }
+      } else if (ev.key === 'ArrowUp') {
+        if (items.length > 0) {
+          ev.preventDefault();
+          this.activeSearchIndex = (this.activeSearchIndex - 1 + items.length) % items.length;
+          items.forEach((it, idx) => it.classList.toggle('highlighted', idx === this.activeSearchIndex));
+          items[this.activeSearchIndex].scrollIntoView({ block: 'nearest' });
+        }
       } else if (ev.key === 'Enter') {
-        const firstItem = this.searchDropdown.querySelector<HTMLElement>('.search-result-item');
-        if (firstItem) {
-          firstItem.click();
+        if (items.length > 0) {
+          const targetItem =
+            this.activeSearchIndex >= 0 && items[this.activeSearchIndex]
+              ? items[this.activeSearchIndex]
+              : items[0];
+          targetItem.click();
         }
       }
     });
@@ -622,6 +654,9 @@ export class AppHUD {
     if (arrowEl) {
       arrowEl.textContent = this.partsDrawerOpen ? '▾' : '▸';
     }
+    if (window.innerWidth <= 640) {
+      this.inspectorCard.classList.toggle('drawer-active', this.partsDrawerOpen);
+    }
     try {
       localStorage.setItem(AppHUD.STORAGE_KEYS.partsDrawerOpen, String(this.partsDrawerOpen));
     } catch {
@@ -634,6 +669,7 @@ export class AppHUD {
     this.partsDrawer.classList.remove('open');
     this.partsToggleBtn.classList.remove('open');
     this.partsToggleBtn.setAttribute('aria-expanded', 'false');
+    this.inspectorCard.classList.remove('drawer-active');
     const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
     if (arrowEl) {
       arrowEl.textContent = '▸';
@@ -680,7 +716,10 @@ export class AppHUD {
         <span class="system-badge" style="background: ${groupMeta?.accentHex ?? '#52dcf2'}22; color: ${groupMeta?.accentHex ?? '#52dcf2'}; border-color: ${groupMeta?.accentHex ?? '#52dcf2'}66;">
           ${groupMeta?.shortTitle ?? 'Structure'}
         </span>
-        <button type="button" class="inspector-close-btn" id="inspector-close-btn" aria-label="Deselect structure">✕</button>
+        <div class="inspector-header-controls">
+          <button type="button" class="inspector-minimize-btn" id="inspector-minimize-btn" title="Minimize / expand card" aria-label="Minimize inspector">─</button>
+          <button type="button" class="inspector-close-btn" id="inspector-close-btn" aria-label="Deselect structure">✕</button>
+        </div>
       </div>
 
       <h2 class="inspector-title">${item.displayName}</h2>
@@ -736,8 +775,17 @@ export class AppHUD {
     this.inspectorCard.classList.add('visible');
 
     // Attach inspector button handlers
+    const minimizeBtn = this.inspectorCard.querySelector('#inspector-minimize-btn') as HTMLButtonElement;
+    minimizeBtn?.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this.inspectorCard.classList.toggle('minimized');
+      minimizeBtn.textContent = this.inspectorCard.classList.contains('minimized') ? '▢' : '─';
+    });
+
     const closeBtn = this.inspectorCard.querySelector('#inspector-close-btn') as HTMLButtonElement;
     closeBtn?.addEventListener('click', () => {
+      this.searchInput.value = '';
+      this.searchClearBtn.style.display = 'none';
       this.scene.selectStructure(null);
     });
 
@@ -752,6 +800,8 @@ export class AppHUD {
 
     const resetBtn = this.inspectorCard.querySelector('#btn-reset-view') as HTMLButtonElement;
     resetBtn?.addEventListener('click', () => {
+      this.searchInput.value = '';
+      this.searchClearBtn.style.display = 'none';
       this.scene.resetView();
     });
 
@@ -852,6 +902,9 @@ export class AppHUD {
       row.addEventListener('click', () => {
         const meshName = row.getAttribute('data-mesh');
         if (meshName) {
+          if (window.innerWidth <= 640) {
+            this.closePartsDrawer();
+          }
           this.scene.selectStructure(meshName, true);
         }
       });
@@ -859,7 +912,10 @@ export class AppHUD {
   }
 
   private handleStructurePicked(meshName: string): void {
-    this.renderInspectorCard(meshName);
+    if (meshName !== this.lastRenderedMesh) {
+      this.lastRenderedMesh = meshName;
+      this.renderInspectorCard(meshName);
+    }
   }
 
   // ===========================================================================
@@ -867,6 +923,7 @@ export class AppHUD {
   // ===========================================================================
   private renderProjectedPins(pins: ProjectedPin2D[]): void {
     const currentIds = new Set(pins.map((p) => p.id));
+    const selectedMesh = this.scene.getSelectedMesh();
 
     // Remove pins that disappeared
     for (const [id, el] of this.pinElements.entries()) {
@@ -897,7 +954,7 @@ export class AppHUD {
 
       el.style.transform = `translate(${Math.round(pin.screenX)}px, ${Math.round(pin.screenY)}px)`;
       el.style.display = pin.visible ? 'flex' : 'none';
-      el.classList.toggle('selected-pin', this.scene.getSnapshot().selectedMesh === pin.meshName);
+      el.classList.toggle('selected-pin', selectedMesh === pin.meshName);
     }
   }
 
@@ -932,8 +989,37 @@ export class AppHUD {
       btn.classList.toggle('active', snap.activePresetId === presetId);
     });
 
-    // 4. Floating Inspector Card
-    this.renderInspectorCard(snap.selectedMesh);
+    // 4. Floating Inspector Card & Search Sync (render only when relevant properties change to prevent scroll jump)
+    if (
+      snap.selectedMesh !== this.lastRenderedMesh ||
+      snap.readingDepth !== this.lastRenderedDepth
+    ) {
+      this.lastRenderedMesh = snap.selectedMesh;
+      this.lastRenderedDepth = snap.readingDepth;
+      this.lastRenderedIsolated = snap.isIsolated;
+      this.renderInspectorCard(snap.selectedMesh);
+
+      // Keep search bar in sync with selected structure
+      if (document.activeElement !== this.searchInput) {
+        if (snap.selectedMesh) {
+          const struct = STRUCTURE_BY_MESH[snap.selectedMesh];
+          if (struct) {
+            this.searchInput.value = struct.shortLabel;
+            this.searchClearBtn.style.display = 'block';
+          }
+        } else {
+          this.searchInput.value = '';
+          this.searchClearBtn.style.display = 'none';
+        }
+      }
+    } else if (snap.isIsolated !== this.lastRenderedIsolated) {
+      this.lastRenderedIsolated = snap.isIsolated;
+      const isolateBtn = this.inspectorCard.querySelector('#btn-isolate');
+      if (isolateBtn) {
+        isolateBtn.textContent = snap.isIsolated ? '👁️ Show All Parts' : '🎯 Isolate Part';
+        isolateBtn.classList.toggle('active', snap.isIsolated);
+      }
+    }
 
     // 5. Update Parts Drawer Row States (highlight selected, eye icons)
     const partRows = this.root.querySelectorAll<HTMLElement>('.part-row');

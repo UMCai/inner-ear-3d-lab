@@ -312,6 +312,27 @@ async function run() {
       }
       console.log(`✓ Expandable Medical Details accordion verified (Latin, CN VIII Innervation, Pearls)`);
 
+      // 4b. Test Accordion scroll retention under slider updates (no DOM scroll reset)
+      const scrollRetentionTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const card = document.querySelector('#inspector-card');
+            card.scrollTop = 60;
+            const setScroll = card.scrollTop;
+            const slider = document.querySelector('#bone-peel-slider');
+            slider.value = '50';
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            const currentScroll = card.scrollTop;
+            return { setScroll, currentScroll };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (scrollRetentionTest.result.value.setScroll > 0 && scrollRetentionTest.result.value.currentScroll === 0) {
+        throw new Error('Inspector Card reset scroll position during slider input');
+      }
+      console.log(`✓ Inspector Card scroll preservation verified (retained: ${scrollRetentionTest.result.value.currentScroll}px)`);
+
       // 5. Test [ 🎯 Isolate Part ] and [ ↺ Reset View ]
       const isolateTest = await client.send('Runtime.evaluate', {
         expression: `
@@ -328,7 +349,7 @@ async function run() {
       });
       console.log(`✓ Isolate / Reset View action buttons verified (Isolate toggled: "${isolateTest.result.value.isolatedText}")`);
 
-      // 6. Test Search Bar functionality
+      // 6. Test Search Bar functionality (input, ArrowDown keyboard highlight, Enter selection)
       const searchTest = await client.send('Runtime.evaluate', {
         expression: `
           (() => {
@@ -338,18 +359,23 @@ async function run() {
             const dropdown = document.querySelector('#search-dropdown');
             const items = dropdown.querySelectorAll('.search-result-item');
             const itemCount = items.length;
-            if (itemCount > 0) {
-              items[0].click();
-            }
-            return { itemCount };
+
+            // Test ArrowDown highlight
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+            const hasHighlighted = dropdown.querySelector('.search-result-item.highlighted') !== null;
+
+            // Test Enter selection
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            const selectedText = input.value;
+            return { itemCount, hasHighlighted, selectedText };
           })()
         `,
         returnByValue: true,
       });
-      if (searchTest.result.value.itemCount === 0) {
-        throw new Error('Search input did not return matching results for "cochlea"');
+      if (searchTest.result.value.itemCount === 0 || !searchTest.result.value.hasHighlighted) {
+        throw new Error('Search input did not return matching results or arrow navigation failed');
       }
-      console.log(`✓ Search Bar verified (${searchTest.result.value.itemCount} matches found for "cochlea", selection clicked)`);
+      console.log(`✓ Search Bar verified (${searchTest.result.value.itemCount} matches found for "cochlea", ArrowDown highlighted, Enter selected "${searchTest.result.value.selectedText}")`);
 
       // 7. Test 4 Guided Presets in Compact Bottom Bar
       const presetsTest = await client.send('Runtime.evaluate', {
@@ -406,9 +432,11 @@ async function run() {
           (() => {
             const toggleBtn = document.querySelector('#parts-toggle-btn');
             const drawer = document.querySelector('#parts-drawer');
+            const inspectorCard = document.querySelector('#inspector-card');
             if (!drawer?.classList.contains('open')) {
               toggleBtn?.click();
             }
+            const mobileDrawerActive = inspectorCard?.classList.contains('drawer-active') || false;
             const rows = drawer?.querySelectorAll('.part-row') || [];
             const eyeBtn = rows[0]?.querySelector('.eye-toggle-btn');
             const beforeEye = eyeBtn?.textContent;
@@ -422,7 +450,8 @@ async function run() {
               drawerOpen: drawer?.classList.contains('open'),
               rowCount: rows.length,
               beforeEye,
-              afterEye
+              afterEye,
+              mobileDrawerActive
             };
           })()
         `,
