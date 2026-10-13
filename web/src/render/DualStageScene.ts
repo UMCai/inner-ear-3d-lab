@@ -972,12 +972,17 @@ export class DualStageScene {
   // ===========================================================================
   public setAppMode(mode: LabAppMode): void {
     this.state.appMode = mode;
+    this.poseTransition = null;
     if (mode === 'mode2_physics') {
+      const curStep =
+        EPLEY_CLINICAL_STEPS[this.state.activeEpleyStepIdx] ?? EPLEY_CLINICAL_STEPS[0];
       this.state.livePhysicsEnabled = true;
       this.state.showSplineAndCanaliths = true;
-      this.activeStepPhiCapMax = 188.0;
+      this.state.headYawDeg = curStep.targetYawDeg;
+      this.state.headPitchDeg = curStep.targetReclineDeg;
+      this.activeStepPhiCapMax = curStep.phiCapMax;
       this.manualPhiHoldActive = false;
-      this.applyDissectionPreset('gate3_bppv_pathway');
+      this.applyDissectionPreset('gate3_bppv_pathway', false);
       if (this.simulator) {
         this.simulator.setPhiDeg(this.state.canalithPhiDeg);
         this.state.telemetry = this.simulator.computeTelemetrySnapshot(
@@ -987,6 +992,8 @@ export class DualStageScene {
       }
     } else {
       this.stopGuidedTour();
+      this.state.headYawDeg = 0.0;
+      this.state.headPitchDeg = 0.0;
       this.state.livePhysicsEnabled = false;
       this.vectorsGroup.visible = false;
     }
@@ -1002,6 +1009,15 @@ export class DualStageScene {
     this.activeStepPhiCapMax = step.phiCapMax;
     this.isDraggingPhiSlider = false;
     this.manualPhiHoldActive = false;
+
+    if (this.tourAudio) {
+      this.tourAudio.pause();
+      this.tourAudio = null;
+    }
+    if (this.tourStepTimer !== null) {
+      window.clearTimeout(this.tourStepTimer);
+      this.tourStepTimer = null;
+    }
 
     // Set initial phi just before transition so particles sediment naturally during the step
     if (this.simulator) {
@@ -1031,7 +1047,7 @@ export class DualStageScene {
       isStep3Assist: step.stepId === 'step3',
     };
 
-    if (playAudio && !this.state.audioMuted) {
+    if (playAudio) {
       this.playStepAudio(step.audioUrl, () => {
         if (this.state.tourPlaying) {
           if (this.state.activeEpleyStepIdx < EPLEY_CLINICAL_STEPS.length - 1) {
@@ -1311,10 +1327,12 @@ export class DualStageScene {
     this.emitState();
   }
 
-  public applyDissectionPreset(presetId: string): void {
+  public applyDissectionPreset(presetId: string, recordUndo = true): void {
     const preset = DISSECTION_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
-    this.pushUndoState();
+    if (recordUndo) {
+      this.pushUndoState();
+    }
     this.state.activePresetId = preset.id;
     this.state.bonyPeelPercent = preset.bonyPeelPercent;
     this.state.microCutawayPercent = preset.microCutawayPercent;
@@ -1358,7 +1376,7 @@ export class DualStageScene {
       this.state.telemetry = this.simulator.computeTelemetrySnapshot(0, 0);
     }
     this.state.toolMode = 'inspect';
-    this.applyDissectionPreset('full_atlas_xray');
+    this.applyDissectionPreset('full_atlas_xray', false);
   }
 
   public setLockedSelectionMesh(meshName: string | null): void {

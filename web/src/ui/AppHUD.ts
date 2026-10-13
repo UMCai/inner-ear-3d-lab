@@ -1113,7 +1113,16 @@ export class AppHUD {
     this.root.querySelector('#layout-mode-group')!.addEventListener('click', (ev) => {
       const btn = (ev.target as HTMLElement).closest<HTMLButtonElement>('[data-layout]');
       if (!btn) return;
-      this.scene.setOverlays({ layoutMode: btn.dataset.layout as ViewportLayoutMode });
+      const nextLayout = btn.dataset.layout as ViewportLayoutMode;
+      if (nextLayout === 'head_main' || nextLayout === 'split_50_50') {
+        if (window.innerWidth <= 600) {
+          this.pipInsetOpenMobile = true;
+        } else {
+          this.pipInsetOpenDesktop = true;
+        }
+      }
+      this.scene.setOverlays({ layoutMode: nextLayout });
+      this.applyPanelStatesToDOM();
       this.syncViewportRects();
     });
 
@@ -1128,8 +1137,11 @@ export class AppHUD {
       if (!pinEl) return;
       const meshName = pinEl.dataset.pinMesh!;
       if (!meshName) return;
+      if (this.quizActive && !this.quizAnswered) {
+        this.handleStructurePickedForQuiz(meshName);
+        return;
+      }
       this.scene.selectStructure(meshName, false);
-      this.handleStructurePickedForQuiz(meshName);
     };
     this.pinsLayer.addEventListener('click', handlePinActivate);
 
@@ -1223,9 +1235,21 @@ export class AppHUD {
       const row = (ev.target as HTMLElement).closest<HTMLElement>('[data-search-mesh]');
       if (!row) return;
       const meshName = row.dataset.searchMesh!;
-      this.scene.selectStructure(meshName, true);
       searchDropdown.classList.remove('open');
       searchInput.value = '';
+      if (this.quizActive && !this.quizAnswered) {
+        this.handleStructurePickedForQuiz(meshName);
+        return;
+      }
+      if (this.rightPanelCollapsed) {
+        this.rightPanelCollapsed = false;
+        this.writeStorageBool(AppHUD.LS_KEYS.rightCollapsed, false);
+      }
+      if (window.innerWidth <= 900) {
+        this.activeDrawerTab = 'info';
+      }
+      this.scene.selectStructure(meshName, true);
+      this.applyPanelStatesToDOM();
     });
 
     document.addEventListener('click', (ev) => {
@@ -1324,6 +1348,12 @@ export class AppHUD {
       this.partListCollapsed = !this.partListCollapsed;
       this.writeStorageBool(AppHUD.LS_KEYS.partsCollapsed, this.partListCollapsed);
       this.applyPanelStatesToDOM();
+      if (!this.partListCollapsed) {
+        const scrollBody = this.root.querySelector<HTMLElement>('#left-dock-scroll-body');
+        if (scrollBody) {
+          scrollBody.scrollTop = scrollBody.scrollHeight;
+        }
+      }
     });
 
     // 11. Responsive Bottom Drawer Tabs, Swipe/Tap Handle, and PiP Inset Toggle
@@ -1375,7 +1405,8 @@ export class AppHUD {
     );
 
     const togglePipInset = () => {
-      if (this.scene && this.scene.getSnapshot().layoutMode === 'split_50_50') {
+      const curLayout = this.scene ? this.scene.getSnapshot().layoutMode : 'labyrinth_main';
+      if (curLayout === 'split_50_50' || curLayout === 'head_main') {
         this.scene.setOverlays({ layoutMode: 'labyrinth_main' });
         if (window.innerWidth <= 600) {
           this.pipInsetOpenMobile = false;
@@ -1419,6 +1450,7 @@ export class AppHUD {
       }
       this.renderState(this.scene.getSnapshot());
       this.applyPanelStatesToDOM();
+      this.syncViewportRects();
     });
 
     this.root.querySelector('#btn-open-welcome')!.addEventListener('click', () => {
@@ -1500,6 +1532,7 @@ export class AppHUD {
         this.renderPredictPanel();
       }
       this.renderState(this.scene.getSnapshot());
+      this.syncViewportRects();
     });
 
     // 14. Mode 1 Anatomy Quiz Toggle & Panel Events
@@ -1588,6 +1621,7 @@ export class AppHUD {
       }
       this.applyPanelStatesToDOM();
       this.renderState(this.scene.getSnapshot());
+      this.syncViewportRects();
     });
 
     this.predictPanelEl.addEventListener('click', (ev) => {
@@ -1623,6 +1657,7 @@ export class AppHUD {
         this.predictRevealed = true;
         this.scene.jumpToEpleyStep(this.predictPendingStepIdx, true);
         this.renderPredictPanel();
+        this.syncViewportRects();
         return;
       }
 
@@ -1632,6 +1667,7 @@ export class AppHUD {
         this.predictRevealed = false;
         this.renderPredictPanel();
         this.renderState(this.scene.getSnapshot());
+        this.syncViewportRects();
         return;
       }
 
@@ -1639,6 +1675,7 @@ export class AppHUD {
         this.predictModeActive = false;
         this.applyPanelStatesToDOM();
         this.renderState(this.scene.getSnapshot());
+        this.syncViewportRects();
       }
     });
 
@@ -2049,8 +2086,11 @@ export class AppHUD {
   }
 
   private isPipInsetVisible(): boolean {
-    if (this.scene && this.scene.getSnapshot().layoutMode === 'split_50_50') {
-      return true;
+    if (this.scene) {
+      const layout = this.scene.getSnapshot().layoutMode;
+      if (layout === 'split_50_50' || layout === 'head_main') {
+        return true;
+      }
     }
     if (window.innerWidth <= 600) {
       return this.pipInsetOpenMobile;
@@ -2182,7 +2222,9 @@ export class AppHUD {
     if (w === 0 || h === 0) return;
 
     const isSmall = window.innerWidth <= 900;
-    const isMode2 = Boolean(this.scene && this.scene.getSnapshot().appMode === 'mode2_physics');
+    const snap = this.scene ? this.scene.getSnapshot() : null;
+    const isMode2 = Boolean(snap && snap.appMode === 'mode2_physics');
+    const isSplit = Boolean(snap && snap.layoutMode === 'split_50_50');
     let visibleH = h;
 
     if (isSmall && !isMode2) {
@@ -2218,6 +2260,10 @@ export class AppHUD {
       if (epleyRect.height > 0 && epleyRect.top > hostRect.top) {
         visibleH = Math.max(Math.round(h * 0.3), Math.round(epleyRect.top - hostRect.top));
       }
+    }
+
+    if (this.pipHudFrame) {
+      this.pipHudFrame.style.height = isSplit ? `${visibleH}px` : '';
     }
 
     if (!this.isPipInsetVisible()) {
@@ -2303,6 +2349,8 @@ export class AppHUD {
     (this.root.querySelector('#chk-spline-canaliths') as HTMLInputElement).checked =
       snap.showSplineAndCanaliths;
     (this.root.querySelector('#clip-flip-checkbox') as HTMLInputElement).checked = snap.clipFlip;
+    (this.root.querySelector('#sync-cam-checkbox') as HTMLInputElement).checked = snap.syncCameras;
+    (this.root.querySelector('#chk-mute-audio') as HTMLInputElement).checked = snap.audioMuted;
 
     // Update Mode 2 Step strip & caption
     this.tourPlayBtn.textContent = snap.tourPlaying ? '⏸ Pause' : '▶ Play Audio Guide';
@@ -2343,6 +2391,7 @@ export class AppHUD {
     this.microCutVal.textContent = `${Math.round(snap.microCutawayPercent)}%`;
     this.explodeInput.value = String(snap.explodePercent);
     this.explodeVal.textContent = `${Math.round(snap.explodePercent)}%`;
+    this.headOpacityInput.value = String(Math.round(snap.headCutawayOpacity * 100));
     this.canalithPhiInput.value = String(snap.canalithPhiDeg);
     this.canalithPhiVal.textContent = `${snap.canalithPhiDeg > 0 ? '+' : ''}${Math.round(
       snap.canalithPhiDeg
@@ -2753,8 +2802,11 @@ export class AppHUD {
         .forEach((row) => {
           row.addEventListener('click', () => {
             const meshName = row.dataset.treeSelect!;
+            if (this.quizActive && !this.quizAnswered) {
+              this.handleStructurePickedForQuiz(meshName);
+              return;
+            }
             this.scene.selectStructure(meshName, true);
-            this.handleStructurePickedForQuiz(meshName);
           });
         });
     }
