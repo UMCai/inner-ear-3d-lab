@@ -24,7 +24,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'locate',
     sceneId: 'scene1_locate',
     badge: 'INTRO · ANATOMY',
-    shortTitle: 'Intro',
+    shortTitle: '1. Intro',
     clinicalTitle: 'Anatomical Location — Right Posterior Canal in Temporal Bone',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -34,7 +34,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Right Posterior-Canal BPPV: Displaced Otoconia',
     caption:
       'In posterior-canal BPPV, displaced otoconia enter the right posterior semicircular canal, which arches 45° posterolaterally behind the utricle.',
-    patientHeadline: 'Intro: Where the Inner Ear Balance Loops Sit',
+    patientHeadline: '1. Intro: Where the Inner Ear Balance Loops Sit',
     patientCaption:
       'Deep inside your right ear are three fluid-filled balance loops. Vertigo (BPPV) most often happens in the back balance loop when tiny calcium crystals slip out of their resting sac.',
   },
@@ -43,7 +43,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'intro',
     sceneId: 'scene2_pathology',
     badge: 'CAUSE · LOOSE CRYSTALS',
-    shortTitle: 'Cause',
+    shortTitle: '2. Why Vertigo Happens',
     clinicalTitle: 'Pathology — Loose Otoconia Settled Near Posterior Ampulla',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -53,7 +53,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Pathology: Loose Otoconia Near the Posterior Ampulla (φ = -84°)',
     caption:
       'Dense calcium carbonate otoconia settle at the gravity-dependent base of the posterior canal just distal to the posterior cupula.',
-    patientHeadline: 'Cause of Vertigo: Loose Crystals Trapped at the Bottom of the Loop',
+    patientHeadline: '2. Why Vertigo Happens: Loose Crystals Trapped in the Bottom Loop',
     patientCaption:
       'Five tiny orange ear crystals have settled at the lowest point of the back balance loop right next to the balance motion sensor. Because the sensor flap blocks the short way out, we must guide them around the loop.',
   },
@@ -62,7 +62,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'step1',
     sceneId: 'scene3_step1',
     badge: 'STEP 1 OF 5 · TURN RIGHT',
-    shortTitle: 'Step 1: Turn Right',
+    shortTitle: '3. Turn Right',
     clinicalTitle: 'Step 1 of 5 — Sit Upright & Rotate Head 45° Right',
     targetYawDeg: -45.0,
     targetReclineDeg: 0.0,
@@ -72,7 +72,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 1: Sit Upright & Turn Head 45° Right (ψ = -45°, θ = 0°)',
     caption:
       'Turning the head 45° toward the affected right ear aligns the right posterior semicircular canal with the sagittal plane of the examination table.',
-    patientHeadline: 'Step 1: Sit Upright & Turn Your Head 45° to the Right',
+    patientHeadline: '3. Turn Right: Sit Upright & Turn Your Head 45° to the Right',
     patientCaption:
       'Turning your head 45° toward the affected right ear lines up the back balance loop so that when you lie back next, the crystals will roll cleanly around the loop.',
   },
@@ -81,7 +81,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'step2',
     sceneId: 'scene4_step2',
     badge: 'STEP 2 OF 5 · LIE BACK',
-    shortTitle: 'Step 2: Lie Back',
+    shortTitle: '4. Lie Back',
     clinicalTitle: 'Step 2 of 5 — Recline to Supine with 30° Neck Extension',
     targetYawDeg: -45.0,
     targetReclineDeg: 120.0,
@@ -91,7 +91,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 2: Supine + 30° Neck Extension (ψ = -45°, θ = 120° → φ = +30°)',
     caption:
       'Gravity pulls the otoconia ampullofugally away from the cupula around the posterior canal arch toward the apex. Hold 30–60 seconds.',
-    patientHeadline: 'Step 2: Lie Back with Head Tilted Slightly Back (Hold 30–60s)',
+    patientHeadline: '4. Lie Back: Lie Back with Head Tilted Slightly Back (Hold 30–60s)',
     patientCaption:
       'Lying back with your head tilted slightly over a pillow lets gravity pull the loose crystals away from the sensor and halfway around the balance loop. Wait 30–60 seconds until the spinning feeling stops.',
   },
@@ -100,7 +100,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'step3',
     sceneId: 'scene5_step3',
     badge: 'STEP 3 OF 5 · TURN LEFT',
-    shortTitle: 'Step 3: Turn Left',
+    shortTitle: '5. Turn Left',
     clinicalTitle: 'Step 3 of 5 — Rotate Head 90° Left (Facing 45° Left)',
     targetYawDeg: 45.0,
     targetReclineDeg: 120.0,
@@ -110,7 +110,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 3: Rotate 90° Left While Extended (ψ = +45°, θ = 120° → φ = +110°)',
     caption:
       'Without raising the head, rotate 90° left. Gravity guides the otoconia across the superior arch into the Common Crus entry.',
-    patientHeadline: 'Step 3: Turn Your Head 90° to the Left Without Lifting It',
+    patientHeadline: '5. Turn Left: Turn Your Head 90° to the Left Without Lifting It',
     patientCaption:
       'Keeping your head tilted back on the bed, turn 90° to the left. Gravity guides the crystals over the top arch of the loop into the shared exit tube (Common Crus). Hold 30–60 seconds.',
   },
@@ -119,7 +119,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'step4',
     sceneId: 'scene6_step4',
     badge: 'STEP 4 OF 5 · ROLL ON SIDE',
-    shortTitle: 'Step 4: Roll on Side',
+    shortTitle: '6. Roll on Side',
     clinicalTitle: 'Step 4 of 5 — Roll Onto Left Shoulder, Nose 45° Down',
     targetYawDeg: 135.0,
     targetReclineDeg: 90.0,
@@ -129,7 +129,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 4: Left Shoulder Roll, Nose 45° Down (ψ = +135°, θ = 90° → φ = +165°)',
     caption:
       'The Common Crus now points steeply downward, allowing gravity to drain the otoconia through the shared limb to the utricular orifice.',
-    patientHeadline: 'Step 4: Roll Onto Your Left Side (Looking Slightly Downward)',
+    patientHeadline: '6. Roll on Side: Roll Onto Your Left Side (Looking Slightly Downward)',
     patientCaption:
       'Roll your body onto your left shoulder so your nose points 45° toward the floor. This points the shared exit tube straight down so the crystals slide to the doorway of the resting sac.',
   },
@@ -138,7 +138,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'step5',
     sceneId: 'scene7_step5',
     badge: 'STEP 5 OF 5 · SIT UP',
-    shortTitle: 'Step 5: Sit Up',
+    shortTitle: '7. Sit Up',
     clinicalTitle: 'Step 5 of 5 — Return Slowly to Upright Sitting',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -148,7 +148,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Step 5: Return to Upright Sitting (ψ = 0°, θ = 0° → φ = +186° Utricle)',
     caption:
       'Keeping the chin tucked, return the patient upright. Otoconia exit into the utricular vestibule where dark cells reabsorb them.',
-    patientHeadline: 'Step 5: Sit Back Up Slowly — Crystals Return to the Resting Sac!',
+    patientHeadline: '7. Sit Up: Sit Back Up Slowly — Crystals Return to the Resting Sac!',
     patientCaption:
       'Keeping your chin slightly tucked, sit upright. The crystals drop harmlessly back into the main resting sac (utricle), where they no longer trigger spinning dizziness and your body naturally dissolves them.',
   },
@@ -157,7 +157,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     stepId: 'outro',
     sceneId: 'scene8_summary',
     badge: 'SUMMARY · CLEARED',
-    shortTitle: 'Cleared!',
+    shortTitle: '8. Cleared!',
     clinicalTitle: 'Clinical Summary — Three Keys to Epley Execution',
     targetYawDeg: 0.0,
     targetReclineDeg: 0.0,
@@ -167,7 +167,7 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     headline: 'Clinical Summary: 30° Extension · No Head Lift in Step 3 · 30–60s Holds',
     caption:
       '1. Use a shoulder pillow for 20–30° neck extension; 2. Never lift the head during the Step 3 turn; 3. Hold each step 30–60s until particles settle.',
-    patientHeadline: 'Cleared! Three Simple Tips for a Successful Epley Treatment',
+    patientHeadline: '8. Cleared! Three Simple Tips for a Successful Epley Treatment',
     patientCaption:
       '1. Place a pillow under your shoulders so your head tilts back gently; 2. Do not lift your head when turning left in Step 3; 3. Pause 30–60 seconds in each step so the crystals finish sliding.',
   },
@@ -185,7 +185,10 @@ export interface PhysicsTelemetryState {
   nystagmusState: 'Baseline (None)' | 'Excitatory Upbeat-Torsional' | 'Inhibitory Reversal';
   anatomicalRegion: string;
   clearancePercent: number;
-  patientSensation: 'Calm' | 'Spinning — Crystals Moving' | 'Spinning — Crystals Sliding Back';
+  patientSensation:
+    | 'Calm (No Spinning)'
+    | 'Spinning (Crystals Moving)'
+    | 'Spinning (Crystals Sliding Back)';
   patientLocation: 'Trapped in Bottom Loop' | 'Moving Through Tube' | 'Back in Resting Sac';
   centerRAS: [number, number, number];
   tangentRAS: [number, number, number];
@@ -299,12 +302,12 @@ export class RealtimeEpleySimulator {
     cupulaDeflection: number
   ): PhysicsTelemetryState['patientSensation'] {
     if (cupulaDeflection > 0.12 || velocityDegPerSec > 1.2) {
-      return 'Spinning — Crystals Moving';
+      return 'Spinning (Crystals Moving)';
     }
     if (cupulaDeflection < -0.12 || velocityDegPerSec < -1.2) {
-      return 'Spinning — Crystals Sliding Back';
+      return 'Spinning (Crystals Sliding Back)';
     }
-    return 'Calm';
+    return 'Calm (No Spinning)';
   }
 
   public interpolateAtPhi(phi: number): {

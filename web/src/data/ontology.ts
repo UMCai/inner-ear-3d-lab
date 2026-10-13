@@ -46,6 +46,7 @@ export interface StructureOntologyItem {
 export interface DissectionPreset {
   id: string;
   title: string;
+  subtitle: string;
   badge: string;
   description: string;
   bonyPeelPercent: number;
@@ -54,6 +55,7 @@ export interface DissectionPreset {
   states: Partial<Record<string, VisibilityState>>;
   defaultSelectedMesh?: string;
   cameraPresetId?: string;
+  advancedOnly?: boolean;
 }
 
 export const SYSTEM_GROUPS: Record<SystemGroupId, SystemGroupMeta> = {
@@ -953,7 +955,8 @@ export const STRUCTURE_BY_MESH: Record<string, StructureOntologyItem> = Object.f
 export const DISSECTION_PRESETS: DissectionPreset[] = [
   {
     id: 'full_atlas_xray',
-    title: 'Full Inner Ear Overview (X-Ray Shell)',
+    title: 'Full Inner Ear',
+    subtitle: 'Balance loops, vestibule & hearing snail',
     badge: 'OVERVIEW',
     description:
       'All 25 inner ear balance loops, sensors, crystal sacs, and hearing chambers visible inside a see-through bony shell.',
@@ -969,7 +972,8 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'gate3_bppv_pathway',
-    title: 'Vertigo (BPPV) Crystal Pathway',
+    title: 'Vertigo Crystal Pathway',
+    subtitle: 'Posterior loop where loose crystals trap',
     badge: 'VERTIGO PATH',
     description:
       'Highlights the Back Balance Loop, Balance Sensor, Shared Exit Tube, and Resting Sac where loose crystals travel during the Epley treatment.',
@@ -1009,7 +1013,8 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'cupula_micro_dissection',
-    title: 'Inside the Balance Sensors (Cupulae)',
+    title: 'Inside Balance Sensors',
+    subtitle: 'Zoom into the 3 cupula sensors',
     badge: 'SENSORS',
     description:
       'Makes the outer sensor chambers see-through to reveal the delicate gel motion sensor flaps (cupulae) inside all three balance loops.',
@@ -1049,7 +1054,8 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'cochlear_scalae_cutaway',
-    title: 'Inside the Hearing Snail (Cochlea)',
+    title: 'Inside Hearing Snail',
+    subtitle: 'Internal chambers of the cochlea',
     badge: 'HEARING',
     description:
       'Makes the outer snail shell see-through to highlight the upper and lower sound tunnels (Scala Vestibuli & Scala Tympani).',
@@ -1089,7 +1095,8 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
   },
   {
     id: 'exploded_27_assembly',
-    title: 'Separated 27-Part View (Exploded)',
+    title: 'Separated 27-Part View',
+    subtitle: 'All 27 parts gently separated outward',
     badge: 'EXPLODED',
     description:
       'Gently separates all 27 inner ear parts outward with guide lines so every structure can be seen clearly without overlap.',
@@ -1097,6 +1104,7 @@ export const DISSECTION_PRESETS: DissectionPreset[] = [
     microCutawayPercent: 40,
     explodePercent: 65,
     defaultSelectedMesh: 'ls_Hsapiens_utricle',
+    advancedOnly: true,
     states: {
       'segT2_th1.07_Otsu': 'ghost',
       seg_coch_outer_T2: 'hidden',
