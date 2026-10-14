@@ -1,0 +1,6 @@
+# Markups fiducial file version = 4.11
+# CoordinateSystem = RAS
+# columns = id,x,y,z,ow,ox,oy,oz,vis,sel,lock,label,desc,associatedNodeID
+vtkMRMLMarkupsFiducialNode_1,4.0700,1.2500,2.2000,0.0,0.0,0.0,1.0,1,1,0,SSC_ant_ampulla,Anterior Canal Ampulla,
+vtkMRMLMarkupsFiducialNode_2,3.8500,0.4500,4.3000,0.0,0.0,0.0,1.0,1,1,0,SSC_ant_apex,Anterior Canal Superior Apex,
+vtkMRMLMarkupsFiducialNode_3,4.2000,-2.2000,2.0000,0.0,0.0,0.0,1.0,1,1,0,SSC_ant_cc_junction,Anterior Canal Common Crus Junction,

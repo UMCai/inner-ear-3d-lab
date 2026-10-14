@@ -1,0 +1,228 @@
+{
+  "blender_version": "5.2.1 LTS",
+  "blender_build_hash": "9e2066aef7ef",
+  "scale_matrix": [
+    [
+      0.001,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0.001,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0.001,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "frame_rate": 30,
+  "frame_range": [
+    1,
+    900
+  ],
+  "scene_units": "metres",
+  "objects": [
+    {
+      "structure_id": "right.anterior_ampulla",
+      "verts": 2080,
+      "triangles": 4156,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.8421630321749944e-09
+    },
+    {
+      "structure_id": "right.lateral_ampulla",
+      "verts": 2002,
+      "triangles": 4000,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.904419010325455e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Duct",
+      "verts": 450,
+      "triangles": 852,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.915771789626433e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Ut",
+      "verts": 410,
+      "triangles": 728,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.5751953337003215e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Wall",
+      "verts": 1112,
+      "triangles": 2196,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.324951063949811e-09
+    },
+    {
+      "structure_id": "right.posterior_ampulla",
+      "verts": 1496,
+      "triangles": 2988,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.830932542887467e-09
+    },
+    {
+      "structure_id": "right.common_crus_anterior",
+      "verts": 3302,
+      "triangles": 6576,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.853759977801019e-09
+    },
+    {
+      "structure_id": "right.common_crus_posterior",
+      "verts": 2320,
+      "triangles": 4624,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.545898324437303e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Duct",
+      "verts": 94,
+      "triangles": 152,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.2867433219507802e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Ut",
+      "verts": 64,
+      "triangles": 96,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.6337893522263585e-09
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Wall",
+      "verts": 1034,
+      "triangles": 2068,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.0566402742238097e-09
+    },
+    {
+      "structure_id": "right.posterior_cupula_duct",
+      "verts": 290,
+      "triangles": 520,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.110412676894271e-09
+    },
+    {
+      "structure_id": "right.posterior_cupula_utricle",
+      "verts": 154,
+      "triangles": 244,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.6337891301817535e-09
+    },
+    {
+      "structure_id": "right.posterior_cupula_wall",
+      "verts": 824,
+      "triangles": 1640,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.2867433219507802e-09
+    },
+    {
+      "structure_id": "right.simple_crus_limb",
+      "verts": 2084,
+      "triangles": 4136,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.489745908387022e-09
+    },
+    {
+      "structure_id": "right.anterior_duct",
+      "verts": 4964,
+      "triangles": 9924,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.693603727901063e-09
+    },
+    {
+      "structure_id": "right.lateral_duct",
+      "verts": 3638,
+      "triangles": 7272,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.2165527130700866e-08
+    },
+    {
+      "structure_id": "right.posterior_duct",
+      "verts": 5846,
+      "triangles": 11688,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.0139162277009746e-09
+    },
+    {
+      "structure_id": "right.posterior_utricular_limb",
+      "verts": 4036,
+      "triangles": 8044,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 3.822021366062245e-09
+    },
+    {
+      "structure_id": "right.utricle",
+      "verts": 4418,
+      "triangles": 8832,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.405212417069038e-09
+    },
+    {
+      "structure_id": "right.cochlea",
+      "verts": 7812,
+      "triangles": 15620,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.298096101251758e-09
+    },
+    {
+      "structure_id": "right.saccule",
+      "verts": 1770,
+      "triangles": 3536,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 2.6037598743755552e-09
+    },
+    {
+      "structure_id": "atlas.segT2_th1.07_Otsu",
+      "verts": 16996,
+      "triangles": 33992,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 1.7419433007148655e-08
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_cupula",
+      "verts": 2528,
+      "triangles": 5052,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.997558811226099e-09
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_scala_tympani",
+      "verts": 11954,
+      "triangles": 23904,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.682006782275039e-09
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_scala_vestibuli",
+      "verts": 10818,
+      "triangles": 21632,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.431152333950195e-09
+    },
+    {
+      "structure_id": "atlas.seg_coch_outer_T2",
+      "verts": 25144,
+      "triangles": 50284,
+      "scale_mm_to_m": 0.001,
+      "max_source_bound_error_mm": 4.393310604200451e-09
+    }
+  ],
+  "status": "technical import check only; clinical review pending"
+}

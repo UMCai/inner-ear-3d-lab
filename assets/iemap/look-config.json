@@ -1,0 +1,36 @@
+{
+  "version": "gate3-v1-epley",
+  "case": "right posterior-canal long-arm canalithiasis (Epley repositioning)",
+  "patient_axes": "RAS millimetres; +X right, +Y anterior, +Z superior",
+  "blender_units": "metres; source geometry scaled by 0.001",
+  "render": {
+    "engine": "CYCLES_CPU_DIRECT",
+    "width": 1920,
+    "height": 1080,
+    "samples": 6,
+    "format": "PNG",
+    "background_linear_rgba": [
+      0.004,
+      0.014,
+      0.02,
+      1.0
+    ],
+    "smooth_surface_normals": true
+  },
+  "palette": {
+    "background": "#071014",
+    "panel": "#161f23",
+    "cyan": "#52dcf2",
+    "text": "#eaf7f8",
+    "muted": "#b6cacf",
+    "warm": "#f0aa62"
+  },
+  "material": {
+    "head_transparent_fraction": 0.84,
+    "posterior_duct_transparent_fraction": 0.7,
+    "common_crus_transparent_fraction": 0.58,
+    "utricle_transparent_fraction": 0.55,
+    "particle_emission_strength": 2.0,
+    "surrounding_anatomy_role": "muted source context"
+  }
+}

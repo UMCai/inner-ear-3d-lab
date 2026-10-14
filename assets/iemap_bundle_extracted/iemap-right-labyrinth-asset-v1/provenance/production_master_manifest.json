@@ -1,0 +1,1730 @@
+[
+  {
+    "structure_id": "right.anterior_ampulla",
+    "source_name": "ls_Hsapiens_Aa.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:5cd975d220a083b00974dc4359df1357794a3de55dc655975d7cd9615a5a3b2d",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Aa.obj",
+    "derived_hash": "sha256:778a7e1382991d7088774a023a1aaa64fbb318c6d9e9c05f4e7fee0f462b3f7e",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 2080,
+    "triangles": 4156,
+    "bounds_ras_mm": [
+      [
+        5.364212989807129,
+        2.173006296157837,
+        1.105967402458191
+      ],
+      [
+        7.123454570770264,
+        4.280671119689941,
+        3.5900144577026367
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.lateral_ampulla",
+    "source_name": "ls_Hsapiens_Al.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:3fe81111311373545defe26581ab3d36de4f222cec4507ce1b8b7429078add7f",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Al.obj",
+    "derived_hash": "sha256:53cdf3968f65a294e50bf005072cb7df7fddd35712ba3e633b999039d9219329",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 2002,
+    "triangles": 4000,
+    "bounds_ras_mm": [
+      [
+        6.230422496795654,
+        1.881920576095581,
+        0.23976252973079681
+      ],
+      [
+        8.488605499267578,
+        4.011374473571777,
+        1.8549740314483643
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Duct",
+    "source_name": "ls_Hsapiens_Ant_Cup_Duct.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:37a482a45498a264b266895551d17d5fa5246cdc14af60014e79481cdb687443",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Ant_Cup_Duct.obj",
+    "derived_hash": "sha256:f47f4139ea72d7475a2c2ab1f8260e612eb516bc33b799c4362ee9bc609f9ac0",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 450,
+    "triangles": 852,
+    "bounds_ras_mm": [
+      [
+        5.7993388175964355,
+        2.5990118980407715,
+        2.09946870803833
+      ],
+      [
+        6.8006463050842285,
+        4.100963592529297,
+        2.9005367755889893
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Ut",
+    "source_name": "ls_Hsapiens_Ant_Cup_Ut.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:5fe309b89c3e249a64eb5d827d2cf0475644be92ff9b8022bde4621c35e873ab",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Ant_Cup_Ut.obj",
+    "derived_hash": "sha256:3c637fc7a88a9a5c5e63f0c9f01e27a6a92ade133cbfd4f7e4ca9ff3a2c92566",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 410,
+    "triangles": 728,
+    "bounds_ras_mm": [
+      [
+        5.599405765533447,
+        2.2989141941070557,
+        1.499345064163208
+      ],
+      [
+        6.500593185424805,
+        4.001087188720703,
+        2.5006542205810547
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Wall",
+    "source_name": "ls_Hsapiens_Ant_Cup_Wall.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:5f57b0f5ee41db82835c4ced34694aeda11d39a8e1a86e5f3a50d393c835eeb6",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Ant_Cup_Wall.obj",
+    "derived_hash": "sha256:1e5870005b510302e75968c494de204b8f03d7448841edee961919d79cbdf9a0",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 1112,
+    "triangles": 2196,
+    "bounds_ras_mm": [
+      [
+        5.463512420654297,
+        2.286579132080078,
+        1.4990993738174438
+      ],
+      [
+        6.874366283416748,
+        4.094038963317871,
+        2.916660785675049
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_ampulla",
+    "source_name": "ls_Hsapiens_Ap.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:6962851bba7fc5a9f80f6a665e5756a09a99ba45eed17208161502578f6e9e21",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Ap.obj",
+    "derived_hash": "sha256:1d99c78a5c62dcbfa416fc0b50c06cd16ef86c155e87bf020c29446d2952cd40",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 1496,
+    "triangles": 2988,
+    "bounds_ras_mm": [
+      [
+        3.197747230529785,
+        -2.029944658279419,
+        -3.1978580951690674
+      ],
+      [
+        4.9603190422058105,
+        -0.19355706870555878,
+        -1.3884556293487549
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.common_crus_anterior",
+    "source_name": "ls_Hsapiens_CCa.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:175da1356f0f6cb034e4c0f1890013f8de5dbde4d365f65b6be7c31bbe6d3e98",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_CCa.obj",
+    "derived_hash": "sha256:026553ec92d74d20a5adfcbee4d99a207c657576724b87deab872819a4740a82",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 3302,
+    "triangles": 6576,
+    "bounds_ras_mm": [
+      [
+        3.1598398685455322,
+        -2.4019722938537598,
+        -0.22434422373771667
+      ],
+      [
+        5.306394577026367,
+        0.7304450273513794,
+        3.0020337104797363
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.common_crus_posterior",
+    "source_name": "ls_Hsapiens_CCp.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:afe8dbdb018a6bc2be25f091a64724d9f105cbe4d46adc71d0b7633334e01db8",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_CCp.obj",
+    "derived_hash": "sha256:6a92cc8e3950d3e7a0357da3a7d29eb898c054060a8e3ab881d035434294ab74",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 2320,
+    "triangles": 4624,
+    "bounds_ras_mm": [
+      [
+        3.2967112064361572,
+        -2.1254570484161377,
+        -0.15033909678459167
+      ],
+      [
+        5.187545299530029,
+        0.6067206859588623,
+        2.7197322845458984
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Duct",
+    "source_name": "ls_Hsapiens_Lat_Cup_Duct.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:9b7a5cf2b3b207958ace3bc61fed288189ff8527759b374401a5b4c28e13b2d6",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Lat_Cup_Duct.obj",
+    "derived_hash": "sha256:7aec259ec399886e81220ac6520f91ce687ca093cae010e6c4acd13a481b1cfb",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 94,
+    "triangles": 152,
+    "bounds_ras_mm": [
+      [
+        7.599872589111328,
+        2.349219560623169,
+        0.6994426846504211
+      ],
+      [
+        7.7001261711120605,
+        3.600839853286743,
+        1.50053071975708
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Ut",
+    "source_name": "ls_Hsapiens_Lat_Cup_Ut.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:56b7214ed10487ea6fa02f085b7741b472f79bbe8c8b3bfd63a1db379b7a702f",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Lat_Cup_Ut.obj",
+    "derived_hash": "sha256:033ed455f87b55dcf97d22976b231071437250ddaaddf42fe2cffe88b5edd8f2",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 64,
+    "triangles": 96,
+    "bounds_ras_mm": [
+      [
+        6.999837875366211,
+        2.399346113204956,
+        0.5995296835899353
+      ],
+      [
+        7.200161933898926,
+        3.4006552696228027,
+        1.3004956245422363
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Wall",
+    "source_name": "ls_Hsapiens_Lat_Cup_Wall.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:b8222225512d485f374c44c6d2dfa19a3e59b002ee310edae9a46f5fe68a28c3",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Lat_Cup_Wall.obj",
+    "derived_hash": "sha256:57f0800856fa4d94839f18e4d016c2eb4ceb890bdddfd12bbcb059706a197b68",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous optional part; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 1034,
+    "triangles": 2068,
+    "bounds_ras_mm": [
+      [
+        6.861667633056641,
+        1.8803504705429077,
+        0.23637813329696655
+      ],
+      [
+        7.731555461883545,
+        3.649150848388672,
+        1.7738125324249268
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_cupula_duct",
+    "source_name": "ls_Hsapiens_Post_Cup_Duct.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:21cbeaf689f93c7a792ce1335f81df3ff29064ba70945cffc807e032b2929e6a",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Post_Cup_Duct.obj",
+    "derived_hash": "sha256:53a5986dd9916be17a00eb90f49ac48ff85032008a0811e41b65ca722f151276",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 290,
+    "triangles": 520,
+    "bounds_ras_mm": [
+      [
+        3.999505043029785,
+        -1.800716519355774,
+        -2.7005558013916016
+      ],
+      [
+        4.700469493865967,
+        -0.699282169342041,
+        -1.8994678258895874
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_cupula_utricle",
+    "source_name": "ls_Hsapiens_Post_Cup_Ut.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:2f7a6f6dc2b607cb9f90c1d09c7497e6b59b131154badd40102ed8b2a6a639b1",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Post_Cup_Ut.obj",
+    "derived_hash": "sha256:c3eceaf9d00b11ce063c43296bf0dd20c9dfccc07f662f7685bfaf79f85566a6",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 154,
+    "triangles": 244,
+    "bounds_ras_mm": [
+      [
+        3.4995293617248535,
+        -1.600740909576416,
+        -2.6005940437316895
+      ],
+      [
+        4.200469493865967,
+        -0.49928370118141174,
+        -1.699380874633789
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_cupula_wall",
+    "source_name": "ls_Hsapiens_Post_Cup_Wall.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:73d6da5b61c8cc60ff6ef06dc214de5c1acbcc91900c30687d33acdb274ef3c2",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Post_Cup_Wall.obj",
+    "derived_hash": "sha256:93462fff38933b079b13d4d2fb5d0c43e5270273aeb2822834a61c2263d68fd9",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 824,
+    "triangles": 1640,
+    "bounds_ras_mm": [
+      [
+        3.399160146713257,
+        -1.8420571088790894,
+        -2.884467601776123
+      ],
+      [
+        4.71346378326416,
+        -0.5275582075119019,
+        -1.6463840007781982
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.simple_crus_limb",
+    "source_name": "ls_Hsapiens_SC.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:159818fd2d511e7a646955edfcd8495f84060f1b7b502d7c047c30139ece8f64",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_SC.obj",
+    "derived_hash": "sha256:f05514fc34852fa8bfa11c8dd24f4df76361488d9e1b39b668257c6485152c3d",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 2084,
+    "triangles": 4136,
+    "bounds_ras_mm": [
+      [
+        3.898667335510254,
+        -1.379187822341919,
+        -1.601332426071167
+      ],
+      [
+        5.972466468811035,
+        0.8099173903465271,
+        0.5085766315460205
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.anterior_duct",
+    "source_name": "ls_Hsapiens_Sa.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:e9ceca62d1e0cce89e7daf8d3a76872313ac566eb93222f70790ac1b5c2d0538",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Sa.obj",
+    "derived_hash": "sha256:da447231fa7d23c5a066b3e6d09597a10ad8e4d00676e55fac5ddc735c618cdf",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 4964,
+    "triangles": 9924,
+    "bounds_ras_mm": [
+      [
+        3.1547462940216064,
+        -2.4401421546936035,
+        2.225593328475952
+      ],
+      [
+        7.964570045471191,
+        4.471871376037598,
+        7.5573530197143555
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.lateral_duct",
+    "source_name": "ls_Hsapiens_Sl.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:14219b72ab4b9df3f9b9750f89ca7e8b88aad9aa74cf6d111eb800463f02ffaa",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Sl.obj",
+    "derived_hash": "sha256:5c99f4fad726d196daefa00b5a6e85ec19a2fdb97f33946a532226fb01c0aa80",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 3638,
+    "triangles": 7272,
+    "bounds_ras_mm": [
+      [
+        5.188358306884766,
+        -2.3295814990997314,
+        -0.14511296153068542
+      ],
+      [
+        10.711997032165527,
+        3.850269317626953,
+        1.8727397918701172
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_duct",
+    "source_name": "ls_Hsapiens_Sp.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:bc71028c27c970180139a44271522788a8d126cec8b92ff5aa991be62f173a8f",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_Sp.obj",
+    "derived_hash": "sha256:9e847a0df92c864f3a7c84e8e809a5179e03cc7d7b1f4e5b18e5e370b26d1704",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 5846,
+    "triangles": 11688,
+    "bounds_ras_mm": [
+      [
+        3.453646183013916,
+        -5.751465797424316,
+        -3.646998167037964
+      ],
+      [
+        8.869681358337402,
+        -0.6752449870109558,
+        3.4726696014404297
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.posterior_utricular_limb",
+    "source_name": "ls_Hsapiens_UCp.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:9a1c85a8e81dfee64ab4b48b59cfb0d1e702cd4b6b62a28d9e0056be5a5376b5",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_UCp.obj",
+    "derived_hash": "sha256:5050be728b473ffb01bc59775d084f54113c23336baf8049c497bb02845a4b63",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 4036,
+    "triangles": 8044,
+    "bounds_ras_mm": [
+      [
+        3.0491204261779785,
+        -0.9537438154220581,
+        -2.3296055793762207
+      ],
+      [
+        5.50432825088501,
+        1.595120906829834,
+        1.0014278888702393
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.utricle",
+    "source_name": "ls_Hsapiens_utricle.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:f1afbe3ebbce3b608f2d252db99f209704b95207e9c49c66e64b307bd8cd1309",
+    "derived_file": "assets/derived/production-prep/master/ls_Hsapiens_utricle.obj",
+    "derived_hash": "sha256:4048812de1135c268053aee504e689545740a95e665bb30b947afc0d800fc4b5",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 4418,
+    "triangles": 8832,
+    "bounds_ras_mm": [
+      [
+        3.0962045192718506,
+        -0.5869240760803223,
+        -1.9897083044052124
+      ],
+      [
+        6.38097620010376,
+        4.296205997467041,
+        1.5316494703292847
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.cochlea",
+    "source_name": "mesh_david_cochlea.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:23d3e23a770afe047261c133f6b00713c30a6edd28d47004238aa02ba977abc3",
+    "derived_file": "assets/derived/production-prep/master/mesh_david_cochlea.obj",
+    "derived_hash": "sha256:f384906852d2d083d756355e203ce7b03bd445c16f94139df7fc3e4bf0fefde2",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": true,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 7812,
+    "triangles": 15620,
+    "bounds_ras_mm": [
+      [
+        -1.8149528503417969,
+        0.741417646408081,
+        -6.1209492683410645
+      ],
+      [
+        5.321792125701904,
+        8.923114776611328,
+        0.45419275760650635
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "right.saccule",
+    "source_name": "mesh_david_sacculus.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:ec8ea3fdc7c1d23f055b82a108e3780df9cb48cafdc1609e83aea95bc4824434",
+    "derived_file": "assets/derived/production-prep/master/mesh_david_sacculus.obj",
+    "derived_hash": "sha256:dfc63070302d8f2cda9bed7a871b499ef3e9e67d66fc9d960f3f7d45b5ccfaae",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "registered membranous production candidate",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 1770,
+    "triangles": 3536,
+    "bounds_ras_mm": [
+      [
+        2.7879953384399414,
+        2.0644888877868652,
+        -2.1609585285186768
+      ],
+      [
+        4.58117151260376,
+        4.071735382080078,
+        0.18305934965610504
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.segT2_th1.07_Otsu",
+    "source_name": "segT2_th1.07_Otsu.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:81abfde4b40ba2791e19769a364e409fe1ddf575c44529a390fc09f60a1258c6",
+    "derived_file": "assets/derived/production-prep/master/segT2_th1.07_Otsu.obj",
+    "derived_hash": "sha256:ec1735a6c496569078be2eeded114ce0248f352e6325c06628e3edc28cdca81a",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "T2 threshold outer context; optional, not a membranous duct",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 16996,
+    "triangles": 33992,
+    "bounds_ras_mm": [
+      [
+        -2.5925636291503906,
+        -5.92384147644043,
+        -6.429778575897217
+      ],
+      [
+        11.236754417419434,
+        9.03281307220459,
+        7.974175930023193
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.seg_coch_inner_cupula",
+    "source_name": "seg_coch_inner_cupula.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:aef4095ea276ece9dc6a6cdaf428d49b25377dc88f10bf5179c0e3f37f3dfb02",
+    "derived_file": "assets/derived/production-prep/master/seg_coch_inner_cupula.obj",
+    "derived_hash": "sha256:a39ca036fdde5a7fea8fa82c12116dc91fdac7d0dc4bfa4cd2f8963b81b12dce",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "alternative cochlear segmentation; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 2528,
+    "triangles": 5052,
+    "bounds_ras_mm": [
+      [
+        0.11613243818283081,
+        6.724152565002441,
+        -3.453165054321289
+      ],
+      [
+        3.278306007385254,
+        8.46890926361084,
+        -1.2279422283172607
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.seg_coch_inner_scala_tympani",
+    "source_name": "seg_coch_inner_scala_tympani.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:f6e991653b075a73972ee65957dc86279a9ff921010d590c30f827779290204d",
+    "derived_file": "assets/derived/production-prep/master/seg_coch_inner_scala_tympani.obj",
+    "derived_hash": "sha256:bf5d2d900201c4739f57c89b8fa7c01acf5d83c8b3d9a672fcae04a33bdd3bec",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "alternative cochlear segmentation; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 11954,
+    "triangles": 23904,
+    "bounds_ras_mm": [
+      [
+        -2.1759238243103027,
+        2.318430185317993,
+        -5.684415817260742
+      ],
+      [
+        4.461977481842041,
+        7.754245758056641,
+        0.5840389728546143
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.seg_coch_inner_scala_vestibuli",
+    "source_name": "seg_coch_inner_scala_vestibuli.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:742e3750f14d0e959d62027307a001b7b0cfe30482df8e0e050007f2e05174b5",
+    "derived_file": "assets/derived/production-prep/master/seg_coch_inner_scala_vestibuli.obj",
+    "derived_hash": "sha256:d76af54f6151d88c5df04206630bf6fd68a6ae9ded49562c0d2b63fe18bc9463",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "alternative cochlear segmentation; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 10818,
+    "triangles": 21632,
+    "bounds_ras_mm": [
+      [
+        -1.573453426361084,
+        3.5198676586151123,
+        -5.882815837860107
+      ],
+      [
+        5.000985145568848,
+        8.176749229431152,
+        0.3848034143447876
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  },
+  {
+    "structure_id": "atlas.seg_coch_outer_T2",
+    "source_name": "seg_coch_outer_T2.vtk",
+    "source_url": "https://zenodo.org/records/10625570",
+    "license": "CC BY 4.0",
+    "source_hash": "sha256:e5fc22c5a1859e1fa4ed1e6200819d658eac41ab6d671f7155453c4271788744",
+    "derived_file": "assets/derived/production-prep/master/seg_coch_outer_T2.obj",
+    "derived_hash": "sha256:19d93687d5cacb1c94913d1b5f95cf6b12db87a69dcfff91ac9c9a6296bcaa34",
+    "source_units": "mm inferred from Slicer scene/segmentation and dimensions",
+    "source_frame": "right-oriented IE-Map RAS template",
+    "transform_to_patient_frame": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        1
+      ]
+    ],
+    "laterality_evidence": "Ahmadi et al. 2021 methods: left ears mirrored to right template",
+    "role": "alternative cochlear segmentation; hidden by default",
+    "included_in_prep_master": true,
+    "visible_by_default": false,
+    "is_schematic": false,
+    "cleaning_steps": [
+      "binary VTK parse",
+      "triangle fan for polygon cells",
+      "OBJ export; no smoothing or repair"
+    ],
+    "review_status": "technical import checked; clinical review pending",
+    "points": 25144,
+    "triangles": 50284,
+    "bounds_ras_mm": [
+      [
+        -2.3757164478302,
+        0.7131263017654419,
+        -6.401716232299805
+      ],
+      [
+        5.6838297843933105,
+        8.943253517150879,
+        0.7843258380889893
+      ]
+    ],
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0
+  }
+]

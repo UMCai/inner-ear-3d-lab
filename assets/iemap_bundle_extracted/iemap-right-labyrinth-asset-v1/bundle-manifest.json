@@ -1,0 +1,745 @@
+{
+  "package_id": "iemap-right-labyrinth-asset-v1",
+  "created_date": "2026-10-08",
+  "source": "IE-Map v1.0.0",
+  "source_url": "https://zenodo.org/records/10625570",
+  "license": "CC BY 4.0",
+  "orientation": "right-oriented patient RAS template",
+  "source_units": "millimetres",
+  "blender_object_scale": 0.001,
+  "blender_scene_units": "metres",
+  "clinical_status": "technical import checked; specialist review pending",
+  "scope": "27 surface meshes, source segmentation and one import-check scene; no BPPV mechanism, head, volumes or video",
+  "structures": [
+    {
+      "structure_id": "right.anterior_ampulla",
+      "source_name": "ls_Hsapiens_Aa.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Aa.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Aa.obj",
+      "source_sha256": "5cd975d220a083b00974dc4359df1357794a3de55dc655975d7cd9615a5a3b2d",
+      "obj_sha256": "778a7e1382991d7088774a023a1aaa64fbb318c6d9e9c05f4e7fee0f462b3f7e",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 2080,
+      "triangles": 4156,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.lateral_ampulla",
+      "source_name": "ls_Hsapiens_Al.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Al.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Al.obj",
+      "source_sha256": "3fe81111311373545defe26581ab3d36de4f222cec4507ce1b8b7429078add7f",
+      "obj_sha256": "53cdf3968f65a294e50bf005072cb7df7fddd35712ba3e633b999039d9219329",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 2002,
+      "triangles": 4000,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Duct",
+      "source_name": "ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Ant_Cup_Duct.obj",
+      "source_sha256": "37a482a45498a264b266895551d17d5fa5246cdc14af60014e79481cdb687443",
+      "obj_sha256": "f47f4139ea72d7475a2c2ab1f8260e612eb516bc33b799c4362ee9bc609f9ac0",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 450,
+      "triangles": 852,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Ut",
+      "source_name": "ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Ant_Cup_Ut.obj",
+      "source_sha256": "5fe309b89c3e249a64eb5d827d2cf0475644be92ff9b8022bde4621c35e873ab",
+      "obj_sha256": "3c637fc7a88a9a5c5e63f0c9f01e27a6a92ade133cbfd4f7e4ca9ff3a2c92566",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 410,
+      "triangles": 728,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Wall",
+      "source_name": "ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Ant_Cup_Wall.obj",
+      "source_sha256": "5f57b0f5ee41db82835c4ced34694aeda11d39a8e1a86e5f3a50d393c835eeb6",
+      "obj_sha256": "1e5870005b510302e75968c494de204b8f03d7448841edee961919d79cbdf9a0",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 1112,
+      "triangles": 2196,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_ampulla",
+      "source_name": "ls_Hsapiens_Ap.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Ap.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Ap.obj",
+      "source_sha256": "6962851bba7fc5a9f80f6a665e5756a09a99ba45eed17208161502578f6e9e21",
+      "obj_sha256": "1d99c78a5c62dcbfa416fc0b50c06cd16ef86c155e87bf020c29446d2952cd40",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 1496,
+      "triangles": 2988,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.common_crus_anterior",
+      "source_name": "ls_Hsapiens_CCa.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_CCa.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_CCa.obj",
+      "source_sha256": "175da1356f0f6cb034e4c0f1890013f8de5dbde4d365f65b6be7c31bbe6d3e98",
+      "obj_sha256": "026553ec92d74d20a5adfcbee4d99a207c657576724b87deab872819a4740a82",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 3302,
+      "triangles": 6576,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.common_crus_posterior",
+      "source_name": "ls_Hsapiens_CCp.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_CCp.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_CCp.obj",
+      "source_sha256": "afe8dbdb018a6bc2be25f091a64724d9f105cbe4d46adc71d0b7633334e01db8",
+      "obj_sha256": "6a92cc8e3950d3e7a0357da3a7d29eb898c054060a8e3ab881d035434294ab74",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 2320,
+      "triangles": 4624,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Duct",
+      "source_name": "ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Lat_Cup_Duct.obj",
+      "source_sha256": "9b7a5cf2b3b207958ace3bc61fed288189ff8527759b374401a5b4c28e13b2d6",
+      "obj_sha256": "7aec259ec399886e81220ac6520f91ce687ca093cae010e6c4acd13a481b1cfb",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 94,
+      "triangles": 152,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Ut",
+      "source_name": "ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Lat_Cup_Ut.obj",
+      "source_sha256": "56b7214ed10487ea6fa02f085b7741b472f79bbe8c8b3bfd63a1db379b7a702f",
+      "obj_sha256": "033ed455f87b55dcf97d22976b231071437250ddaaddf42fe2cffe88b5edd8f2",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 64,
+      "triangles": 96,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Wall",
+      "source_name": "ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Lat_Cup_Wall.obj",
+      "source_sha256": "b8222225512d485f374c44c6d2dfa19a3e59b002ee310edae9a46f5fe68a28c3",
+      "obj_sha256": "57f0800856fa4d94839f18e4d016c2eb4ceb890bdddfd12bbcb059706a197b68",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 1034,
+      "triangles": 2068,
+      "role": "registered membranous optional part; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_cupula_duct",
+      "source_name": "ls_Hsapiens_Post_Cup_Duct.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Post_Cup_Duct.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Post_Cup_Duct.obj",
+      "source_sha256": "21cbeaf689f93c7a792ce1335f81df3ff29064ba70945cffc807e032b2929e6a",
+      "obj_sha256": "53a5986dd9916be17a00eb90f49ac48ff85032008a0811e41b65ca722f151276",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 290,
+      "triangles": 520,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_cupula_utricle",
+      "source_name": "ls_Hsapiens_Post_Cup_Ut.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Post_Cup_Ut.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Post_Cup_Ut.obj",
+      "source_sha256": "2f7a6f6dc2b607cb9f90c1d09c7497e6b59b131154badd40102ed8b2a6a639b1",
+      "obj_sha256": "c3eceaf9d00b11ce063c43296bf0dd20c9dfccc07f662f7685bfaf79f85566a6",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 154,
+      "triangles": 244,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_cupula_wall",
+      "source_name": "ls_Hsapiens_Post_Cup_Wall.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Post_Cup_Wall.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Post_Cup_Wall.obj",
+      "source_sha256": "73d6da5b61c8cc60ff6ef06dc214de5c1acbcc91900c30687d33acdb274ef3c2",
+      "obj_sha256": "93462fff38933b079b13d4d2fb5d0c43e5270273aeb2822834a61c2263d68fd9",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 824,
+      "triangles": 1640,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.simple_crus_limb",
+      "source_name": "ls_Hsapiens_SC.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_SC.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_SC.obj",
+      "source_sha256": "159818fd2d511e7a646955edfcd8495f84060f1b7b502d7c047c30139ece8f64",
+      "obj_sha256": "f05514fc34852fa8bfa11c8dd24f4df76361488d9e1b39b668257c6485152c3d",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 2084,
+      "triangles": 4136,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.anterior_duct",
+      "source_name": "ls_Hsapiens_Sa.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Sa.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Sa.obj",
+      "source_sha256": "e9ceca62d1e0cce89e7daf8d3a76872313ac566eb93222f70790ac1b5c2d0538",
+      "obj_sha256": "da447231fa7d23c5a066b3e6d09597a10ad8e4d00676e55fac5ddc735c618cdf",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 4964,
+      "triangles": 9924,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.lateral_duct",
+      "source_name": "ls_Hsapiens_Sl.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Sl.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Sl.obj",
+      "source_sha256": "14219b72ab4b9df3f9b9750f89ca7e8b88aad9aa74cf6d111eb800463f02ffaa",
+      "obj_sha256": "5c99f4fad726d196daefa00b5a6e85ec19a2fdb97f33946a532226fb01c0aa80",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 3638,
+      "triangles": 7272,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_duct",
+      "source_name": "ls_Hsapiens_Sp.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_Sp.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_Sp.obj",
+      "source_sha256": "bc71028c27c970180139a44271522788a8d126cec8b92ff5aa991be62f173a8f",
+      "obj_sha256": "9e847a0df92c864f3a7c84e8e809a5179e03cc7d7b1f4e5b18e5e370b26d1704",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 5846,
+      "triangles": 11688,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.posterior_utricular_limb",
+      "source_name": "ls_Hsapiens_UCp.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_UCp.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_UCp.obj",
+      "source_sha256": "9a1c85a8e81dfee64ab4b48b59cfb0d1e702cd4b6b62a28d9e0056be5a5376b5",
+      "obj_sha256": "5050be728b473ffb01bc59775d084f54113c23336baf8049c497bb02845a4b63",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 4036,
+      "triangles": 8044,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.utricle",
+      "source_name": "ls_Hsapiens_utricle.vtk",
+      "vtk_path": "source/vtk/ls_Hsapiens_utricle.vtk",
+      "obj_path": "mesh/obj/ls_Hsapiens_utricle.obj",
+      "source_sha256": "f1afbe3ebbce3b608f2d252db99f209704b95207e9c49c66e64b307bd8cd1309",
+      "obj_sha256": "4048812de1135c268053aee504e689545740a95e665bb30b947afc0d800fc4b5",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 4418,
+      "triangles": 8832,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.cochlea",
+      "source_name": "mesh_david_cochlea.vtk",
+      "vtk_path": "source/vtk/mesh_david_cochlea.vtk",
+      "obj_path": "mesh/obj/mesh_david_cochlea.obj",
+      "source_sha256": "23d3e23a770afe047261c133f6b00713c30a6edd28d47004238aa02ba977abc3",
+      "obj_sha256": "f384906852d2d083d756355e203ce7b03bd445c16f94139df7fc3e4bf0fefde2",
+      "visible_by_default": true,
+      "is_schematic": false,
+      "points": 7812,
+      "triangles": 15620,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "right.saccule",
+      "source_name": "mesh_david_sacculus.vtk",
+      "vtk_path": "source/vtk/mesh_david_sacculus.vtk",
+      "obj_path": "mesh/obj/mesh_david_sacculus.obj",
+      "source_sha256": "ec8ea3fdc7c1d23f055b82a108e3780df9cb48cafdc1609e83aea95bc4824434",
+      "obj_sha256": "dfc63070302d8f2cda9bed7a871b499ef3e9e67d66fc9d960f3f7d45b5ccfaae",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 1770,
+      "triangles": 3536,
+      "role": "registered membranous production candidate",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.segT2_th1.07_Otsu",
+      "source_name": "segT2_th1.07_Otsu.vtk",
+      "vtk_path": "source/vtk/segT2_th1.07_Otsu.vtk",
+      "obj_path": "mesh/obj/segT2_th1.07_Otsu.obj",
+      "source_sha256": "81abfde4b40ba2791e19769a364e409fe1ddf575c44529a390fc09f60a1258c6",
+      "obj_sha256": "ec1735a6c496569078be2eeded114ce0248f352e6325c06628e3edc28cdca81a",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 16996,
+      "triangles": 33992,
+      "role": "T2 threshold outer context; optional, not a membranous duct",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_cupula",
+      "source_name": "seg_coch_inner_cupula.vtk",
+      "vtk_path": "source/vtk/seg_coch_inner_cupula.vtk",
+      "obj_path": "mesh/obj/seg_coch_inner_cupula.obj",
+      "source_sha256": "aef4095ea276ece9dc6a6cdaf428d49b25377dc88f10bf5179c0e3f37f3dfb02",
+      "obj_sha256": "a39ca036fdde5a7fea8fa82c12116dc91fdac7d0dc4bfa4cd2f8963b81b12dce",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 2528,
+      "triangles": 5052,
+      "role": "alternative cochlear segmentation; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_scala_tympani",
+      "source_name": "seg_coch_inner_scala_tympani.vtk",
+      "vtk_path": "source/vtk/seg_coch_inner_scala_tympani.vtk",
+      "obj_path": "mesh/obj/seg_coch_inner_scala_tympani.obj",
+      "source_sha256": "f6e991653b075a73972ee65957dc86279a9ff921010d590c30f827779290204d",
+      "obj_sha256": "bf5d2d900201c4739f57c89b8fa7c01acf5d83c8b3d9a672fcae04a33bdd3bec",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 11954,
+      "triangles": 23904,
+      "role": "alternative cochlear segmentation; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.seg_coch_inner_scala_vestibuli",
+      "source_name": "seg_coch_inner_scala_vestibuli.vtk",
+      "vtk_path": "source/vtk/seg_coch_inner_scala_vestibuli.vtk",
+      "obj_path": "mesh/obj/seg_coch_inner_scala_vestibuli.obj",
+      "source_sha256": "742e3750f14d0e959d62027307a001b7b0cfe30482df8e0e050007f2e05174b5",
+      "obj_sha256": "d76af54f6151d88c5df04206630bf6fd68a6ae9ded49562c0d2b63fe18bc9463",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 10818,
+      "triangles": 21632,
+      "role": "alternative cochlear segmentation; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    },
+    {
+      "structure_id": "atlas.seg_coch_outer_T2",
+      "source_name": "seg_coch_outer_T2.vtk",
+      "vtk_path": "source/vtk/seg_coch_outer_T2.vtk",
+      "obj_path": "mesh/obj/seg_coch_outer_T2.obj",
+      "source_sha256": "e5fc22c5a1859e1fa4ed1e6200819d658eac41ab6d671f7155453c4271788744",
+      "obj_sha256": "19d93687d5cacb1c94913d1b5f95cf6b12db87a69dcfff91ac9c9a6296bcaa34",
+      "visible_by_default": false,
+      "is_schematic": false,
+      "points": 25144,
+      "triangles": 50284,
+      "role": "alternative cochlear segmentation; hidden by default",
+      "review_status": "technical import checked; clinical review pending"
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "size_bytes": 6139,
+      "sha256": "012ef6b3a1e71601a30e7de584e4807465e3ab0274635fce9219ceb72647e42a"
+    },
+    {
+      "path": "import_labyrinth.py",
+      "size_bytes": 3024,
+      "sha256": "7c16fc9e56ecb9dbe0fd77ab5f4d9945163c723960cb25078f186b0245a74123"
+    },
+    {
+      "path": "verify_package.py",
+      "size_bytes": 609,
+      "sha256": "9b3f1a8dff60abbc1e0e329bcdd85f0d656999bede248b0589e21f4c21a33acf"
+    },
+    {
+      "path": "source/LICENSE.txt",
+      "size_bytes": 19043,
+      "sha256": "9f614db80a4e62cbb744e6f00d9da221adf45c6463556cb32f81ad1f8467f188"
+    },
+    {
+      "path": "source/README.md",
+      "size_bytes": 3967,
+      "sha256": "a957c9984cfaecd1f9751c8a9ff20911dc1dceb02b95fa8bc9cf5bf07feb52f0"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Aa.vtk",
+      "size_bytes": 116598,
+      "sha256": "5cd975d220a083b00974dc4359df1357794a3de55dc655975d7cd9615a5a3b2d"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Aa.obj",
+      "size_bytes": 136223,
+      "sha256": "778a7e1382991d7088774a023a1aaa64fbb318c6d9e9c05f4e7fee0f462b3f7e"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Al.vtk",
+      "size_bytes": 112230,
+      "sha256": "3fe81111311373545defe26581ab3d36de4f222cec4507ce1b8b7429078add7f"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Al.obj",
+      "size_bytes": 131897,
+      "sha256": "53cdf3968f65a294e50bf005072cb7df7fddd35712ba3e633b999039d9219329"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "size_bytes": 24610,
+      "sha256": "37a482a45498a264b266895551d17d5fa5246cdc14af60014e79481cdb687443"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Ant_Cup_Duct.obj",
+      "size_bytes": 27059,
+      "sha256": "f47f4139ea72d7475a2c2ab1f8260e612eb516bc33b799c4362ee9bc609f9ac0"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "size_bytes": 21666,
+      "sha256": "5fe309b89c3e249a64eb5d827d2cf0475644be92ff9b8022bde4621c35e873ab"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Ant_Cup_Ut.obj",
+      "size_bytes": 23956,
+      "sha256": "3c637fc7a88a9a5c5e63f0c9f01e27a6a92ade133cbfd4f7e4ca9ff3a2c92566"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "size_bytes": 62005,
+      "sha256": "5f57b0f5ee41db82835c4ced34694aeda11d39a8e1a86e5f3a50d393c835eeb6"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Ant_Cup_Wall.obj",
+      "size_bytes": 69492,
+      "sha256": "1e5870005b510302e75968c494de204b8f03d7448841edee961919d79cbdf9a0"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Ap.vtk",
+      "size_bytes": 83894,
+      "sha256": "6962851bba7fc5a9f80f6a665e5756a09a99ba45eed17208161502578f6e9e21"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Ap.obj",
+      "size_bytes": 99836,
+      "sha256": "1d99c78a5c62dcbfa416fc0b50c06cd16ef86c155e87bf020c29446d2952cd40"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_CCa.vtk",
+      "size_bytes": 184646,
+      "sha256": "175da1356f0f6cb034e4c0f1890013f8de5dbde4d365f65b6be7c31bbe6d3e98"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_CCa.obj",
+      "size_bytes": 226926,
+      "sha256": "026553ec92d74d20a5adfcbee4d99a207c657576724b87deab872819a4740a82"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_CCp.vtk",
+      "size_bytes": 129846,
+      "sha256": "afe8dbdb018a6bc2be25f091a64724d9f105cbe4d46adc71d0b7633334e01db8"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_CCp.obj",
+      "size_bytes": 157739,
+      "sha256": "6a92cc8e3950d3e7a0357da3a7d29eb898c054060a8e3ab881d035434294ab74"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "size_bytes": 4863,
+      "sha256": "9b7a5cf2b3b207958ace3bc61fed288189ff8527759b374401a5b4c28e13b2d6"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Lat_Cup_Duct.obj",
+      "size_bytes": 5038,
+      "sha256": "7aec259ec399886e81220ac6520f91ce687ca093cae010e6c4acd13a481b1cfb"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "size_bytes": 3246,
+      "sha256": "56b7214ed10487ea6fa02f085b7741b472f79bbe8c8b3bfd63a1db379b7a702f"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Lat_Cup_Ut.obj",
+      "size_bytes": 3354,
+      "sha256": "033ed455f87b55dcf97d22976b231071437250ddaaddf42fe2cffe88b5edd8f2"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "size_bytes": 58085,
+      "sha256": "b8222225512d485f374c44c6d2dfa19a3e59b002ee310edae9a46f5fe68a28c3"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Lat_Cup_Wall.obj",
+      "size_bytes": 64957,
+      "sha256": "57f0800856fa4d94839f18e4d016c2eb4ceb890bdddfd12bbcb059706a197b68"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Post_Cup_Duct.vtk",
+      "size_bytes": 15458,
+      "sha256": "21cbeaf689f93c7a792ce1335f81df3ff29064ba70945cffc807e032b2929e6a"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Post_Cup_Duct.obj",
+      "size_bytes": 17482,
+      "sha256": "53a5986dd9916be17a00eb90f49ac48ff85032008a0811e41b65ca722f151276"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Post_Cup_Ut.vtk",
+      "size_bytes": 7777,
+      "sha256": "2f7a6f6dc2b607cb9f90c1d09c7497e6b59b131154badd40102ed8b2a6a639b1"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Post_Cup_Ut.obj",
+      "size_bytes": 8748,
+      "sha256": "c3eceaf9d00b11ce063c43296bf0dd20c9dfccc07f662f7685bfaf79f85566a6"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Post_Cup_Wall.vtk",
+      "size_bytes": 46195,
+      "sha256": "73d6da5b61c8cc60ff6ef06dc214de5c1acbcc91900c30687d33acdb274ef3c2"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Post_Cup_Wall.obj",
+      "size_bytes": 52925,
+      "sha256": "93462fff38933b079b13d4d2fb5d0c43e5270273aeb2822834a61c2263d68fd9"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_SC.vtk",
+      "size_bytes": 116374,
+      "sha256": "159818fd2d511e7a646955edfcd8495f84060f1b7b502d7c047c30139ece8f64"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_SC.obj",
+      "size_bytes": 142748,
+      "sha256": "f05514fc34852fa8bfa11c8dd24f4df76361488d9e1b39b668257c6485152c3d"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Sa.vtk",
+      "size_bytes": 278102,
+      "sha256": "e9ceca62d1e0cce89e7daf8d3a76872313ac566eb93222f70790ac1b5c2d0538"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Sa.obj",
+      "size_bytes": 337140,
+      "sha256": "da447231fa7d23c5a066b3e6d09597a10ad8e4d00676e55fac5ddc735c618cdf"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Sl.vtk",
+      "size_bytes": 203846,
+      "sha256": "14219b72ab4b9df3f9b9750f89ca7e8b88aad9aa74cf6d111eb800463f02ffaa"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Sl.obj",
+      "size_bytes": 248225,
+      "sha256": "5c99f4fad726d196daefa00b5a6e85ec19a2fdb97f33946a532226fb01c0aa80"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_Sp.vtk",
+      "size_bytes": 327495,
+      "sha256": "bc71028c27c970180139a44271522788a8d126cec8b92ff5aa991be62f173a8f"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_Sp.obj",
+      "size_bytes": 404412,
+      "sha256": "9e847a0df92c864f3a7c84e8e809a5179e03cc7d7b1f4e5b18e5e370b26d1704"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_UCp.vtk",
+      "size_bytes": 225750,
+      "sha256": "9a1c85a8e81dfee64ab4b48b59cfb0d1e702cd4b6b62a28d9e0056be5a5376b5"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_UCp.obj",
+      "size_bytes": 281017,
+      "sha256": "5050be728b473ffb01bc59775d084f54113c23336baf8049c497bb02845a4b63"
+    },
+    {
+      "path": "source/vtk/ls_Hsapiens_utricle.vtk",
+      "size_bytes": 247526,
+      "sha256": "f1afbe3ebbce3b608f2d252db99f209704b95207e9c49c66e64b307bd8cd1309"
+    },
+    {
+      "path": "mesh/obj/ls_Hsapiens_utricle.obj",
+      "size_bytes": 303846,
+      "sha256": "4048812de1135c268053aee504e689545740a95e665bb30b947afc0d800fc4b5"
+    },
+    {
+      "path": "source/vtk/mesh_david_cochlea.vtk",
+      "size_bytes": 437591,
+      "sha256": "23d3e23a770afe047261c133f6b00713c30a6edd28d47004238aa02ba977abc3"
+    },
+    {
+      "path": "mesh/obj/mesh_david_cochlea.obj",
+      "size_bytes": 541855,
+      "sha256": "f384906852d2d083d756355e203ce7b03bd445c16f94139df7fc3e4bf0fefde2"
+    },
+    {
+      "path": "source/vtk/mesh_david_sacculus.vtk",
+      "size_bytes": 99238,
+      "sha256": "ec8ea3fdc7c1d23f055b82a108e3780df9cb48cafdc1609e83aea95bc4824434"
+    },
+    {
+      "path": "mesh/obj/mesh_david_sacculus.obj",
+      "size_bytes": 117775,
+      "sha256": "dfc63070302d8f2cda9bed7a871b499ef3e9e67d66fc9d960f3f7d45b5ccfaae"
+    },
+    {
+      "path": "source/vtk/segT2_th1.07_Otsu.vtk",
+      "size_bytes": 951962,
+      "sha256": "81abfde4b40ba2791e19769a364e409fe1ddf575c44529a390fc09f60a1258c6"
+    },
+    {
+      "path": "mesh/obj/segT2_th1.07_Otsu.obj",
+      "size_bytes": 1228257,
+      "sha256": "ec1735a6c496569078be2eeded114ce0248f352e6325c06628e3edc28cdca81a"
+    },
+    {
+      "path": "source/vtk/seg_coch_inner_cupula.vtk",
+      "size_bytes": 141686,
+      "sha256": "aef4095ea276ece9dc6a6cdaf428d49b25377dc88f10bf5179c0e3f37f3dfb02"
+    },
+    {
+      "path": "mesh/obj/seg_coch_inner_cupula.obj",
+      "size_bytes": 170315,
+      "sha256": "a39ca036fdde5a7fea8fa82c12116dc91fdac7d0dc4bfa4cd2f8963b81b12dce"
+    },
+    {
+      "path": "source/vtk/seg_coch_inner_scala_tympani.vtk",
+      "size_bytes": 669545,
+      "sha256": "f6e991653b075a73972ee65957dc86279a9ff921010d590c30f827779290204d"
+    },
+    {
+      "path": "mesh/obj/seg_coch_inner_scala_tympani.obj",
+      "size_bytes": 849503,
+      "sha256": "bf5d2d900201c4739f57c89b8fa7c01acf5d83c8b3d9a672fcae04a33bdd3bec"
+    },
+    {
+      "path": "source/vtk/seg_coch_inner_scala_vestibuli.vtk",
+      "size_bytes": 605929,
+      "sha256": "742e3750f14d0e959d62027307a001b7b0cfe30482df8e0e050007f2e05174b5"
+    },
+    {
+      "path": "mesh/obj/seg_coch_inner_scala_vestibuli.obj",
+      "size_bytes": 760841,
+      "sha256": "d76af54f6151d88c5df04206630bf6fd68a6ae9ded49562c0d2b63fe18bc9463"
+    },
+    {
+      "path": "source/vtk/seg_coch_outer_T2.vtk",
+      "size_bytes": 1408186,
+      "sha256": "e5fc22c5a1859e1fa4ed1e6200819d658eac41ab6d671f7155453c4271788744"
+    },
+    {
+      "path": "mesh/obj/seg_coch_outer_T2.obj",
+      "size_bytes": 1853148,
+      "sha256": "19d93687d5cacb1c94913d1b5f95cf6b12db87a69dcfff91ac9c9a6296bcaa34"
+    },
+    {
+      "path": "scene/iemap-import-check.blend",
+      "size_bytes": 5461496,
+      "sha256": "f61a1a852b5d81618e64a1eac2440d5b0da7ecb87dd4dcc91f897dd15f056758"
+    },
+    {
+      "path": "provenance/production_master_manifest.json",
+      "size_bytes": 45239,
+      "sha256": "ba01bcb39b6e19b300a1f6842e0f74b19b8846a7824ae9ec7b41a7858d8020f1"
+    },
+    {
+      "path": "provenance/full_source_inventory.json",
+      "size_bytes": 20344,
+      "sha256": "58ee31ebeed7d1b8e151c50cb0ef4d8c035931546b1c40277685c2c72c3d71be"
+    },
+    {
+      "path": "provenance/blender_import_check.json",
+      "size_bytes": 5797,
+      "sha256": "4ae8ac589a6f43e7a3afe693e8c02a71d46c2ecd921edb04efe86eb19fa2a2ed"
+    },
+    {
+      "path": "views/01-right-lateral-corrected-labels.png",
+      "size_bytes": 170262,
+      "sha256": "df95f19c22925355172f7ba4274d0caf1ccd70ba7fab8b1b92d8bb04797bba5e"
+    },
+    {
+      "path": "views/02-anterior-corrected-labels.png",
+      "size_bytes": 177302,
+      "sha256": "1d63ad1895a8eca7a9a7f86aecb4a3639fea917ba0cfdc0922bd7eefc861a815"
+    },
+    {
+      "path": "views/03-superior-corrected-labels.png",
+      "size_bytes": 158060,
+      "sha256": "f3a9c176402bb6678e45cdf8b2f89a5c30d72c26e9c84eac038f66c805258763"
+    },
+    {
+      "path": "views/04-posterior-three-quarter-corrected-labels.png",
+      "size_bytes": 179494,
+      "sha256": "caaa06ab8f4d614ed93fa72bc992e831757af8093dfa79f93680b3d81e4c96cd"
+    },
+    {
+      "path": "source/segIEMap.seg.nrrd",
+      "size_bytes": 294334,
+      "sha256": "5ac50e8b2dc6cc81b9722b58aeaec279993ae85db8345ed2eadd4a406c352b31"
+    },
+    {
+      "path": "provenance/segmentation_and_mesh_audit.json",
+      "size_bytes": 17162,
+      "sha256": "69bbbc3f823f5c6b63482513823f3320e3e127051759de92195810cb32bb74c9"
+    }
+  ],
+  "support_data": {
+    "source_segmentation_path": "source/segIEMap.seg.nrrd",
+    "source_segmentation_sha256": "5ac50e8b2dc6cc81b9722b58aeaec279993ae85db8345ed2eadd4a406c352b31",
+    "segmentation_transform_audit": "provenance/segmentation_and_mesh_audit.json"
+  }
+}

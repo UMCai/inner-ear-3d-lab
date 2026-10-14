@@ -1,0 +1,856 @@
+{
+  "source": "assets/source/iemap-1.0.0/segIEMap.seg.nrrd",
+  "source_sha256": "5ac50e8b2dc6cc81b9722b58aeaec279993ae85db8345ed2eadd4a406c352b31",
+  "source_space": "LPS",
+  "patient_space": "RAS",
+  "origin_ras_mm": [
+    19.8999996185303,
+    -19.8999996185303,
+    -14.900000572204597
+  ],
+  "index_xyz_to_ras_mm": [
+    [
+      -0.10000000149011598,
+      0,
+      0,
+      19.8999996185303
+    ],
+    [
+      0,
+      0.10000000149011598,
+      0,
+      -19.8999996185303
+    ],
+    [
+      0,
+      0,
+      0.10000000149011598,
+      -14.900000572204597
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "segments": [
+    {
+      "name": "ls_Hsapiens_Ant_Cup_Ut",
+      "segment_number": 0,
+      "layer": 0,
+      "label": 1,
+      "voxels": 98,
+      "bounds_zyx": [
+        [
+          164,
+          222,
+          134
+        ],
+        [
+          174,
+          239,
+          143
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Post_Cup_Mid",
+      "segment_number": 10,
+      "layer": 0,
+      "label": 7,
+      "voxels": 0,
+      "bounds_zyx": null
+    },
+    {
+      "name": "ls_Hsapiens_Post_Cup_Ut",
+      "segment_number": 11,
+      "layer": 1,
+      "label": 5,
+      "voxels": 31,
+      "bounds_zyx": [
+        [
+          123,
+          183,
+          157
+        ],
+        [
+          132,
+          194,
+          164
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Post_Cup_Wall",
+      "segment_number": 12,
+      "layer": 2,
+      "label": 1,
+      "voxels": 728,
+      "bounds_zyx": [
+        [
+          120,
+          181,
+          152
+        ],
+        [
+          133,
+          194,
+          165
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Sa",
+      "segment_number": 13,
+      "layer": 0,
+      "label": 8,
+      "voxels": 5975,
+      "bounds_zyx": [
+        [
+          171,
+          175,
+          120
+        ],
+        [
+          224,
+          243,
+          167
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_SC_1",
+      "segment_number": 14,
+      "layer": 2,
+      "label": 2,
+      "voxels": 2457,
+      "bounds_zyx": [
+        [
+          133,
+          185,
+          139
+        ],
+        [
+          154,
+          207,
+          160
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Sl",
+      "segment_number": 15,
+      "layer": 0,
+      "label": 9,
+      "voxels": 4110,
+      "bounds_zyx": [
+        [
+          148,
+          176,
+          92
+        ],
+        [
+          167,
+          237,
+          147
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Sp",
+      "segment_number": 16,
+      "layer": 0,
+      "label": 10,
+      "voxels": 6880,
+      "bounds_zyx": [
+        [
+          113,
+          142,
+          111
+        ],
+        [
+          183,
+          192,
+          164
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_UCp",
+      "segment_number": 17,
+      "layer": 3,
+      "label": 1,
+      "voxels": 6300,
+      "bounds_zyx": [
+        [
+          126,
+          190,
+          144
+        ],
+        [
+          159,
+          215,
+          168
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Aa",
+      "segment_number": 18,
+      "layer": 2,
+      "label": 3,
+      "voxels": 3399,
+      "bounds_zyx": [
+        [
+          160,
+          221,
+          128
+        ],
+        [
+          185,
+          241,
+          145
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Al",
+      "segment_number": 19,
+      "layer": 2,
+      "label": 4,
+      "voxels": 3336,
+      "bounds_zyx": [
+        [
+          152,
+          218,
+          114
+        ],
+        [
+          167,
+          239,
+          137
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Ant_Cup_Wall",
+      "segment_number": 1,
+      "layer": 1,
+      "label": 1,
+      "voxels": 1170,
+      "bounds_zyx": [
+        [
+          164,
+          222,
+          130
+        ],
+        [
+          178,
+          240,
+          144
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Ant_Cup_Duct",
+      "segment_number": 20,
+      "layer": 0,
+      "label": 11,
+      "voxels": 123,
+      "bounds_zyx": [
+        [
+          170,
+          225,
+          131
+        ],
+        [
+          178,
+          240,
+          141
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Ant_Cup_Mid",
+      "segment_number": 21,
+      "layer": 0,
+      "label": 12,
+      "voxels": 0,
+      "bounds_zyx": null
+    },
+    {
+      "name": "Segment_1",
+      "segment_number": 22,
+      "layer": 4,
+      "label": 1,
+      "voxels": 8603,
+      "bounds_zyx": [
+        [
+          129,
+          193,
+          136
+        ],
+        [
+          164,
+          242,
+          168
+        ]
+      ]
+    },
+    {
+      "name": "mesh_david_sacculus",
+      "segment_number": 23,
+      "layer": 0,
+      "label": 13,
+      "voxels": 2532,
+      "bounds_zyx": [
+        [
+          127,
+          220,
+          153
+        ],
+        [
+          151,
+          240,
+          171
+        ]
+      ]
+    },
+    {
+      "name": "Segment_1_1",
+      "segment_number": 24,
+      "layer": 1,
+      "label": 6,
+      "voxels": 91072,
+      "bounds_zyx": [
+        [
+          85,
+          207,
+          143
+        ],
+        [
+          156,
+          288,
+          222
+        ]
+      ]
+    },
+    {
+      "name": "Segment_2",
+      "segment_number": 25,
+      "layer": 0,
+      "label": 14,
+      "voxels": 23149,
+      "bounds_zyx": [
+        [
+          93,
+          223,
+          155
+        ],
+        [
+          154,
+          276,
+          220
+        ]
+      ]
+    },
+    {
+      "name": "seg_coch_inner_CISS -_1",
+      "segment_number": 26,
+      "layer": 0,
+      "label": 15,
+      "voxels": 20151,
+      "bounds_zyx": [
+        [
+          91,
+          235,
+          149
+        ],
+        [
+          152,
+          280,
+          214
+        ]
+      ]
+    },
+    {
+      "name": "seg_coch_inner_CISS -_2",
+      "segment_number": 27,
+      "layer": 0,
+      "label": 16,
+      "voxels": 4272,
+      "bounds_zyx": [
+        [
+          115,
+          267,
+          167
+        ],
+        [
+          136,
+          284,
+          198
+        ]
+      ]
+    },
+    {
+      "name": "mesh_david_cochlea",
+      "segment_number": 28,
+      "layer": 2,
+      "label": 5,
+      "voxels": 4512,
+      "bounds_zyx": [
+        [
+          88,
+          206,
+          146
+        ],
+        [
+          153,
+          288,
+          217
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Ap",
+      "segment_number": 2,
+      "layer": 0,
+      "label": 2,
+      "voxels": 2080,
+      "bounds_zyx": [
+        [
+          117,
+          179,
+          149
+        ],
+        [
+          135,
+          197,
+          167
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_CCa",
+      "segment_number": 3,
+      "layer": 0,
+      "label": 3,
+      "voxels": 5178,
+      "bounds_zyx": [
+        [
+          147,
+          175,
+          146
+        ],
+        [
+          179,
+          206,
+          167
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_CCp",
+      "segment_number": 4,
+      "layer": 1,
+      "label": 2,
+      "voxels": 2905,
+      "bounds_zyx": [
+        [
+          148,
+          178,
+          147
+        ],
+        [
+          176,
+          205,
+          166
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Lat_Cup_Duct",
+      "segment_number": 5,
+      "layer": 0,
+      "label": 4,
+      "voxels": 20,
+      "bounds_zyx": [
+        [
+          156,
+          222,
+          122
+        ],
+        [
+          164,
+          235,
+          123
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Lat_Cup_Mid",
+      "segment_number": 6,
+      "layer": 0,
+      "label": 5,
+      "voxels": 0,
+      "bounds_zyx": null
+    },
+    {
+      "name": "ls_Hsapiens_Lat_Cup_Ut",
+      "segment_number": 7,
+      "layer": 0,
+      "label": 6,
+      "voxels": 12,
+      "bounds_zyx": [
+        [
+          155,
+          223,
+          127
+        ],
+        [
+          162,
+          233,
+          129
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Lat_Cup_Wall",
+      "segment_number": 8,
+      "layer": 1,
+      "label": 3,
+      "voxels": 975,
+      "bounds_zyx": [
+        [
+          152,
+          218,
+          122
+        ],
+        [
+          167,
+          236,
+          131
+        ]
+      ]
+    },
+    {
+      "name": "ls_Hsapiens_Post_Cup_Duct",
+      "segment_number": 9,
+      "layer": 1,
+      "label": 4,
+      "voxels": 68,
+      "bounds_zyx": [
+        [
+          122,
+          181,
+          152
+        ],
+        [
+          130,
+          192,
+          159
+        ]
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "source": "ls_Hsapiens_Aa.vtk",
+      "vertices": 2080,
+      "triangles": 4156,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -3.3652045008612705,
+      "absolute_volume_mm3": 3.3652045008612705
+    },
+    {
+      "source": "ls_Hsapiens_Al.vtk",
+      "vertices": 2002,
+      "triangles": 4000,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -3.31257894329549,
+      "absolute_volume_mm3": 3.31257894329549
+    },
+    {
+      "source": "ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "vertices": 450,
+      "triangles": 852,
+      "components": 13,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -0.006032618258368538,
+      "absolute_volume_mm3": 0.006032618258368538
+    },
+    {
+      "source": "ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "vertices": 410,
+      "triangles": 728,
+      "components": 24,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -0.0011190171569126033,
+      "absolute_volume_mm3": 0.0011190171569126033
+    },
+    {
+      "source": "ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "vertices": 1112,
+      "triangles": 2196,
+      "components": 7,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -1.1304195482067192,
+      "absolute_volume_mm3": 1.1304195482067192
+    },
+    {
+      "source": "ls_Hsapiens_Ap.vtk",
+      "vertices": 1496,
+      "triangles": 2988,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -2.0469539811723654,
+      "absolute_volume_mm3": 2.0469539811723654
+    },
+    {
+      "source": "ls_Hsapiens_CCa.vtk",
+      "vertices": 3302,
+      "triangles": 6576,
+      "components": 9,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -5.127156846616667,
+      "absolute_volume_mm3": 5.127156846616667
+    },
+    {
+      "source": "ls_Hsapiens_CCp.vtk",
+      "vertices": 2320,
+      "triangles": 4624,
+      "components": 4,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -2.8449814462594136,
+      "absolute_volume_mm3": 2.8449814462594136
+    },
+    {
+      "source": "ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "vertices": 94,
+      "triangles": 152,
+      "components": 9,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -1.20131183919875e-10,
+      "absolute_volume_mm3": 1.20131183919875e-10
+    },
+    {
+      "source": "ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "vertices": 64,
+      "triangles": 96,
+      "components": 8,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -2.35624793466652e-12,
+      "absolute_volume_mm3": 2.35624793466652e-12
+    },
+    {
+      "source": "ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "vertices": 1034,
+      "triangles": 2068,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -0.9409407835470991,
+      "absolute_volume_mm3": 0.9409407835470991
+    },
+    {
+      "source": "ls_Hsapiens_Post_Cup_Duct.vtk",
+      "vertices": 290,
+      "triangles": 520,
+      "components": 15,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -1.3639506757756603e-05,
+      "absolute_volume_mm3": 1.3639506757756603e-05
+    },
+    {
+      "source": "ls_Hsapiens_Post_Cup_Ut.vtk",
+      "vertices": 154,
+      "triangles": 244,
+      "components": 16,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": 4.943478210611184e-10,
+      "absolute_volume_mm3": 4.943478210611184e-10
+    },
+    {
+      "source": "ls_Hsapiens_Post_Cup_Wall.vtk",
+      "vertices": 824,
+      "triangles": 1640,
+      "components": 2,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -0.6927861327279569,
+      "absolute_volume_mm3": 0.6927861327279569
+    },
+    {
+      "source": "ls_Hsapiens_SC.vtk",
+      "vertices": 2084,
+      "triangles": 4136,
+      "components": 8,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -2.3961298217064364,
+      "absolute_volume_mm3": 2.3961298217064364
+    },
+    {
+      "source": "ls_Hsapiens_Sa.vtk",
+      "vertices": 4964,
+      "triangles": 9924,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -5.708119718869313,
+      "absolute_volume_mm3": 5.708119718869313
+    },
+    {
+      "source": "ls_Hsapiens_Sl.vtk",
+      "vertices": 3638,
+      "triangles": 7272,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -3.8946665643433462,
+      "absolute_volume_mm3": 3.8946665643433462
+    },
+    {
+      "source": "ls_Hsapiens_Sp.vtk",
+      "vertices": 5846,
+      "triangles": 11688,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -6.645924521652774,
+      "absolute_volume_mm3": 6.645924521652774
+    },
+    {
+      "source": "ls_Hsapiens_UCp.vtk",
+      "vertices": 4036,
+      "triangles": 8044,
+      "components": 7,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -6.212966988934983,
+      "absolute_volume_mm3": 6.212966988934983
+    },
+    {
+      "source": "ls_Hsapiens_utricle.vtk",
+      "vertices": 4418,
+      "triangles": 8832,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -8.533035001533202,
+      "absolute_volume_mm3": 8.533035001533202
+    },
+    {
+      "source": "mesh_david_cochlea.vtk",
+      "vertices": 7812,
+      "triangles": 15620,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -3.218171569666911,
+      "absolute_volume_mm3": 3.218171569666911
+    },
+    {
+      "source": "mesh_david_sacculus.vtk",
+      "vertices": 1770,
+      "triangles": 3536,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -2.4798975766401643,
+      "absolute_volume_mm3": 2.4798975766401643
+    },
+    {
+      "source": "segT2_th1.07_Otsu.vtk",
+      "vertices": 16996,
+      "triangles": 33992,
+      "components": 3,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -255.3482961627561,
+      "absolute_volume_mm3": 255.3482961627561
+    },
+    {
+      "source": "seg_coch_inner_cupula.vtk",
+      "vertices": 2528,
+      "triangles": 5052,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -4.231594712681057,
+      "absolute_volume_mm3": 4.231594712681057
+    },
+    {
+      "source": "seg_coch_inner_scala_tympani.vtk",
+      "vertices": 11954,
+      "triangles": 23904,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -23.080734854024417,
+      "absolute_volume_mm3": 23.080734854024417
+    },
+    {
+      "source": "seg_coch_inner_scala_vestibuli.vtk",
+      "vertices": 10818,
+      "triangles": 21632,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -20.08408145590026,
+      "absolute_volume_mm3": 20.08408145590026
+    },
+    {
+      "source": "seg_coch_outer_T2.vtk",
+      "vertices": 25144,
+      "triangles": 50284,
+      "components": 1,
+      "degenerate_faces": 0,
+      "boundary_edges": 0,
+      "nonmanifold_edges": 0,
+      "signed_volume_mm3": -91.35843262021483,
+      "absolute_volume_mm3": 91.35843262021483
+    }
+  ]
+}

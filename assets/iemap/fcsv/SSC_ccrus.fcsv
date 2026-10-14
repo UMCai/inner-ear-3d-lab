@@ -1,0 +1,6 @@
+# Markups fiducial file version = 4.11
+# CoordinateSystem = RAS
+# columns = id,x,y,z,ow,ox,oy,oz,vis,sel,lock,label,desc,associatedNodeID
+vtkMRMLMarkupsFiducialNode_1,4.2000,-2.2000,2.0000,0.0,0.0,0.0,1.0,1,1,0,SSC_ccrus_sup,Superior Common Crus Bifurcation,
+vtkMRMLMarkupsFiducialNode_2,3.9766,-0.8475,1.2231,0.0,0.0,0.0,1.0,1,1,0,SSC_ccrus_mid,Mid Common Crus,
+vtkMRMLMarkupsFiducialNode_3,4.0300,-0.1500,0.1000,0.0,0.0,0.0,1.0,1,1,0,SSC_ccrus_utricle,Common Crus Utricular Orifice,

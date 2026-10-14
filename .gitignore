@@ -1,0 +1,32 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Python & Blender Caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Blender Temporary Auto-saves
+*.blend1
+*.blend2
+
+# Render & Video Build Artifacts (3.8GB+ Frame Sequences)
+build/
+output/*.tmp
+
+# Node.js & Vite Web Artifacts
+node_modules/
+dist/
+web/node_modules/
+web/dist/
+web/public/assets/
+
+# Editor & Scratch
+.idea/
+.vscode/
+*.swp
+*.swo
+scratch/
+.system_generated/

@@ -1,0 +1,474 @@
+{
+  "atlas": "IE-Map (Inner Ear Template & Semicircular Canal / Labyrinth Atlas)",
+  "citation": "Ahmadi et al., Sci Rep 11, 3293 (2021). doi:10.1038/s41598-021-82716-0",
+  "zenodo_record": "https://zenodo.org/records/10625570",
+  "github_repo": "https://github.com/pydsgz/IEMap",
+  "membranous_source": "David et al., Sci Rep 6, 32772 (2016). doi:10.1038/srep32772",
+  "coordinate_system": "RAS (+X=Right/Lateral, +Y=Anterior, +Z=Superior)",
+  "ear_laterality": "Right",
+  "source_mode": "authentic_iemap_bundle_ingested",
+  "bundle_dir": "assets/iemap_bundle_extracted/iemap-right-labyrinth-asset-v1",
+  "look_config": "assets/iemap/look-config.json",
+  "meshes": {
+    "ls_Hsapiens_Aa": {
+      "structure_id": "right.anterior_ampulla",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Aa.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Aa.obj",
+      "role": "anterior_ampulla",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Aa.vtk",
+      "color_rgba": [
+        0.42,
+        0.51,
+        0.65,
+        0.62
+      ],
+      "num_vertices": 2080,
+      "num_faces": 4156
+    },
+    "ls_Hsapiens_Al": {
+      "structure_id": "right.lateral_ampulla",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Al.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Al.obj",
+      "role": "lateral_ampulla",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Al.vtk",
+      "color_rgba": [
+        0.42,
+        0.51,
+        0.65,
+        0.62
+      ],
+      "num_vertices": 2002,
+      "num_faces": 4000
+    },
+    "ls_Hsapiens_Ant_Cup_Duct": {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Ant_Cup_Duct.obj",
+      "role": "anterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Ant_Cup_Duct.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 450,
+      "num_faces": 852
+    },
+    "ls_Hsapiens_Ant_Cup_Ut": {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Ut",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Ant_Cup_Ut.obj",
+      "role": "anterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Ant_Cup_Ut.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 410,
+      "num_faces": 728
+    },
+    "ls_Hsapiens_Ant_Cup_Wall": {
+      "structure_id": "atlas.ls_Hsapiens_Ant_Cup_Wall",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Ant_Cup_Wall.obj",
+      "role": "anterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Ant_Cup_Wall.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 1112,
+      "num_faces": 2196
+    },
+    "ls_Hsapiens_Ap": {
+      "structure_id": "right.posterior_ampulla",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Ap.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Ap.obj",
+      "role": "posterior_ampulla",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Ap.vtk",
+      "color_rgba": [
+        0.941,
+        0.667,
+        0.384,
+        0.82
+      ],
+      "num_vertices": 1496,
+      "num_faces": 2988
+    },
+    "ls_Hsapiens_CCa": {
+      "structure_id": "right.common_crus_anterior",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_CCa.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_CCa.obj",
+      "role": "common_crus",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_CCa.vtk",
+      "color_rgba": [
+        0.62,
+        0.68,
+        0.92,
+        0.42
+      ],
+      "num_vertices": 3302,
+      "num_faces": 6576
+    },
+    "ls_Hsapiens_CCp": {
+      "structure_id": "right.common_crus_posterior",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_CCp.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_CCp.obj",
+      "role": "common_crus",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_CCp.vtk",
+      "color_rgba": [
+        0.62,
+        0.68,
+        0.92,
+        0.42
+      ],
+      "num_vertices": 2320,
+      "num_faces": 4624
+    },
+    "ls_Hsapiens_Lat_Cup_Duct": {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Lat_Cup_Duct.obj",
+      "role": "lateral_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Lat_Cup_Duct.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 94,
+      "num_faces": 152
+    },
+    "ls_Hsapiens_Lat_Cup_Ut": {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Ut",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Lat_Cup_Ut.obj",
+      "role": "lateral_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Lat_Cup_Ut.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 64,
+      "num_faces": 96
+    },
+    "ls_Hsapiens_Lat_Cup_Wall": {
+      "structure_id": "atlas.ls_Hsapiens_Lat_Cup_Wall",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Lat_Cup_Wall.obj",
+      "role": "lateral_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Lat_Cup_Wall.vtk",
+      "color_rgba": [
+        0.45,
+        0.54,
+        0.68,
+        0.65
+      ],
+      "num_vertices": 1034,
+      "num_faces": 2068
+    },
+    "ls_Hsapiens_Post_Cup_Duct": {
+      "structure_id": "right.posterior_cupula_duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Post_Cup_Duct.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Post_Cup_Duct.obj",
+      "role": "posterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Post_Cup_Duct.vtk",
+      "color_rgba": [
+        0.96,
+        0.74,
+        0.46,
+        0.88
+      ],
+      "num_vertices": 290,
+      "num_faces": 520
+    },
+    "ls_Hsapiens_Post_Cup_Ut": {
+      "structure_id": "right.posterior_cupula_utricle",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Post_Cup_Ut.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Post_Cup_Ut.obj",
+      "role": "posterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Post_Cup_Ut.vtk",
+      "color_rgba": [
+        0.96,
+        0.74,
+        0.46,
+        0.88
+      ],
+      "num_vertices": 154,
+      "num_faces": 244
+    },
+    "ls_Hsapiens_Post_Cup_Wall": {
+      "structure_id": "right.posterior_cupula_wall",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Post_Cup_Wall.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Post_Cup_Wall.obj",
+      "role": "posterior_cupula",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Post_Cup_Wall.vtk",
+      "color_rgba": [
+        0.96,
+        0.74,
+        0.46,
+        0.88
+      ],
+      "num_vertices": 824,
+      "num_faces": 1640
+    },
+    "ls_Hsapiens_SC": {
+      "structure_id": "right.simple_crus_limb",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_SC.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_SC.obj",
+      "role": "saccular_duct",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_SC.vtk",
+      "color_rgba": [
+        0.4,
+        0.49,
+        0.62,
+        0.48
+      ],
+      "num_vertices": 2084,
+      "num_faces": 4136
+    },
+    "ls_Hsapiens_Sa": {
+      "structure_id": "right.anterior_duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Sa.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Sa.obj",
+      "role": "anterior_duct",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Sa.vtk",
+      "color_rgba": [
+        0.42,
+        0.51,
+        0.65,
+        0.62
+      ],
+      "num_vertices": 4964,
+      "num_faces": 9924
+    },
+    "ls_Hsapiens_Sl": {
+      "structure_id": "right.lateral_duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Sl.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Sl.obj",
+      "role": "lateral_duct",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Sl.vtk",
+      "color_rgba": [
+        0.42,
+        0.51,
+        0.65,
+        0.62
+      ],
+      "num_vertices": 3638,
+      "num_faces": 7272
+    },
+    "ls_Hsapiens_Sp": {
+      "structure_id": "right.posterior_duct",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_Sp.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_Sp.obj",
+      "role": "posterior_duct",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_Sp.vtk",
+      "color_rgba": [
+        0.322,
+        0.863,
+        0.949,
+        0.3
+      ],
+      "num_vertices": 5846,
+      "num_faces": 11688
+    },
+    "ls_Hsapiens_UCp": {
+      "structure_id": "right.posterior_utricular_limb",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_UCp.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_UCp.obj",
+      "role": "utricular_cistern",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_UCp.vtk",
+      "color_rgba": [
+        0.46,
+        0.78,
+        0.62,
+        0.42
+      ],
+      "num_vertices": 4036,
+      "num_faces": 8044
+    },
+    "ls_Hsapiens_utricle": {
+      "structure_id": "right.utricle",
+      "vtk": "assets/iemap/vtk/ls_Hsapiens_utricle.vtk",
+      "obj": "assets/iemap/obj/ls_Hsapiens_utricle.obj",
+      "role": "utricle",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "ls_Hsapiens_utricle.vtk",
+      "color_rgba": [
+        0.46,
+        0.78,
+        0.62,
+        0.45
+      ],
+      "num_vertices": 4418,
+      "num_faces": 8832
+    },
+    "mesh_david_cochlea": {
+      "structure_id": "right.cochlea",
+      "vtk": "assets/iemap/vtk/mesh_david_cochlea.vtk",
+      "obj": "assets/iemap/obj/mesh_david_cochlea.obj",
+      "role": "cochlea",
+      "visible_by_default": true,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "mesh_david_cochlea.vtk",
+      "color_rgba": [
+        0.42,
+        0.51,
+        0.65,
+        0.68
+      ],
+      "num_vertices": 7812,
+      "num_faces": 15620
+    },
+    "mesh_david_sacculus": {
+      "structure_id": "right.saccule",
+      "vtk": "assets/iemap/vtk/mesh_david_sacculus.vtk",
+      "obj": "assets/iemap/obj/mesh_david_sacculus.obj",
+      "role": "saccule",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "mesh_david_sacculus.vtk",
+      "color_rgba": [
+        0.4,
+        0.49,
+        0.62,
+        0.5
+      ],
+      "num_vertices": 1770,
+      "num_faces": 3536
+    },
+    "segT2_th1.07_Otsu": {
+      "structure_id": "atlas.segT2_th1.07_Otsu",
+      "vtk": "assets/iemap/vtk/segT2_th1.07_Otsu.vtk",
+      "obj": "assets/iemap/obj/segT2_th1.07_Otsu.obj",
+      "role": "bony_labyrinth",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "segT2_th1.07_Otsu.vtk",
+      "color_rgba": [
+        0.35,
+        0.44,
+        0.56,
+        0.0
+      ],
+      "num_vertices": 16996,
+      "num_faces": 33992
+    },
+    "seg_coch_inner_cupula": {
+      "structure_id": "atlas.seg_coch_inner_cupula",
+      "vtk": "assets/iemap/vtk/seg_coch_inner_cupula.vtk",
+      "obj": "assets/iemap/obj/seg_coch_inner_cupula.obj",
+      "role": "cochlear_duct",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "seg_coch_inner_cupula.vtk",
+      "color_rgba": [
+        0.48,
+        0.6,
+        0.74,
+        0.72
+      ],
+      "num_vertices": 2528,
+      "num_faces": 5052
+    },
+    "seg_coch_inner_scala_tympani": {
+      "structure_id": "atlas.seg_coch_inner_scala_tympani",
+      "vtk": "assets/iemap/vtk/seg_coch_inner_scala_tympani.vtk",
+      "obj": "assets/iemap/obj/seg_coch_inner_scala_tympani.obj",
+      "role": "cochlear_duct",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "seg_coch_inner_scala_tympani.vtk",
+      "color_rgba": [
+        0.48,
+        0.6,
+        0.74,
+        0.72
+      ],
+      "num_vertices": 11954,
+      "num_faces": 23904
+    },
+    "seg_coch_inner_scala_vestibuli": {
+      "structure_id": "atlas.seg_coch_inner_scala_vestibuli",
+      "vtk": "assets/iemap/vtk/seg_coch_inner_scala_vestibuli.vtk",
+      "obj": "assets/iemap/obj/seg_coch_inner_scala_vestibuli.obj",
+      "role": "cochlear_duct",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "seg_coch_inner_scala_vestibuli.vtk",
+      "color_rgba": [
+        0.48,
+        0.6,
+        0.74,
+        0.72
+      ],
+      "num_vertices": 10818,
+      "num_faces": 21632
+    },
+    "seg_coch_outer_T2": {
+      "structure_id": "atlas.seg_coch_outer_T2",
+      "vtk": "assets/iemap/vtk/seg_coch_outer_T2.vtk",
+      "obj": "assets/iemap/obj/seg_coch_outer_T2.obj",
+      "role": "cochlear_duct",
+      "visible_by_default": false,
+      "source": "iemap_v1_bundle_authentic",
+      "source_file": "seg_coch_outer_T2.vtk",
+      "color_rgba": [
+        0.48,
+        0.6,
+        0.74,
+        0.72
+      ],
+      "num_vertices": 25144,
+      "num_faces": 50284
+    }
+  },
+  "posterior_canal_path": "assets/iemap/posterior_canal_path.json"
+}

@@ -1,0 +1,64 @@
+1
+00:00:00,120 --> 00:00:05,600
+In posterior-canal BPPV, displaced otoconia enter the posterior semicircular canal.
+
+2
+00:00:05,650 --> 00:00:11,547
+Inside the right temporal bone, the posterior canal arches posterolaterally behind the utricle.
+
+3
+00:00:11,787 --> 00:00:17,331
+Dense otoconia settle at the lowest point of the right posterior canal near the posterior ampulla.
+
+4
+00:00:17,381 --> 00:00:23,347
+Sequential head rotations use gravity to guide the particles around the canal, through the common crus, and into the utricle.
+
+5
+00:00:23,587 --> 00:00:29,707
+Step 1: Sit upright with a shoulder pillow behind the upper back and turn the head 45° right.
+
+6
+00:00:29,757 --> 00:00:36,347
+Turning the head 45° right aligns the right posterior semicircular canal with the plane of recline.
+
+7
+00:00:36,587 --> 00:00:44,195
+Step 2: Maintaining the 45° right turn, recline onto the shoulder pillow with 20–30° neck extension.
+
+8
+00:00:44,245 --> 00:00:52,447
+Gravity pulls the otoconia away from the ampulla toward the posterior canal apex. Hold 30–60 seconds.
+
+9
+00:00:52,687 --> 00:01:00,135
+Step 3: Without lifting the head, rotate 90° left to face 45° left while maintaining neck extension.
+
+10
+00:01:00,185 --> 00:01:08,213
+Gravity guides the otoconia over the superior arch into the common crus. Hold 30–60 seconds.
+
+11
+00:01:08,453 --> 00:01:15,869
+Step 4: Roll onto the left shoulder and turn the head another 90° left until the nose points 45° down.
+
+12
+00:01:15,919 --> 00:01:23,913
+The common crus now points steeply downward, draining the otoconia toward the utricle. Hold 30–60 seconds.
+
+13
+00:01:24,153 --> 00:01:29,921
+Step 5: Keeping the chin slightly tucked, slowly return the patient to an upright sitting position.
+
+14
+00:01:29,971 --> 00:01:36,180
+Otoconia repositioned → maneuver complete. Particles exit into the utricle; if posterior-canal BPPV is the cause, vertigo should resolve.
+
+15
+00:01:36,420 --> 00:01:42,972
+Clinical Summary: (1) Shoulder pillow for 20–30° extension; (2) Never lift the head during the Step 3 turn.
+
+16
+00:01:43,022 --> 00:01:50,080
+(3) Hold each step 30–60 seconds so the otoconia completely settle along the canal pathway.
+
