@@ -1,8 +1,21 @@
-# Project Status: Epley Maneuver for Right-Ear Posterior-Canal BPPV (Gate 3 Redesign)
+# Project Status: Inner Ear 3D Lab (Gate 3 Medaium)
 
-## Current Phase: Complete — Authentic IE-Map & Realistic Sculpted Head Ingested, Verified & Rendered
+## Current Phase: Active — Stage 1 (Audio-Visual Tonotopy Engine & Hearing Lab) Complete & Verified
 
-### Completed Milestones
+### WebGL Inner Ear 3D Lab Milestones
+- [x] **Stage 0: Pure 3D Anatomy Lab MVP**:
+  - Ingested 27 authentic IE-Map v1.0.0 surface meshes in RAS millimeter coordinates.
+  - Built single-stage 60fps Three.js canvas, Gate 3 rim-lit shaders with backface culling, bone peel slider ($0\text{–}100\%$), exploded view slider ($0\text{–}100\%$), 27-part ontology with Latin names and clinical pearls.
+- [x] **Stage 1: Audio-Visual Tonotopy Engine & Hearing Lab**:
+  - Donald D. Greenwood auditory place-frequency engine ($F(x) = 165.4 \cdot (10^{2.1 x} - 0.88)$ Hz) and inverse $x(F)$ with 100-knot 3D RAS spline table ($28.79\text{ mm}$ length).
+  - High-performance continuous segment orthogonal projection attribute generator ($<5\text{ ms}$, zero memory leaks).
+  - Web Audio API zero-asset tone synthesizer with shared `AudioContext`, click-free exponential gain envelope ($50\text{ ms}$ attack/decay, floor $0.0001$), pitch gliding ($35\text{ ms}$), and safety limiter compressor.
+  - Interactive Clinical Pure-Tone Audiogram drawer ($-10\text{ to }120\text{ dB HL}$, $125\text{ to }8{,}000\text{ Hz}$, right ear red circle $\bigcirc$ markers), 4 clinical presets, speech banana phoneme overlay, and drawer mutual exclusivity.
+  - Dynamic tonotopy shader with 7-stop perceptual rainbow heatmap, von Békésy asymmetric traveling wave simulation, and audiogram pathology crimson desaturation mask.
+  - Mode switcher (`[ 🏛️ Anatomy Atlas ] [ 🎵 Hearing & Tonotopy ]`), contextual bottom dock morphing to Hearing Workbench, and electrophysiology badges.
+  - Automated verification: `scripts/test_hearing_engine.js` (100% pass across 7 suites) and `scripts/verify_mvp_cdp.js` (100% pass across 4 viewports with 0 errors).
+
+### Headless Blender Editorial Video Milestones (Phase 0)
 - [x] **Authentic IE-Map v1.0.0 Asset Ingestion (`src/anatomy/prepare_iemap.py`, `src/anatomy/export_glb_and_preview.py`)**:
   - Ingested 27 authentic IE-Map v1.0.0 surface meshes directly from `assets/iemap_bundle_extracted/iemap-right-labyrinth-asset-v1/` into `assets/iemap/obj/*.obj` and `assets/iemap/vtk/*.vtk`.
   - Ingested the verified smooth posterior canal route `assets/posterior_path_smooth.json` (300 nodes, 14.92 mm inside `ls_Hsapiens_Sp`, 0.25–0.31 mm clearance) smoothly extended through `CCp` and `utricle` into `assets/iemap/posterior_canal_path.json` (313 samples, 19.33 mm total length).

@@ -40,6 +40,9 @@ export interface StructureOntologyItem {
   physiologicalFunction: string;
   clinicalPearl: string;
   patientSummary: string;
+  characteristicFrequencyRange?: string;
+  endocochlearPotential?: string;
+  ionicComposition?: string;
   sources?: string[];
 }
 
@@ -737,6 +740,9 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Peel or ghost this envelope using the "Ampulla & Cochlea Micro-Cutaway" slider to reveal the internal Scala Vestibuli, Scala Tympani, and Helicotrema Cupula!',
     patientSummary:
       'The snail-shaped hearing organ of the inner ear. While it shares fluid pathways with the balance system next door, its job is turning sound vibrations into hearing signals.',
+    characteristicFrequencyRange: '20 Hz – 20,678 Hz',
+    endocochlearPotential: '+80 mV (Scala Media) / 0 mV (Scala Tympani)',
+    ionicComposition: 'Endolymph: 150 mM K+, 2 mM Na+; Perilymph: 140 mM Na+, 4 mM K+',
   },
   {
     meshName: 'seg_coch_inner_scala_vestibuli',
@@ -765,6 +771,9 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Continuous with the perilymph of the vestibule; in otosclerosis, stapes fixation at the oval window blocks acoustic energy entry into the Scala Vestibuli.',
     patientSummary:
       'The upper fluid tunnel inside the snail-shaped hearing organ that carries incoming sound waves upward toward its tip.',
+    characteristicFrequencyRange: '20 Hz – 20,678 Hz (Conduit from Oval Window)',
+    endocochlearPotential: '0 mV (Perilymphatic ground potential)',
+    ionicComposition: 'Perilymph: 140 mM Na+, 4 mM K+, 1.2 mM Ca2+',
   },
   {
     meshName: 'seg_coch_inner_scala_tympani',
@@ -793,6 +802,9 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Surgical target for Cochlear Implantation: electrode arrays are inserted via the Round Window niche directly into the Scala Tympani to stimulate spiral ganglion neurons tonotopically.',
     patientSummary:
       'The lower fluid tunnel inside the snail-shaped hearing organ; this is also the pathway where cochlear implant electrodes are gently placed to restore hearing.',
+    characteristicFrequencyRange: '20 Hz – 20,678 Hz (Electrode array target)',
+    endocochlearPotential: '0 mV (Perilymphatic ground potential)',
+    ionicComposition: 'Perilymph: 140 mM Na+, 4 mM K+, 1.2 mM Ca2+',
   },
   {
     meshName: 'seg_coch_inner_cupula',
@@ -821,6 +833,9 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
       'Acts as a hydraulic high-pass filter protecting the Organ of Corti from static barometric pressure shifts.',
     patientSummary:
       'The very tip of the snail-shaped hearing spiral where the upper and lower fluid tunnels meet and deep bass sounds are detected.',
+    characteristicFrequencyRange: '20 Hz – 100 Hz (Infrasound / deep sub-bass)',
+    endocochlearPotential: '0 mV (Helicotrema perilymphatic communication)',
+    ionicComposition: 'Perilymph: 140 mM Na+, 4 mM K+',
   },
 
   // ============================================================================

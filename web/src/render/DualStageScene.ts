@@ -14,9 +14,25 @@ import {
   createGate3StructureMaterial,
   updateGate3MaterialState,
 } from './gate3Materials';
+import {
+  computeMeshGreenwoodX,
+  getCoordinatesForFrequency,
+  greenwoodFrequency,
+  greenwoodPosition,
+  interpolateGreenwoodXFromIntersection,
+} from '../data/greenwoodEngine';
 
 export type LabelDensityMode = 'off' | 'key' | 'all';
 export type ReadingDepth = 'simple' | 'detailed';
+export type LabMode = 'anatomy' | 'hearing' | 'vestibular' | 'radiology';
+
+export interface HearingLabState {
+  activeFrequency: number;
+  activeGreenwoodX: number;
+  isPlaying: boolean;
+  activePresetId: string | null;
+  lossSector: [number, number] | null;
+}
 
 export interface ProjectedPin2D {
   id: string;
@@ -33,6 +49,8 @@ export interface ProjectedPin2D {
 }
 
 export interface LabSceneSnapshot {
+  labMode: LabMode;
+  hearingState: HearingLabState;
   selectedMesh: string | null;
   hoveredMesh: string | null;
   visibilityMap: Record<string, VisibilityState>;
@@ -85,8 +103,27 @@ export class DualStageScene {
   // Undo History Stack for Dissection Operations
   private undoStack: Array<Record<string, VisibilityState>> = [];
 
+  // Tonotopy Cursor & Saved Anatomy State
+  private tonotopyCursorMesh: THREE.Mesh | null = null;
+  private savedAnatomyState: {
+    visibilityMap: Record<string, VisibilityState>;
+    bonyPeelPercent: number;
+    cameraPos: THREE.Vector3;
+    controlsTarget: THREE.Vector3;
+  } | null = null;
+  private lossRangeVector = new THREE.Vector2(0, 0);
+  private onHearingToneRequestCallbacks: Array<(freqHz: number) => void> = [];
+
   // Reactive State
   private state: LabSceneSnapshot = {
+    labMode: 'anatomy',
+    hearingState: {
+      activeFrequency: 1000,
+      activeGreenwoodX: greenwoodPosition(1000),
+      isPlaying: false,
+      activePresetId: null,
+      lossSector: null,
+    },
     selectedMesh: 'ls_Hsapiens_Sp',
     hoveredMesh: null,
     visibilityMap: {},
@@ -174,6 +211,19 @@ export class DualStageScene {
     this.labyrinthRoot = new THREE.Group();
     this.scene.add(this.labyrinthRoot);
 
+    // Glowing 3D Tonotopic Resonant Cursor Sphere
+    const cursorGeom = new THREE.SphereGeometry(0.32, 16, 16);
+    const cursorMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#ffffff'),
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+    this.tonotopyCursorMesh = new THREE.Mesh(cursorGeom, cursorMat);
+    this.tonotopyCursorMesh.renderOrder = 999;
+    this.tonotopyCursorMesh.visible = false;
+    this.labyrinthRoot.add(this.tonotopyCursorMesh);
+
     this.setupPointerInteractions();
   }
 
@@ -198,6 +248,11 @@ export class DualStageScene {
       IEMAP_STRUCTURES.map(async (item) => {
         const url = `/assets/iemap/obj/${item.meshName}.obj`;
         const geometry = await fetchObjGeometry(url);
+
+        if (item.meshName === 'mesh_david_cochlea') {
+          const greenwoodX = computeMeshGreenwoodX(geometry);
+          geometry.setAttribute('aGreenwoodX', new THREE.BufferAttribute(greenwoodX, 1));
+        }
 
         const material = createGate3StructureMaterial({
           colorHex: item.colorHex,
@@ -268,6 +323,8 @@ export class DualStageScene {
   // ===========================================================================
   private applySceneStateToMeshes(): void {
     const {
+      labMode,
+      hearingState,
       visibilityMap,
       bonyPeelPercent,
       explodePercent,
@@ -275,6 +332,7 @@ export class DualStageScene {
       hoveredMesh,
     } = this.state;
 
+    const isHearingMode = labMode === 'hearing';
     const explodeFactor = explodePercent / 100.0;
     const dummyClipNormal = new THREE.Vector3(0, 0, -1);
 
@@ -283,18 +341,45 @@ export class DualStageScene {
       let effState: VisibilityState = visibilityMap[meshName] ?? ontology.defaultState;
       let overrideOpacity: number | undefined;
 
-      // Outer Bone Shell Peel (0% = solid, 25-95% = transparent glass, >=96% = hidden)
-      if (ontology.systemGroup === 'bony_capsule') {
-        if (bonyPeelPercent >= 96) {
-          effState = 'hidden';
-        } else if (effState !== 'hidden') {
-          const bonyFactor = Math.max(0.0, 1.0 - bonyPeelPercent / 100.0);
-          if (bonyPeelPercent >= 25) {
-            effState = 'ghost';
-            overrideOpacity = Math.max(0.08, bonyFactor * 0.85);
+      let tonotopyMode = 0.0;
+      let activeGreenwoodX = -1.0;
+      let waveAmplitude = 0.0;
+      let lossMaskActive = 0.0;
+
+      if (isHearingMode) {
+        if (ontology.systemGroup === 'cochlear_system') {
+          effState = 'visible';
+          if (meshName === 'mesh_david_cochlea') {
+            tonotopyMode = 1.0;
+            activeGreenwoodX = hearingState.activeGreenwoodX;
+            waveAmplitude = hearingState.isPlaying ? 1.0 : 0.0;
+            lossMaskActive = hearingState.lossSector ? 1.0 : 0.0;
+            overrideOpacity = 0.88;
           } else {
-            effState = 'visible';
-            overrideOpacity = 0.42 + bonyFactor * 0.48;
+            // Keep internal scala chambers visible through translucent spectral cochlea
+            overrideOpacity = 0.82;
+          }
+        } else if (ontology.systemGroup === 'bony_capsule') {
+          effState = 'hidden';
+        } else {
+          // Vestibular system ghosted to 15% opacity
+          effState = 'ghost';
+          overrideOpacity = 0.15;
+        }
+      } else {
+        // Outer Bone Shell Peel (0% = solid, 25-95% = transparent glass, >=96% = hidden)
+        if (ontology.systemGroup === 'bony_capsule') {
+          if (bonyPeelPercent >= 96) {
+            effState = 'hidden';
+          } else if (effState !== 'hidden') {
+            const bonyFactor = Math.max(0.0, 1.0 - bonyPeelPercent / 100.0);
+            if (bonyPeelPercent >= 25) {
+              effState = 'ghost';
+              overrideOpacity = Math.max(0.08, bonyFactor * 0.85);
+            } else {
+              effState = 'visible';
+              overrideOpacity = 0.42 + bonyFactor * 0.48;
+            }
           }
         }
       }
@@ -339,7 +424,24 @@ export class DualStageScene {
         clipActive: false,
         clipNormal: dummyClipNormal,
         clipConstant: 1000.0,
+        tonotopyMode,
+        activeGreenwoodX,
+        waveAmplitude,
+        lossMaskActive,
+        lossRange: this.lossRangeVector,
+        lossSeverity: 0.92,
       });
+    }
+
+    // Update 3D Tonotopic Resonant Cursor Sphere
+    if (this.tonotopyCursorMesh) {
+      if (isHearingMode) {
+        const coords = getCoordinatesForFrequency(this.state.hearingState.activeFrequency);
+        this.tonotopyCursorMesh.position.set(coords[0], coords[1], coords[2]);
+        this.tonotopyCursorMesh.visible = true;
+      } else {
+        this.tonotopyCursorMesh.visible = false;
+      }
     }
   }
 
@@ -392,6 +494,102 @@ export class DualStageScene {
       this.state.selectedMesh = prevSelected;
     }
     this.emitState();
+  }
+
+  // ===========================================================================
+  // HEARING LAB & TONOTOPY ENGINE API
+  // ===========================================================================
+  public setLabMode(mode: LabMode): void {
+    if (this.state.labMode === mode) return;
+
+    if (mode === 'hearing') {
+      // Save current anatomy state for lossless restoration
+      this.savedAnatomyState = {
+        visibilityMap: { ...this.state.visibilityMap },
+        bonyPeelPercent: this.state.bonyPeelPercent,
+        cameraPos: this.camera.position.clone(),
+        controlsTarget: this.controls.target.clone(),
+      };
+
+      this.state.labMode = 'hearing';
+      this.state.selectedMesh = 'mesh_david_cochlea';
+
+      // Anterolateral cochlear perspective fly-to
+      const targetRAS = new THREE.Vector3(1.77, 6.38, -2.96);
+      const camPos = new THREE.Vector3(13.5, 14.0, 2.5);
+      this.startCameraFly(camPos, targetRAS, 550);
+    } else if (mode === 'anatomy') {
+      this.state.labMode = 'anatomy';
+      if (this.savedAnatomyState) {
+        this.state.visibilityMap = { ...this.savedAnatomyState.visibilityMap };
+        this.state.bonyPeelPercent = this.savedAnatomyState.bonyPeelPercent;
+        this.startCameraFly(
+          this.savedAnatomyState.cameraPos,
+          this.savedAnatomyState.controlsTarget,
+          500
+        );
+      }
+    }
+
+    this.applySceneStateToMeshes();
+    this.emitState();
+  }
+
+  public setHearingFrequency(freqHz: number, triggerAudio = true): void {
+    const clamped = Math.max(20, Math.min(20000, freqHz));
+    const x = greenwoodPosition(clamped);
+    this.state.hearingState.activeFrequency = clamped;
+    this.state.hearingState.activeGreenwoodX = x;
+
+    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+    if (cochleaEntry) {
+      cochleaEntry.material.uniforms.uActiveGreenwoodX.value = x;
+    }
+
+    if (this.tonotopyCursorMesh) {
+      const coords = getCoordinatesForFrequency(clamped);
+      this.tonotopyCursorMesh.position.set(coords[0], coords[1], coords[2]);
+      this.tonotopyCursorMesh.visible = this.state.labMode === 'hearing';
+    }
+
+    if (triggerAudio) {
+      for (const cb of this.onHearingToneRequestCallbacks) {
+        cb(clamped);
+      }
+    }
+
+    this.emitState();
+  }
+
+  public setHearingPlayback(isPlaying: boolean): void {
+    this.state.hearingState.isPlaying = isPlaying;
+    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+    if (cochleaEntry) {
+      cochleaEntry.material.uniforms.uWaveAmplitude.value = isPlaying ? 1.0 : 0.0;
+    }
+    this.emitState();
+  }
+
+  public setHearingLossSector(lossSector: [number, number] | null, presetId: string | null = null): void {
+    this.state.hearingState.lossSector = lossSector;
+    this.state.hearingState.activePresetId = presetId;
+
+    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+    if (cochleaEntry) {
+      if (lossSector) {
+        this.lossRangeVector.set(lossSector[0], lossSector[1]);
+        cochleaEntry.material.uniforms.uLossMaskActive.value = 1.0;
+        cochleaEntry.material.uniforms.uLossRange.value.copy(this.lossRangeVector);
+        cochleaEntry.material.uniforms.uLossSeverity.value = 0.92;
+      } else {
+        cochleaEntry.material.uniforms.uLossMaskActive.value = 0.0;
+      }
+    }
+    this.emitState();
+  }
+
+  public onHearingToneRequest(cb: (freqHz: number) => void): void {
+    this.onHearingToneRequestCallbacks.push(cb);
   }
 
   // ===========================================================================
@@ -623,6 +821,15 @@ export class DualStageScene {
       );
       if (moveDist > 6) return;
 
+      if (this.state.labMode === 'hearing') {
+        const cochleaHit = this.raycastCochleaAtScreen(ev.clientX, ev.clientY);
+        if (cochleaHit !== null) {
+          const freq = greenwoodFrequency(cochleaHit);
+          this.setHearingFrequency(freq, true);
+          return;
+        }
+      }
+
       const hitMesh = this.raycastLabyrinthAtScreen(ev.clientX, ev.clientY);
       if (hitMesh) {
         this.selectStructure(hitMesh, true);
@@ -695,6 +902,31 @@ export class DualStageScene {
     return null;
   }
 
+  private raycastCochleaAtScreen(clientX: number, clientY: number): number | null {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+
+    const x = clientX - bounds.left;
+    const y = clientY - bounds.top;
+
+    if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) {
+      return null;
+    }
+
+    const ndcX = (x / bounds.width) * 2 - 1;
+    const ndcY = -(y / bounds.height) * 2 + 1;
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+
+    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+    if (!cochleaEntry || !cochleaEntry.mesh.visible) return null;
+
+    const hits = this.raycaster.intersectObject(cochleaEntry.mesh, false);
+    if (hits.length > 0) {
+      return interpolateGreenwoodXFromIntersection(hits[0], cochleaEntry.mesh);
+    }
+    return null;
+  }
+
   // ===========================================================================
   // 3D LABELS PROJECTION TO 2D OVERLAY
   // ===========================================================================
@@ -729,7 +961,7 @@ export class DualStageScene {
       depth: number;
     }
 
-    const candidates: CandidatePin[] = [];
+    let candidates: CandidatePin[] = [];
 
     for (const item of IEMAP_STRUCTURES) {
       const entry = this.meshEntries.get(item.meshName);
@@ -767,6 +999,10 @@ export class DualStageScene {
         maxDist,
         depth: proj.depth,
       });
+    }
+
+    if (this.state.labMode === 'hearing') {
+      candidates = candidates.filter((c) => c.pin.meshName.includes('coch'));
     }
 
     // Filter distance & avoid collisions
@@ -819,7 +1055,16 @@ export class DualStageScene {
   public startRenderLoop(): void {
     const renderFrame = (now: number) => {
       this.animationFrameId = requestAnimationFrame(renderFrame);
+      const dt = Math.min(0.1, (now - this.lastFrameTime) * 0.001);
       this.lastFrameTime = now;
+
+      // Update Traveling Wave Phase on Cochlea Material
+      if (this.state.labMode === 'hearing' && this.state.hearingState.isPlaying) {
+        const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+        if (cochleaEntry) {
+          cochleaEntry.material.uniforms.uWavePhase.value += dt * 18.0;
+        }
+      }
 
       // Update Camera Fly-To interpolation
       if (this.flyAnim && this.flyAnim.active) {

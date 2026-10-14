@@ -169,6 +169,54 @@ body,
   font-weight: 400;
 }
 
+/* Mode Switcher Segmented Control */
+.mode-switcher {
+  display: flex;
+  align-items: center;
+  background: rgba(14, 25, 33, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.mode-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mode-pill:hover {
+  color: var(--text-main);
+  background: rgba(82, 220, 242, 0.08);
+}
+
+.mode-pill.active {
+  background: rgba(82, 220, 242, 0.18);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(82, 220, 242, 0.25);
+}
+
+.mode-icon {
+  font-size: 13px;
+}
+
+.mode-label {
+  letter-spacing: 0.02em;
+}
+
 /* Quick Search Container */
 .search-container {
   position: relative;
@@ -544,6 +592,7 @@ body,
 }
 
 .inspector-card.minimized .inspector-latin,
+.inspector-card.minimized .electrophys-box,
 .inspector-card.minimized .inspector-summary,
 .inspector-card.minimized .inspector-actions,
 .inspector-card.minimized .accordion-section {
@@ -570,6 +619,63 @@ body,
   font-style: italic;
   color: var(--cyan);
   margin-top: -4px;
+}
+
+/* Electrophysiology & Tonotopy Card Block */
+.electrophys-box {
+  margin: 6px 0 2px 0;
+  padding: 8px 10px;
+  background: rgba(10, 20, 27, 0.7);
+  border: 1px solid rgba(82, 220, 242, 0.22);
+  border-radius: 8px;
+}
+
+.electrophys-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+
+.electrophys-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.ep-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(14, 25, 33, 0.65);
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(82, 220, 242, 0.12);
+}
+
+.ep-stat.ep-stat-wide {
+  grid-column: 1 / -1;
+}
+
+.ep-stat-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ep-stat-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.ep-stat-val.val-high-ep {
+  color: #ffca28;
 }
 
 .inspector-summary {
@@ -693,6 +799,15 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+}
+
+.anatomy-dock-content,
+.hearing-dock-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   gap: 16px;
 }
 
@@ -832,6 +947,159 @@ input[type='range']::-webkit-slider-thumb:hover {
   font-weight: 700;
   padding: 1px 5px;
   border-radius: 10px;
+}
+
+/* =============================================================================
+   4B. HEARING WORKBENCH DOCK CONTROLS
+   ============================================================================= */
+.tone-play-btn {
+  background: rgba(17, 30, 38, 0.9);
+  border: 1px solid rgba(82, 220, 242, 0.35);
+  border-radius: 8px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tone-play-btn:hover {
+  background: rgba(82, 220, 242, 0.2);
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(82, 220, 242, 0.3);
+}
+
+.tone-play-btn.playing {
+  background: rgba(82, 220, 242, 0.28);
+  border-color: var(--cyan);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(82, 220, 242, 0.5);
+}
+
+.tone-icon {
+  font-size: 11px;
+}
+
+.hearing-slider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+}
+
+.hearing-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.hearing-slider-title {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hearing-readout-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hearing-freq-val {
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.hearing-landmark-badge {
+  background: rgba(240, 170, 98, 0.16);
+  border: 1px solid rgba(240, 170, 98, 0.4);
+  color: var(--warm);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.hearing-freq-slider {
+  width: 100%;
+}
+
+.octave-chips-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.octave-chip {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.2);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 5px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.octave-chip:hover {
+  color: var(--text-main);
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.12);
+}
+
+.octave-chip.active {
+  background: rgba(82, 220, 242, 0.24);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(82, 220, 242, 0.3);
+}
+
+.audiogram-toggle-btn {
+  background: rgba(17, 30, 38, 0.9);
+  border: 1px solid rgba(82, 220, 242, 0.3);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.audiogram-toggle-btn:hover {
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.16);
+}
+
+.audiogram-toggle-btn.open {
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.22);
+}
+
+.audiogram-icon {
+  font-size: 12px;
 }
 
 /* =============================================================================
@@ -1002,6 +1270,229 @@ input[type='range']::-webkit-slider-thumb:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* =============================================================================
+   5B. CLINICAL AUDIOGRAM DRAWER
+   ============================================================================= */
+.audiogram-drawer {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px);
+  background: rgba(14, 25, 33, 0.96);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  z-index: 35;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.audiogram-drawer.open {
+  display: flex;
+}
+
+.audiogram-panel {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.audiogram-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(82, 220, 242, 0.15);
+}
+
+.audiogram-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clinical-badge {
+  background: rgba(235, 87, 87, 0.18);
+  border: 1px solid rgba(235, 87, 87, 0.4);
+  color: #eb5757;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.audiogram-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.audiogram-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speech-banana-toggle {
+  background: rgba(240, 170, 98, 0.15);
+  border: 1px solid rgba(240, 170, 98, 0.35);
+  color: var(--warm);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.speech-banana-toggle.active {
+  background: rgba(240, 170, 98, 0.3);
+  border-color: var(--warm);
+  box-shadow: 0 0 8px rgba(240, 170, 98, 0.3);
+}
+
+.audiogram-presets-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.audio-preset-btn {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.22);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 5px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.audio-preset-btn:hover {
+  color: var(--text-main);
+  border-color: var(--cyan);
+}
+
+.audio-preset-btn.active {
+  background: rgba(82, 220, 242, 0.22);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.audiogram-svg-wrap {
+  width: 100%;
+  background: rgba(8, 16, 21, 0.8);
+  border: 1px solid rgba(82, 220, 242, 0.18);
+  border-radius: 8px;
+  padding: 6px 4px 2px 2px;
+}
+
+.audiogram-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.axis-title {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+.axis-label-x,
+.axis-label-y {
+  fill: var(--text-dim);
+  font-size: 9px;
+  font-family: var(--font-mono);
+}
+
+.phoneme-label {
+  fill: #ffd54f;
+  font-size: 9px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+
+.freq-column-hit {
+  cursor: pointer;
+}
+
+.audiogram-node {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.audiogram-node:hover circle {
+  stroke-width: 3.5;
+}
+
+.audiogram-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.preset-meta-info {
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.preset-meta-title {
+  color: var(--text-main);
+  margin-right: 4px;
+}
+
+.audiogram-conventions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-top: 4px;
+  border-top: 1px solid rgba(82, 220, 242, 0.1);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-sym.red-circle {
+  color: #eb5757;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.normal-swatch {
+  background: rgba(82, 220, 242, 0.35);
+  border: 1px solid rgba(82, 220, 242, 0.6);
+}
+
+.speech-swatch {
+  background: rgba(255, 213, 79, 0.35);
+  border: 1px solid rgba(255, 213, 79, 0.7);
 }
 
 /* =============================================================================
@@ -1227,6 +1718,22 @@ input[type='range']::-webkit-slider-thumb:hover {
     bottom: 74px;
     width: 340px;
   }
+
+  .audiogram-drawer {
+    right: 12px;
+    bottom: 74px;
+    width: 440px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .octave-chips-group {
+    gap: 3px;
+  }
+
+  .octave-chip {
+    padding: 4px 6px;
+    font-size: 9.5px;
+  }
 }
 
 /* Mobile Screens (<= 640px) */
@@ -1330,6 +1837,54 @@ input[type='range']::-webkit-slider-thumb:hover {
     bottom: 110px;
     width: auto;
     max-height: 52vh;
+  }
+
+  .mode-pill {
+    padding: 4px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  .mode-label {
+    display: none;
+  }
+
+  .hearing-dock-content {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .hearing-slider-wrap {
+    min-width: 100%;
+    order: 2;
+  }
+
+  .octave-chips-group {
+    order: 3;
+    overflow-x: auto;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tone-play-btn {
+    order: 1;
+    padding: 6px 10px;
+    font-size: 10px;
+  }
+
+  .audiogram-toggle-btn {
+    order: 1;
+    padding: 6px 10px;
+    font-size: 10px;
+    margin-left: auto;
+  }
+
+  .audiogram-drawer {
+    left: 8px;
+    right: 8px;
+    bottom: 110px;
+    width: auto;
+    max-height: 54vh;
   }
 }
 

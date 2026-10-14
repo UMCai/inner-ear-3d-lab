@@ -11,8 +11,8 @@
 ```mermaid
 flowchart LR
     S0["Stage 0: Pure 3D Anatomy Lab<br/><b>[DONE]</b><br/>• 27 Authentic Meshes<br/>• Bone Peel & Explode<br/>• 60fps WebGL MVP"] 
-    --> S1["Stage 1: Hearing & Tonotopy<br/><b>[NEXT]</b><br/>• Greenwood Place Map<br/>• Web Audio Pure Tones<br/>• Interactive Audiogram<br/>• Mode Switcher"]
-    --> S2["Stage 2: Virtual Radiology<br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• SCDS Third-Window"]
+    --> S1["Stage 1: Hearing & Tonotopy<br/><b>[DONE]</b><br/>• Greenwood Place Map<br/>• Web Audio Pure Tones<br/>• Interactive Audiogram<br/>• Mode Switcher"]
+    --> S2["Stage 2: Virtual Radiology<br/><b>[NEXT]</b><br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• SCDS Third-Window"]
     --> S3["Stage 3: Vestibular & VOR<br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS Convection"]
     --> S4["Stage 4: Surgical Scenarios<br/>• Cochlear Implant Insertion<br/>• Scalar Translocation Risk<br/>• Acoustic Neuroma Staging"]
 ```
@@ -32,43 +32,48 @@ flowchart LR
 
 ---
 
-## Stage 1: Audio-Visual Tonotopy Engine & Hearing Lab — 🚀 IMMEDIATE NEXT BUILD
+## Stage 1: Audio-Visual Tonotopy Engine & Hearing Lab — ✅ COMPLETE
 
 ### Objective
 Transform the static cochlea into an interactive frequency analyzer driven by the Greenwood function and real-time Web Audio API pure-tone synthesis, complete with an interactive clinical audiogram drawer.
 
 ### Task Breakdown
-- [ ] **Step 1.1: Web Audio Pure-Tone Synthesizer (`web/src/audio/ToneSynthesizer.ts`)**:
+- [x] **Step 1.1: Web Audio Pure-Tone Synthesizer (`web/src/audio/ToneSynthesizer.ts`)**:
   - Implement a shared browser `AudioContext` with lazy user-gesture initialization.
   - Implement dynamic sine-wave generation (`OscillatorNode`, `GainNode`) with exponential attack/decay envelope ($50\text{ ms}$) to prevent speaker clicking.
-  - Provide continuous pitch gliding for frequency scrubbing.
-- [ ] **Step 1.2: Greenwood Place-Frequency Engine (`web/src/data/greenwoodEngine.ts`)**:
-  - Implement the Donald D. Greenwood formula: $F(x) = 165.4 \cdot (10^{2.1 \cdot x} - 0.88)$.
-  - Map normalized distance $x \in [0.0, 1.0]$ to 3D vertex coordinates along the `mesh_david_cochlea` / `cochlea_membrane` spiral.
-  - Provide inverse mapping: given any 3D hit point on the cochlea, compute the corresponding frequency in Hertz.
-- [ ] **Step 1.3: Hearing Mode Shading & Spectral Gradient in `DualStageScene.ts`**:
+  - Provide continuous pitch gliding for frequency scrubbing ($35\text{ ms}$ time constant).
+  - Add safety dynamics compressor limiter ($-4\text{ dB}$ threshold, $12:1$ ratio).
+- [x] **Step 1.2: Greenwood Place-Frequency Engine (`web/src/data/greenwoodEngine.ts`)**:
+  - Implement the Donald D. Greenwood formula: $F(x) = 165.4 \cdot (10^{2.1 \cdot x} - 0.88)$ and inverse $x(F)$.
+  - 100-knot 3D RAS spline table ($28.79\text{ mm}$ apex to base).
+  - Ultra-fast continuous orthogonal segment projection ($<5\text{ ms}$ for 8k verts, zero memory leak / OOM).
+  - Barycentric face vertex interpolation for raycast picking without inter-turn aliasing.
+- [x] **Step 1.3: Hearing Mode Shading & Spectral Gradient in `DualStageScene.ts`**:
   - Add `hearingLab` mode support to `DualStageScene`.
   - In Hearing Mode: Automatically ghost the vestibular system (canals, ampullae, vestibule) to $15\%$ opacity to direct visual focus to the cochlea.
-  - Render a continuous perceptual spectral gradient along the cochlear coil (Red $\approx 20\text{ kHz}$ base $\to$ Gold $\approx 4\text{ kHz}$ $\to$ Cyan $\approx 1\text{ kHz}$ $\to$ Violet $\approx 20\text{ Hz}$ apex).
-  - Add animated traveling wave pulse ripple on tone trigger.
-- [ ] **Step 1.4: Top Header Mode Switcher (`AppHUD.ts`)**:
-  - Add the clean segmented mode pill in the top header: `[ 🧬 Anatomy ] [ 🎧 Hearing Lab ]`.
+  - Render a continuous 7-stop perceptual rainbow spectral gradient along the cochlear coil (Red $\approx 20\text{ kHz}$ base $\to$ Gold $\approx 4\text{ kHz}$ $\to$ Green $\approx 1\text{ kHz}$ $\to$ Cyan $\approx 500\text{ Hz}$ $\to$ Violet $\approx 20\text{ Hz}$ apex).
+  - Add animated traveling wave pulse ripple on tone trigger (`uWavePhase`).
+- [x] **Step 1.4: Top Header Mode Switcher (`AppHUD.ts`)**:
+  - Add the clean segmented mode pill in the top header: `[ 🏛️ Anatomy Atlas ] [ 🎵 Hearing & Tonotopy ]`.
   - Maintain desktop, tablet, and mobile responsiveness without crowding the search bar.
-- [ ] **Step 1.5: Contextual Bottom Dock for Hearing Mode**:
+- [x] **Step 1.5: Contextual Bottom Dock for Hearing Mode**:
   - Morph the bottom bar when in Hearing Mode:
     - Logarithmic Frequency Slider ($20\text{ Hz}\to 20{,}000\text{ Hz}$).
-    - `Play Tone 🔊` button and live readout (`4,000 Hz · Consonants & High Pitch`).
-    - 4 Clinical Presets: `Normal Hearing`, `Presbycusis (High Loss)`, `4 kHz Noise Notch`, `Apical Loss (Ménière)`.
-- [ ] **Step 1.6: Interactive Mini-Audiogram Drawer**:
-  - Add a collapsible `[ 📊 Interactive Audiogram ]` drawer sliding up over the bottom-right corner.
-  - Interactive $125\text{ Hz}\to 8{,}000\text{ Hz}$ / $-10\text{ dB}\to 120\text{ dB HL}$ standard clinical grid.
-  - Tapping a hearing loss preset highlights the damaged hair-cell sector directly on the 3D cochlea.
-- [ ] **Step 1.7: Fluid Compartment & Voltage Badge in Inspector**:
+    - `Play Tone ▶` toggle button and live readout (`4000 Hz · 4 kHz Notch (19.2 mm)`).
+    - Audiometric octave jump chips (`125`, `250`, `500`, `1k`, `2k`, `4k`, `8k`).
+- [x] **Step 1.6: Interactive Clinical Audiogram Drawer (`AudiogramDrawer.ts`)**:
+  - Collapsible `[ 📊 Audiogram ▾ ]` drawer sliding up over the bottom-right corner.
+  - Interactive $125\text{ Hz}\to 8{,}000\text{ Hz}$ / $-10\text{ dB}\to 120\text{ dB HL}$ standard clinical grid with right-ear red circle $\bigcirc$ markers and Speech Banana overlay.
+  - 4 Clinical Presets: `Normal Hearing`, `Presbycusis (High Loss)`, `4 kHz Noise Notch`, `Ménière's (Low Loss)`.
+  - Bi-directional 3D linking: selecting presets maps damaged hair-cell zones in crimson on the 3D cochlea.
+  - Drawer mutual exclusivity: opening Audiogram closes Parts Drawer and vice versa.
+- [x] **Step 1.7: Fluid Compartment & Voltage Badge in Inspector**:
   - Display Scala Media (Endolymph $+80\text{ mV}$, high $\text{K}^+$) vs. Scala Tympani/Vestibuli (Perilymph $0\text{ mV}$, high $\text{Na}^+$).
-  - Concise mechanotransduction summary for medical students.
-- [ ] **Step 1.8: Build & QA Verification**:
+  - Display $150\text{ mV}$ electrical driving force badge.
+- [x] **Step 1.8: Build & QA Verification**:
   - Zero TypeScript errors (`npm run build`).
-  - Verify Web Audio smooth tone playback and 60fps rendering across desktop, tablet, and mobile.
+  - Automated deep unit tests: `scripts/test_hearing_engine.js` (100% pass across 7 suites).
+  - Headless Chrome CDP verification: `scripts/verify_mvp_cdp.js` (100% pass across 4 viewports with 0 errors).
 
 ---
 

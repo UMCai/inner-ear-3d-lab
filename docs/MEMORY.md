@@ -32,13 +32,16 @@
 
 ---
 
-### 2026-10-14: Clinical Expansion Strategy & "Modal Workbench" Consensus
-- **Context:** The pure 3D anatomical atlas was verified and complete. The team evaluated what high-value features to add for medical students, ENT residents, and audiology specialists.
-- **Architectural & Clinical Decisions:**
-  1. **Target Audience Scope:** Formally expanded to serve **both** undergraduate medical students (physiology, VOR, tonotopy) and postgraduate residents/specialists (pathology, radiology, surgery).
-  2. **The "Modal Workbench" Paradigm:** Formally rejected the "cockpit trap." Agreed to maintain the 85%+ full-bleed 3D canvas and swap bottom dock controls contextually per mode (`🧬 Anatomy`, `🎧 Hearing`, `🌀 Vestibular`, `🩻 CT Slicing`).
-  3. **Implementation Sequence:** Selected **Phase 1: Audio-Visual Tonotopy Engine & Hearing Lab** as the immediate next build.
-  4. **Documentation Standardization:** Established `docs/**`, `AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `docs/MEMORY.md`, and `ROADMAP.md` as permanent repo memory.
+### 2026-10-14: Stage 1 — Audio-Visual Tonotopy Engine & Hearing Lab (Completed)
+- **Objective:** Transform static cochlea into an interactive auditory-physiological simulator driven by the Donald D. Greenwood place-frequency function ($F(x) = 165.4 \cdot (10^{2.1 x} - 0.88)$ Hz) and native browser Web Audio API sine synthesis, linked with an interactive Clinical Pure-Tone Audiogram Drawer.
+- **Key Deliverables:**
+  - `web/src/data/greenwoodEngine.ts`: Greenwood forward & inverse engine, 100-knot 3D RAS spline table ($28.79\text{ mm}$ apex to base), continuous segment projection attribute mapper ($<5\text{ ms}$ for 8k vertices, zero OOM), speech acoustic landmarks.
+  - `web/src/audio/ToneSynthesizer.ts`: Singleton Web Audio service with shared `AudioContext` lazily resumed on user gesture, click-free exponential gain envelopes ($50\text{ ms}$ attack/decay, floor $0.0001$), continuous pitch glide ($35\text{ ms}$), safety limiter compressor.
+  - `web/src/ui/AudiogramDrawer.ts`: Clinical pure-tone air conduction SVG grid ($-10\text{ to }120\text{ dB HL}$, $125\text{ to }8{,}000\text{ Hz}$, right ear red circle $\bigcirc$ markers), 4 clinical presets (`Normal`, `Presbycusis`, `4 kHz Noise Notch`, `Ménière's`), speech banana phoneme overlay.
+  - `web/src/render/gate3Materials.ts`: Dynamic tonotopy shader with 7-stop perceptual rainbow heatmap, von Békésy asymmetric traveling wave simulation, and audiogram pathology crimson desaturation mask.
+  - `web/src/render/DualStageScene.ts`: Lab mode transitions (`setLabMode('anatomy' | 'hearing')`), glowing 3D resonant cursor sphere tracking the cochlear spline, raycast face picking with continuous frequency evaluation.
+  - `web/src/ui/AppHUD.ts`: Header Mode Switcher, contextual Hearing Workbench dock with log frequency slider ($20\text{ Hz}\to 20\text{ kHz}$), octave jump chips, drawer mutual exclusivity, and electrophysiology badges ($+80\text{ mV}$ EP, $150\text{ mV}$ driving force).
+  - Automated tests: `scripts/test_hearing_engine.js` (100% pass across 7 suites) and `scripts/verify_mvp_cdp.js` (100% pass across all 4 viewports with zero console errors).
 
 ---
 

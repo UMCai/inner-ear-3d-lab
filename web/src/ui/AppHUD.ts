@@ -9,11 +9,15 @@ import {
 } from '../data/ontology';
 import {
   DualStageScene,
+  LabMode,
   LabelDensityMode,
   LabSceneSnapshot,
   ProjectedPin2D,
   ReadingDepth,
 } from '../render/DualStageScene';
+import { ToneSynthesizer } from '../audio/ToneSynthesizer';
+import { AudiogramDrawer } from './AudiogramDrawer';
+import { getAcousticLandmark, getDistanceApexMm, greenwoodPosition } from '../data/greenwoodEngine';
 
 export class AppHUD {
   private root: HTMLElement;
@@ -21,6 +25,10 @@ export class AppHUD {
   private canvasHost!: HTMLElement;
   private pinsLayer!: HTMLElement;
   private pinElements = new Map<string, HTMLElement>();
+
+  // Mode Switcher Elements
+  private modeAnatomyBtn!: HTMLButtonElement;
+  private modeHearingBtn!: HTMLButtonElement;
 
   // Header Elements
   private searchInput!: HTMLInputElement;
@@ -36,6 +44,10 @@ export class AppHUD {
 
   // Bottom Bar Elements
   private bottomBar!: HTMLElement;
+  private anatomyDockContent!: HTMLElement;
+  private hearingDockContent!: HTMLElement;
+
+  // Anatomy Dock Controls
   private boneSlider!: HTMLInputElement;
   private boneValEl!: HTMLElement;
   private explodeSlider!: HTMLInputElement;
@@ -44,6 +56,21 @@ export class AppHUD {
   private partsToggleBtn!: HTMLButtonElement;
   private partsDrawer!: HTMLElement;
   private partsDrawerOpen = false;
+
+  // Hearing Workbench Dock Controls
+  private tonePlayBtn!: HTMLButtonElement;
+  private toneIconEl!: HTMLElement;
+  private toneLabelEl!: HTMLElement;
+  private hearingSlider!: HTMLInputElement;
+  private hearingFreqReadout!: HTMLElement;
+  private hearingLandmarkBadge!: HTMLElement;
+  private octaveChips: HTMLButtonElement[] = [];
+  private audiogramToggleBtn!: HTMLButtonElement;
+  private audiogramArrowEl!: HTMLElement;
+
+  // Hearing Services
+  private toneSynth = ToneSynthesizer.getInstance();
+  private audiogramDrawer!: AudiogramDrawer;
 
   // Modals & Overlays
   private aboutModal!: HTMLElement;
@@ -58,6 +85,7 @@ export class AppHUD {
   private lastRenderedMesh: string | null = '__init__';
   private lastRenderedDepth: ReadingDepth | null = null;
   private lastRenderedIsolated: boolean | null = null;
+  private lastRenderedLabMode: LabMode | null = null;
   private activeSearchIndex = -1;
 
   private static readonly STORAGE_KEYS = {
@@ -77,6 +105,13 @@ export class AppHUD {
     this.scene.onStateChange((snap) => this.renderState(snap));
     this.scene.onPinsUpdate((pins) => this.renderProjectedPins(pins));
     this.scene.onStructurePicked((meshName) => this.handleStructurePicked(meshName));
+    this.scene.onHearingToneRequest((freqHz) => {
+      if (this.toneSynth.getIsPlaying()) {
+        this.toneSynth.setFrequency(freqHz);
+      }
+      this.audiogramDrawer.setActiveFrequency(freqHz);
+      this.syncFrequencyUI(freqHz, true);
+    });
 
     window.addEventListener('resize', () => {
       // Recompute responsive pin boundaries on window resize
@@ -129,6 +164,34 @@ export class AppHUD {
               <span class="brand-sub">27-Part Anatomy Atlas</span>
             </div>
           </div>
+
+          <!-- Lab Mode Switcher -->
+          <nav class="mode-switcher" role="tablist" aria-label="Lab Modes">
+            <button
+              type="button"
+              class="mode-pill active"
+              id="mode-anatomy-btn"
+              role="tab"
+              aria-selected="true"
+              aria-controls="anatomy-dock-content"
+              title="3D Anatomy Atlas (27 Parts)"
+            >
+              <span class="mode-icon">🏛️</span>
+              <span class="mode-label">Anatomy Atlas</span>
+            </button>
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-hearing-btn"
+              role="tab"
+              aria-selected="false"
+              aria-controls="hearing-dock-content"
+              title="Tonotopy & Hearing Lab (Georg von Békésy Wave)"
+            >
+              <span class="mode-icon">🎵</span>
+              <span class="mode-label">Hearing &amp; Tonotopy</span>
+            </button>
+          </nav>
 
           <!-- Quick Search Bar -->
           <div class="search-container">
@@ -207,72 +270,135 @@ export class AppHUD {
         <!-- 3. FLOATING PART INSPECTOR CARD -->
         <aside class="inspector-card" id="inspector-card" aria-label="Structure Inspector"></aside>
 
-        <!-- 4. COMPACT BOTTOM VISUALIZATION BAR -->
+        <!-- 4. COMPACT BOTTOM VISUALIZATION BAR / WORKBENCH -->
         <nav class="bottom-viz-bar" id="bottom-bar" aria-label="Visualization Controls">
-          <!-- 4 Guided Presets -->
-          <div class="preset-group" role="group" aria-label="Guided Anatomy Presets">
-            <button type="button" class="preset-btn active" data-preset="overview" title="Full 27-part inner ear labyrinth">
-              <span class="preset-icon">🌐</span>
-              <span class="preset-label">Overview</span>
-            </button>
-            <button type="button" class="preset-btn" data-preset="balance_system" title="3 Semicircular canals and vestibule">
-              <span class="preset-icon">⚖️</span>
-              <span class="preset-label">Balance System</span>
-            </button>
-            <button type="button" class="preset-btn" data-preset="hearing_snail" title="Cochlea and internal scala chambers">
-              <span class="preset-icon">🐚</span>
-              <span class="preset-label">Hearing Snail</span>
-            </button>
-            <button type="button" class="preset-btn" data-preset="exploded_view" title="Radial separation of all 27 parts">
-              <span class="preset-icon">💥</span>
-              <span class="preset-label">Exploded View</span>
-            </button>
+          <!-- 4A. Anatomy Dock Content -->
+          <div class="anatomy-dock-content" id="anatomy-dock-content">
+            <!-- 4 Guided Presets -->
+            <div class="preset-group" role="group" aria-label="Guided Anatomy Presets">
+              <button type="button" class="preset-btn active" data-preset="overview" title="Full 27-part inner ear labyrinth">
+                <span class="preset-icon">🌐</span>
+                <span class="preset-label">Overview</span>
+              </button>
+              <button type="button" class="preset-btn" data-preset="balance_system" title="3 Semicircular canals and vestibule">
+                <span class="preset-icon">⚖️</span>
+                <span class="preset-label">Balance System</span>
+              </button>
+              <button type="button" class="preset-btn" data-preset="hearing_snail" title="Cochlea and internal scala chambers">
+                <span class="preset-icon">🐚</span>
+                <span class="preset-label">Hearing Snail</span>
+              </button>
+              <button type="button" class="preset-btn" data-preset="exploded_view" title="Radial separation of all 27 parts">
+                <span class="preset-icon">💥</span>
+                <span class="preset-label">Exploded View</span>
+              </button>
+            </div>
+
+            <!-- 2 Visual Sliders -->
+            <div class="sliders-group">
+              <div class="slider-item">
+                <div class="slider-header">
+                  <label for="bone-peel-slider">Outer Bone Shell</label>
+                  <span class="slider-val" id="bone-val">80%</span>
+                </div>
+                <input
+                  type="range"
+                  id="bone-peel-slider"
+                  min="0"
+                  max="100"
+                  value="80"
+                  aria-label="Outer Bone Shell Opacity Peel"
+                />
+              </div>
+              <div class="slider-item">
+                <div class="slider-header">
+                  <label for="explode-slider">Separate Parts</label>
+                  <span class="slider-val" id="explode-val">0%</span>
+                </div>
+                <input
+                  type="range"
+                  id="explode-slider"
+                  min="0"
+                  max="100"
+                  value="0"
+                  aria-label="Separate Parts Radial Explode"
+                />
+              </div>
+            </div>
+
+            <!-- Collapsible 27 Parts Toggle -->
+            <div class="parts-toggle-wrap">
+              <button
+                type="button"
+                class="parts-toggle-btn ${this.partsDrawerOpen ? 'open' : ''}"
+                id="parts-toggle-btn"
+                aria-expanded="${this.partsDrawerOpen ? 'true' : 'false'}"
+                aria-controls="parts-drawer"
+              >
+                <span class="toggle-arrow" aria-hidden="true">${this.partsDrawerOpen ? '▾' : '▸'}</span>
+                <span class="toggle-text">Browse All 27 Parts</span>
+                <span class="parts-badge">27</span>
+              </button>
+            </div>
           </div>
 
-          <!-- 2 Visual Sliders -->
-          <div class="sliders-group">
-            <div class="slider-item">
-              <div class="slider-header">
-                <label for="bone-peel-slider">Outer Bone Shell</label>
-                <span class="slider-val" id="bone-val">80%</span>
-              </div>
-              <input
-                type="range"
-                id="bone-peel-slider"
-                min="0"
-                max="100"
-                value="80"
-                aria-label="Outer Bone Shell Opacity Peel"
-              />
-            </div>
-            <div class="slider-item">
-              <div class="slider-header">
-                <label for="explode-slider">Separate Parts</label>
-                <span class="slider-val" id="explode-val">0%</span>
-              </div>
-              <input
-                type="range"
-                id="explode-slider"
-                min="0"
-                max="100"
-                value="0"
-                aria-label="Separate Parts Radial Explode"
-              />
-            </div>
-          </div>
-
-          <!-- Collapsible 27 Parts Toggle -->
-          <div class="parts-toggle-wrap">
+          <!-- 4B. Hearing Workbench Dock Content -->
+          <div class="hearing-dock-content" id="hearing-dock-content" style="display: none;">
+            <!-- Play / Pause Pure-Tone Button -->
             <button
               type="button"
-              class="parts-toggle-btn ${this.partsDrawerOpen ? 'open' : ''}"
-              id="parts-toggle-btn"
-              aria-expanded="${this.partsDrawerOpen ? 'true' : 'false'}"
-              aria-controls="parts-drawer"
+              class="tone-play-btn"
+              id="tone-play-btn"
+              aria-label="Play pure tone"
+              title="Toggle pure-tone sound synthesis (Web Audio)"
             >
-              <span class="toggle-arrow" aria-hidden="true">${this.partsDrawerOpen ? '▾' : '▸'}</span>
-              <span class="toggle-text">Browse All 27 Parts</span>
-              <span class="parts-badge">27</span>
+              <span class="tone-icon" id="tone-icon">▶</span>
+              <span class="tone-label" id="tone-label">Play Tone</span>
+            </button>
+
+            <!-- Logarithmic Frequency Slider & Metric Readout -->
+            <div class="hearing-slider-wrap">
+              <div class="hearing-slider-header">
+                <span class="hearing-slider-title">Stimulus Frequency</span>
+                <div class="hearing-readout-wrap">
+                  <span class="hearing-freq-val" id="hearing-freq-readout">1000 Hz</span>
+                  <span class="hearing-landmark-badge" id="hearing-landmark-badge">Vowel 1st Formant (19.4 mm)</span>
+                </div>
+              </div>
+              <input
+                type="range"
+                class="hearing-freq-slider"
+                id="hearing-freq-slider"
+                min="0"
+                max="1000"
+                value="566"
+                aria-label="Pure Tone Frequency (20 Hz to 20,000 Hz logarithmic)"
+              />
+            </div>
+
+            <!-- Standard Audiometric Octave Chips -->
+            <div class="octave-chips-group" role="group" aria-label="Audiometric Octave Steps">
+              <button type="button" class="octave-chip" data-octave="125">125</button>
+              <button type="button" class="octave-chip" data-octave="250">250</button>
+              <button type="button" class="octave-chip" data-octave="500">500</button>
+              <button type="button" class="octave-chip active" data-octave="1000">1k</button>
+              <button type="button" class="octave-chip" data-octave="2000">2k</button>
+              <button type="button" class="octave-chip" data-octave="4000">4k</button>
+              <button type="button" class="octave-chip" data-octave="8000">8k</button>
+            </div>
+
+            <!-- Clinical Audiogram Drawer Toggle Button -->
+            <button
+              type="button"
+              class="audiogram-toggle-btn"
+              id="audiogram-toggle-btn"
+              aria-expanded="false"
+              aria-controls="audiogram-drawer"
+              title="Open Clinical Pure-Tone Audiogram Drawer"
+            >
+              <span class="audiogram-icon">📊</span>
+              <span class="audiogram-label">Audiogram</span>
+              <span class="audiogram-arrow" id="audiogram-arrow">▸</span>
             </button>
           </div>
         </nav>
@@ -350,6 +476,8 @@ export class AppHUD {
   private bindDOMReferences(): void {
     this.canvasHost = this.root.querySelector('#canvas-host') as HTMLElement;
     this.pinsLayer = this.root.querySelector('#pins-layer') as HTMLElement;
+    this.modeAnatomyBtn = this.root.querySelector('#mode-anatomy-btn') as HTMLButtonElement;
+    this.modeHearingBtn = this.root.querySelector('#mode-hearing-btn') as HTMLButtonElement;
     this.searchInput = this.root.querySelector('#search-input') as HTMLInputElement;
     this.searchClearBtn = this.root.querySelector('#search-clear-btn') as HTMLButtonElement;
     this.searchDropdown = this.root.querySelector('#search-dropdown') as HTMLElement;
@@ -357,12 +485,32 @@ export class AppHUD {
     this.settingsPopover = this.root.querySelector('#settings-popover') as HTMLElement;
     this.inspectorCard = this.root.querySelector('#inspector-card') as HTMLElement;
     this.bottomBar = this.root.querySelector('#bottom-bar') as HTMLElement;
+    this.anatomyDockContent = this.root.querySelector('#anatomy-dock-content') as HTMLElement;
+    this.hearingDockContent = this.root.querySelector('#hearing-dock-content') as HTMLElement;
+
+    // Anatomy Controls
     this.boneSlider = this.root.querySelector('#bone-peel-slider') as HTMLInputElement;
     this.boneValEl = this.root.querySelector('#bone-val') as HTMLElement;
     this.explodeSlider = this.root.querySelector('#explode-slider') as HTMLInputElement;
     this.explodeValEl = this.root.querySelector('#explode-val') as HTMLElement;
     this.partsToggleBtn = this.root.querySelector('#parts-toggle-btn') as HTMLButtonElement;
     this.partsDrawer = this.root.querySelector('#parts-drawer') as HTMLElement;
+
+    // Hearing Controls
+    this.tonePlayBtn = this.root.querySelector('#tone-play-btn') as HTMLButtonElement;
+    this.toneIconEl = this.root.querySelector('#tone-icon') as HTMLElement;
+    this.toneLabelEl = this.root.querySelector('#tone-label') as HTMLElement;
+    this.hearingSlider = this.root.querySelector('#hearing-freq-slider') as HTMLInputElement;
+    this.hearingFreqReadout = this.root.querySelector('#hearing-freq-readout') as HTMLElement;
+    this.hearingLandmarkBadge = this.root.querySelector('#hearing-landmark-badge') as HTMLElement;
+    this.audiogramToggleBtn = this.root.querySelector('#audiogram-toggle-btn') as HTMLButtonElement;
+    this.audiogramArrowEl = this.root.querySelector('#audiogram-arrow') as HTMLElement;
+    this.octaveChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.octave-chip'));
+
+    // Audiogram Drawer Initialization
+    const labShell = this.root.querySelector('.lab-shell') as HTMLElement;
+    this.audiogramDrawer = new AudiogramDrawer(labShell);
+
     this.aboutModal = this.root.querySelector('#about-modal') as HTMLElement;
     this.loadingOverlay = this.root.querySelector('#loading-overlay') as HTMLElement;
     this.loadingFill = this.root.querySelector('#loading-fill') as HTMLElement;
@@ -548,6 +696,71 @@ export class AppHUD {
     drawerCloseBtn?.addEventListener('click', () => {
       this.closePartsDrawer();
     });
+
+    // -------------------------------------------------------------------------
+    // Lab Mode Switcher (Anatomy Atlas vs Hearing Workbench)
+    // -------------------------------------------------------------------------
+    this.modeAnatomyBtn.addEventListener('click', () => {
+      this.switchLabMode('anatomy');
+    });
+
+    this.modeHearingBtn.addEventListener('click', () => {
+      this.switchLabMode('hearing');
+    });
+
+    // -------------------------------------------------------------------------
+    // Hearing Workbench Controls
+    // -------------------------------------------------------------------------
+    // Pure-Tone Play/Pause Toggle
+    this.tonePlayBtn.addEventListener('click', () => {
+      const isPlaying = !this.toneSynth.getIsPlaying();
+      const currentFreq = this.scene.getSnapshot().hearingState.activeFrequency;
+      if (isPlaying) {
+        this.toneSynth.play(currentFreq);
+      } else {
+        this.toneSynth.pause();
+      }
+      this.scene.setHearingPlayback(isPlaying);
+      this.updateTonePlayButton(isPlaying);
+    });
+
+    // Logarithmic Stimulus Frequency Slider (20 Hz to 20,000 Hz)
+    this.hearingSlider.addEventListener('input', () => {
+      const val = parseFloat(this.hearingSlider.value);
+      // Map linear slider [0, 1000] to logarithmic frequency [20, 20000] Hz
+      const freq = Math.round(20 * Math.pow(10, (3 * val) / 1000));
+      this.handleFrequencyChange(freq, false);
+    });
+
+    // Standard Audiometric Octave Step Chips
+    this.octaveChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const freqStr = chip.getAttribute('data-octave');
+        if (freqStr) {
+          const freq = parseInt(freqStr, 10);
+          this.handleFrequencyChange(freq, true);
+        }
+      });
+    });
+
+    // Clinical Audiogram Drawer Toggle & Callbacks
+    this.audiogramToggleBtn.addEventListener('click', () => {
+      this.toggleAudiogramDrawer();
+    });
+
+    this.audiogramDrawer.onClose(() => {
+      this.audiogramToggleBtn.classList.remove('open');
+      this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
+      this.audiogramArrowEl.textContent = '▸';
+    });
+
+    this.audiogramDrawer.onPresetChange((presetId, lossSector) => {
+      this.scene.setHearingLossSector(lossSector, presetId);
+    });
+
+    this.audiogramDrawer.onFrequencySelect((freqHz) => {
+      this.handleFrequencyChange(freqHz, true);
+    });
   }
 
   // ===========================================================================
@@ -646,6 +859,9 @@ export class AppHUD {
   // PARTS DRAWER TOGGLE
   // ===========================================================================
   private togglePartsDrawer(): void {
+    if (!this.partsDrawerOpen && this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
     this.partsDrawerOpen = !this.partsDrawerOpen;
     this.partsDrawer.classList.toggle('open', this.partsDrawerOpen);
     this.partsToggleBtn.classList.toggle('open', this.partsDrawerOpen);
@@ -679,6 +895,93 @@ export class AppHUD {
     } catch {
       // ignore
     }
+  }
+
+  // ===========================================================================
+  // AUDIOGRAM DRAWER TOGGLE & HEARING LAB HELPERS
+  // ===========================================================================
+  private toggleAudiogramDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    const isOpen = this.audiogramDrawer.toggle();
+    this.audiogramToggleBtn.classList.toggle('open', isOpen);
+    this.audiogramToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    this.audiogramArrowEl.textContent = isOpen ? '▾' : '▸';
+  }
+
+  private closeAudiogramDrawer(): void {
+    this.audiogramDrawer.close();
+    this.audiogramToggleBtn.classList.remove('open');
+    this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
+    this.audiogramArrowEl.textContent = '▸';
+  }
+
+  public switchLabMode(mode: LabMode): void {
+    if (mode === 'hearing') {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      this.scene.setLabMode('hearing');
+      this.modeAnatomyBtn.classList.remove('active');
+      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
+      this.modeHearingBtn.classList.add('active');
+      this.modeHearingBtn.setAttribute('aria-selected', 'true');
+      this.anatomyDockContent.style.display = 'none';
+      this.hearingDockContent.style.display = 'flex';
+
+      const snap = this.scene.getSnapshot();
+      this.syncFrequencyUI(snap.hearingState.activeFrequency, true);
+    } else {
+      if (this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.toneSynth.getIsPlaying()) {
+        this.toneSynth.pause();
+        this.scene.setHearingPlayback(false);
+        this.updateTonePlayButton(false);
+      }
+      this.scene.setLabMode('anatomy');
+      this.modeHearingBtn.classList.remove('active');
+      this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeAnatomyBtn.classList.add('active');
+      this.modeAnatomyBtn.setAttribute('aria-selected', 'true');
+      this.hearingDockContent.style.display = 'none';
+      this.anatomyDockContent.style.display = 'flex';
+    }
+  }
+
+  private handleFrequencyChange(freq: number, updateSlider: boolean): void {
+    this.scene.setHearingFrequency(freq, true);
+    if (this.toneSynth.getIsPlaying()) {
+      this.toneSynth.setFrequency(freq);
+    }
+    this.audiogramDrawer.setActiveFrequency(freq);
+    this.syncFrequencyUI(freq, updateSlider);
+  }
+
+  private syncFrequencyUI(freq: number, updateSlider = true): void {
+    this.hearingFreqReadout.textContent = `${Math.round(freq)} Hz`;
+    const landmark = getAcousticLandmark(freq);
+    const x = greenwoodPosition(freq);
+    const apexDist = getDistanceApexMm(x);
+    this.hearingLandmarkBadge.textContent = `${landmark.shortTag} (${apexDist.toFixed(1)} mm)`;
+
+    if (updateSlider && document.activeElement !== this.hearingSlider) {
+      const val = Math.round((Math.log10(Math.max(20, freq) / 20) / 3) * 1000);
+      this.hearingSlider.value = String(val);
+    }
+
+    this.octaveChips.forEach((chip) => {
+      const octaveVal = parseInt(chip.getAttribute('data-octave') || '0', 10);
+      chip.classList.toggle('active', Math.abs(octaveVal - freq) < 15);
+    });
+  }
+
+  private updateTonePlayButton(isPlaying: boolean): void {
+    this.tonePlayBtn.classList.toggle('playing', isPlaying);
+    this.toneIconEl.textContent = isPlaying ? '⏸' : '▶';
+    this.toneLabelEl.textContent = isPlaying ? 'Pause Tone' : 'Play Tone';
   }
 
   // ===========================================================================
@@ -724,6 +1027,51 @@ export class AppHUD {
 
       <h2 class="inspector-title">${item.displayName}</h2>
       <div class="inspector-latin">${item.latinName}</div>
+
+      ${
+        item.endocochlearPotential || item.characteristicFrequencyRange || item.ionicComposition
+          ? `
+        <div class="electrophys-box">
+          <div class="electrophys-header">
+            <span class="ep-icon">⚡</span>
+            <span class="ep-title">Electrophysiology &amp; Tonotopy</span>
+          </div>
+          <div class="electrophys-grid">
+            ${
+              item.endocochlearPotential
+                ? `
+              <div class="ep-stat">
+                <span class="ep-stat-label">Endocochlear Potential</span>
+                <span class="ep-stat-val ${item.endocochlearPotential.includes('+80') ? 'val-high-ep' : ''}">${item.endocochlearPotential}</span>
+              </div>
+            `
+                : ''
+            }
+            ${
+              item.characteristicFrequencyRange
+                ? `
+              <div class="ep-stat">
+                <span class="ep-stat-label">Tuned Frequency</span>
+                <span class="ep-stat-val">${item.characteristicFrequencyRange}</span>
+              </div>
+            `
+                : ''
+            }
+            ${
+              item.ionicComposition
+                ? `
+              <div class="ep-stat ep-stat-wide">
+                <span class="ep-stat-label">Ionic Environment</span>
+                <span class="ep-stat-val">${item.ionicComposition}</span>
+              </div>
+            `
+                : ''
+            }
+          </div>
+        </div>
+      `
+          : ''
+      }
 
       <p class="inspector-summary">${summaryText}</p>
 
@@ -1036,5 +1384,23 @@ export class AppHUD {
         }
       }
     });
+
+    // 6. Lab Mode Switcher & Hearing State Synchronization
+    if (snap.labMode !== this.lastRenderedLabMode) {
+      this.lastRenderedLabMode = snap.labMode;
+      const isHearing = snap.labMode === 'hearing';
+      this.modeAnatomyBtn.classList.toggle('active', !isHearing);
+      this.modeAnatomyBtn.setAttribute('aria-selected', !isHearing ? 'true' : 'false');
+      this.modeHearingBtn.classList.toggle('active', isHearing);
+      this.modeHearingBtn.setAttribute('aria-selected', isHearing ? 'true' : 'false');
+      this.anatomyDockContent.style.display = isHearing ? 'none' : 'flex';
+      this.hearingDockContent.style.display = isHearing ? 'flex' : 'none';
+    }
+
+    if (snap.labMode === 'hearing') {
+      this.syncFrequencyUI(snap.hearingState.activeFrequency, true);
+      this.updateTonePlayButton(snap.hearingState.isPlaying);
+      this.audiogramDrawer.setActiveFrequency(snap.hearingState.activeFrequency);
+    }
   }
 }

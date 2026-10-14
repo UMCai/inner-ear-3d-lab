@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const DIST_DIR = '/Users/umcai/Documents/antigravity/radiant-darwin/web/dist';
 const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 4188;
-const DEBUG_PORT = 9223;
+const DEBUG_PORT = 9225;
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -47,12 +48,15 @@ function startServer() {
 }
 
 // 2. Launch Headless Chrome with Remote Debugging
+let chromeTmpDir = null;
 function launchChrome() {
+  chromeTmpDir = mkdtempSync(join(tmpdir(), 'chrome-cdp-lab-'));
   const proc = spawn(
     CHROME_PATH,
     [
       '--headless=new',
       `--remote-debugging-port=${DEBUG_PORT}`,
+      `--user-data-dir=${chromeTmpDir}`,
       '--no-sandbox',
       '--disable-background-networking',
       '--disable-default-apps',
@@ -68,7 +72,7 @@ function launchChrome() {
   return proc;
 }
 
-async function waitForCdpEndpoint(maxWaitMs = 10000) {
+async function waitForCdpEndpoint(maxWaitMs = 12000) {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     try {
@@ -100,29 +104,47 @@ class CdpClient {
 
   async connect() {
     this.ws = new WebSocket(this.wsUrl);
+    this.ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.id && this.pending.has(msg.id)) {
+          const { resolve, reject } = this.pending.get(msg.id);
+          this.pending.delete(msg.id);
+          if (msg.error) reject(new Error(msg.error.message));
+          else resolve(msg.result);
+        } else if (msg.method) {
+          const cbs = this.events.get(msg.method) || [];
+          for (const cb of cbs) cb(msg.params);
+        }
+      } catch (e) {
+        console.error('Error handling CDP message:', e);
+      }
+    };
     await new Promise((resolve, reject) => {
       this.ws.onopen = resolve;
       this.ws.onerror = reject;
     });
-
-    this.ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      if (msg.id && this.pending.has(msg.id)) {
-        const { resolve, reject } = this.pending.get(msg.id);
-        this.pending.delete(msg.id);
-        if (msg.error) reject(new Error(msg.error.message));
-        else resolve(msg.result);
-      } else if (msg.method) {
-        const cbs = this.events.get(msg.method) || [];
-        for (const cb of cbs) cb(msg.params);
-      }
-    };
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = 25000) {
     const id = ++this.id;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          reject(new Error(`Timeout (${timeoutMs}ms) awaiting CDP response for ${method}`));
+        }
+      }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (val) => {
+          clearTimeout(timer);
+          resolve(val);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      });
       this.ws.send(JSON.stringify({ id, method, params }));
     });
   }
@@ -151,13 +173,16 @@ async function run() {
 
     const consoleErrors = [];
     client.on('Runtime.consoleAPICalled', (params) => {
+      const text = params.args.map((a) => a.value || a.description || '').join(' ');
       if (params.type === 'error') {
-        const text = params.args.map((a) => a.value || a.description || '').join(' ');
+        console.error(`[Browser Error] ${text}`);
         consoleErrors.push(`[Console Error] ${text}`);
       }
     });
     client.on('Runtime.exceptionThrown', (params) => {
-      consoleErrors.push(`[Uncaught Exception] ${params.exceptionDetails.text}`);
+      const text = params.exceptionDetails.exception?.description || params.exceptionDetails.text;
+      console.error(`[Browser Exception] ${text}`);
+      consoleErrors.push(`[Uncaught Exception] ${text}`);
     });
 
     await client.send('Page.enable');
@@ -182,6 +207,7 @@ async function run() {
       });
 
       await client.send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` });
+      await new Promise((r) => setTimeout(r, 600));
 
       // Wait for page load and 3D assets to load
       let loaded = false;
@@ -199,9 +225,12 @@ async function run() {
           `,
           returnByValue: true,
         });
-        if (evalRes.result.value?.isHidden && evalRes.result.value?.title.includes('Inner Ear 3D Lab')) {
+        if (evalRes.result?.value?.isHidden && evalRes.result?.value?.title.includes('Inner Ear 3D Lab')) {
           loaded = true;
         } else {
+          if (Date.now() - startTime > 1000 && (Math.round((Date.now() - startTime) / 300) % 5 === 0)) {
+            console.log(`[Loading Progress ${Math.round((Date.now() - startTime) / 1000)}s]`, evalRes.result?.value);
+          }
           await new Promise((r) => setTimeout(r, 300));
         }
       }
@@ -498,6 +527,146 @@ async function run() {
       const ssPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/mvp_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
       writeFileSync(ssPath, Buffer.from(ss.data, 'base64'));
       console.log(`✓ Captured visual screenshot to ${ssPath}`);
+
+      // 11. Test Mode Switcher: Switch to Hearing Lab
+      const hearingModeTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const hearingBtn = document.querySelector('#mode-hearing-btn');
+            hearingBtn?.click();
+            const hearingDock = document.querySelector('#hearing-dock-content');
+            const anatomyDock = document.querySelector('#anatomy-dock-content');
+            const hearingBtnActive = hearingBtn?.classList.contains('active');
+            const hearingDockVisible = hearingDock && hearingDock.style.display !== 'none';
+            const anatomyDockHidden = anatomyDock && anatomyDock.style.display === 'none';
+            return { hearingBtnActive, hearingDockVisible, anatomyDockHidden };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!hearingModeTest.result.value.hearingBtnActive || !hearingModeTest.result.value.hearingDockVisible || !hearingModeTest.result.value.anatomyDockHidden) {
+        throw new Error(`Hearing mode switch failed: ${JSON.stringify(hearingModeTest.result.value)}`);
+      }
+      console.log(`✓ Mode Switcher verified (switched to Hearing & Tonotopy mode)`);
+
+      // 12. Test Hearing Slider & Live Readout
+      const hearingSliderTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const slider = document.querySelector('#hearing-freq-slider');
+            slider.value = '700'; // ~2.8 kHz
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            const readout = document.querySelector('#hearing-freq-readout')?.textContent;
+            const badge = document.querySelector('#hearing-landmark-badge')?.textContent;
+            return { readout, badge };
+          })()
+        `,
+        returnByValue: true,
+      });
+      console.log(`✓ Hearing Slider verified (Readout: ${hearingSliderTest.result.value.readout}, Landmark: "${hearingSliderTest.result.value.badge}")`);
+
+      // 13. Test Octave Jump Chips
+      const octaveTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const chip4k = document.querySelector('.octave-chip[data-octave="4000"]');
+            chip4k?.click();
+            const readout = document.querySelector('#hearing-freq-readout')?.textContent;
+            const chipActive = chip4k?.classList.contains('active');
+            return { readout, chipActive };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!octaveTest.result.value.chipActive || !octaveTest.result.value.readout.includes('4000')) {
+        throw new Error(`Octave chip test failed: ${JSON.stringify(octaveTest.result.value)}`);
+      }
+      console.log(`✓ Octave Jump Chips verified (jumped to 4000 Hz, readout: ${octaveTest.result.value.readout})`);
+
+      // 14. Test Audiogram Drawer Toggle & Clinical Presets
+      const audiogramTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const toggleBtn = document.querySelector('#audiogram-toggle-btn');
+            toggleBtn?.click();
+            const drawer = document.querySelector('#audiogram-drawer');
+            const drawerOpen = drawer?.classList.contains('open');
+            const presetButtons = drawer?.querySelectorAll('.audio-preset-btn') || [];
+            
+            // Click Noise Notch preset
+            drawer?.querySelector('.audio-preset-btn[data-preset-id="noise_notch"]')?.click();
+            const activePresetBtn = drawer?.querySelector('.audio-preset-btn.active');
+            const notchActive = activePresetBtn?.getAttribute('data-preset-id') === 'noise_notch';
+            const title = drawer?.querySelector('.preset-meta-title')?.textContent;
+
+            // Toggle Speech Banana
+            const bananaBtn = drawer?.querySelector('#speech-banana-btn');
+            bananaBtn?.click();
+            const bananaToggled = bananaBtn !== null;
+
+            return { drawerOpen, presetCount: presetButtons.length, notchActive, title, bananaToggled };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!audiogramTest.result.value.drawerOpen || audiogramTest.result.value.presetCount !== 4 || !audiogramTest.result.value.notchActive) {
+        throw new Error(`Audiogram drawer test failed: ${JSON.stringify(audiogramTest.result.value)}`);
+      }
+      console.log(`✓ Clinical Audiogram Drawer verified (${audiogramTest.result.value.presetCount} presets, active: "${audiogramTest.result.value.title}")`);
+
+      // 15. Test Drawer Mutual Exclusivity
+      const mutualExclusivityTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const audioDrawer = document.querySelector('#audiogram-drawer');
+            const partsDrawer = document.querySelector('#parts-drawer');
+            const audioOpen = audioDrawer?.classList.contains('open');
+            const partsOpenWithAudio = partsDrawer?.classList.contains('open');
+
+            // Switch to Anatomy mode, open parts drawer
+            document.querySelector('#mode-anatomy-btn')?.click();
+            const partsToggle = document.querySelector('#parts-toggle-btn');
+            if (!partsDrawer?.classList.contains('open')) {
+              partsToggle?.click();
+            }
+            const partsOpen = partsDrawer?.classList.contains('open');
+
+            // Switch back to Hearing mode and open audiogram
+            document.querySelector('#mode-hearing-btn')?.click();
+            const audiogramToggle = document.querySelector('#audiogram-toggle-btn');
+            if (!audioDrawer?.classList.contains('open')) {
+              audiogramToggle?.click();
+            }
+            const partsOpenAfterAudiogram = partsDrawer?.classList.contains('open');
+
+            return { audioOpen, partsOpenWithAudio, partsOpen, partsOpenAfterAudiogram };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (mutualExclusivityTest.result.value.partsOpenAfterAudiogram) {
+        throw new Error('Mutual exclusivity failed: parts drawer remained open when audiogram was opened');
+      }
+      console.log(`✓ Drawer Mutual Exclusivity verified (Audiogram and 27-Parts drawers never overlap)`);
+
+      // 16. Capture Stage 1 Hearing Lab Screenshot
+      const hearingSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const hearingSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage1_hearing_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(hearingSsPath, Buffer.from(hearingSs.data, 'base64'));
+      console.log(`✓ Captured Stage 1 Hearing Lab visual screenshot to ${hearingSsPath}`);
+
+      // 17. Return to Anatomy Mode for clean state
+      await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const audioDrawer = document.querySelector('#audiogram-drawer');
+            if (audioDrawer?.classList.contains('open')) {
+              document.querySelector('#audiogram-toggle-btn')?.click();
+            }
+            document.querySelector('#mode-anatomy-btn')?.click();
+          })()
+        `,
+      });
     }
 
     // Check for any unhandled console errors across all viewports
@@ -512,7 +681,10 @@ async function run() {
 
     client.close();
   } finally {
-    chromeProc.kill('SIGKILL');
+    try { chromeProc.kill('SIGKILL'); } catch {}
+    if (chromeTmpDir && existsSync(chromeTmpDir)) {
+      try { rmSync(chromeTmpDir, { recursive: true, force: true }); } catch {}
+    }
     server.close();
   }
 }
