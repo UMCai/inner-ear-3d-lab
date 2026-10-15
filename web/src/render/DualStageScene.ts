@@ -113,6 +113,9 @@ export class DualStageScene {
   } | null = null;
   private lossRangeVector = new THREE.Vector2(0, 0);
   private onHearingToneRequestCallbacks: Array<(freqHz: number) => void> = [];
+  private static readonly DUMMY_CLIP_NORMAL = new THREE.Vector3(0, 0, -1);
+  private tempRendererSize = new THREE.Vector2();
+  private tempNDC = new THREE.Vector2();
 
   // Reactive State
   private state: LabSceneSnapshot = {
@@ -334,7 +337,6 @@ export class DualStageScene {
 
     const isHearingMode = labMode === 'hearing';
     const explodeFactor = explodePercent / 100.0;
-    const dummyClipNormal = new THREE.Vector3(0, 0, -1);
 
     for (const [meshName, entry] of this.meshEntries.entries()) {
       const { ontology, mesh, material, tetherLine, tetherPositions } = entry;
@@ -422,7 +424,7 @@ export class DualStageScene {
         overrideOpacity,
         highlightLevel,
         clipActive: false,
-        clipNormal: dummyClipNormal,
+        clipNormal: DualStageScene.DUMMY_CLIP_NORMAL,
         clipConstant: 1000.0,
         tonotopyMode,
         activeGreenwoodX,
@@ -865,7 +867,8 @@ export class DualStageScene {
 
     const ndcX = (x / bounds.width) * 2 - 1;
     const ndcY = -(y / bounds.height) * 2 + 1;
-    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    this.tempNDC.set(ndcX, ndcY);
+    this.raycaster.setFromCamera(this.tempNDC, this.camera);
 
     // 1. Raycast visible internal structures (skip outer bone shell to allow picking internal organs)
     const visibleInternal = this.pickableMeshes.filter((m) => {
@@ -915,7 +918,8 @@ export class DualStageScene {
 
     const ndcX = (x / bounds.width) * 2 - 1;
     const ndcY = -(y / bounds.height) * 2 + 1;
-    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    this.tempNDC.set(ndcX, ndcY);
+    this.raycaster.setFromCamera(this.tempNDC, this.camera);
 
     const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
     if (!cochleaEntry || !cochleaEntry.mesh.visible) return null;
@@ -1092,7 +1096,7 @@ export class DualStageScene {
       const canvasH = this.container.clientHeight;
       if (canvasW === 0 || canvasH === 0) return;
 
-      const rendererSize = this.renderer.getSize(new THREE.Vector2());
+      const rendererSize = this.renderer.getSize(this.tempRendererSize);
       if (rendererSize.x !== canvasW || rendererSize.y !== canvasH) {
         this.renderer.setSize(canvasW, canvasH, false);
         this.camera.aspect = canvasW / canvasH;

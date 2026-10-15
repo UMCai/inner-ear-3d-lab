@@ -397,9 +397,22 @@ export function interpolateGreenwoodXFromIntersection(
     return (xA + xB + xC) / 3.0;
   }
 
-  const v = (d11 * d20 - d01 * d21) / denom;
-  const w = (d00 * d21 - d01 * d20) / denom;
-  const u = 1.0 - v - w;
+  let v = (d11 * d20 - d01 * d21) / denom;
+  let w = (d00 * d21 - d01 * d20) / denom;
+  let u = 1.0 - v - w;
+
+  // Clamp and renormalize to guarantee valid convex combination
+  u = Math.max(0.0, u);
+  v = Math.max(0.0, v);
+  w = Math.max(0.0, w);
+  const sum = u + v + w;
+  if (sum > 1e-6) {
+    u /= sum;
+    v /= sum;
+    w /= sum;
+  } else {
+    return (xA + xB + xC) / 3.0;
+  }
 
   const interpX = u * xA + v * xB + w * xC;
   return Math.max(0.0, Math.min(1.0, interpX));
