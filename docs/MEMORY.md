@@ -57,6 +57,18 @@
 
 ---
 
+### 2026-10-17: Stage 3 — Step 1: Geometric & Asset Foundation (Completed & Verified)
+- **Objective:** Lay the anatomical and geometric foundations for Multi-Canal BPPV dynamics and 3D VOR eye avatars.
+- **Key Deliverables Achieved:**
+  - `horizontal_canal_path.json` ($150$ knots, $15.46\text{ mm}$, mean lumen clearance $0.234\text{ mm}$ inside `ls_Hsapiens_Sl.obj`) with continuous Bishop parallel transport frames.
+  - `anterior_canal_path.json` ($150$ knots, $19.19\text{ mm}$, mean lumen clearance $0.270\text{ mm}$ inside `ls_Hsapiens_Sa.obj`), smoothly transitioning through the Common Crus at $[4.20, -2.20, 2.00]\text{ mm}$ to Utricle orifice at $[4.03, -0.15, 0.10]\text{ mm}$.
+  - `assets/iemap/eye_avatar.glb` ($274.9\text{ kB}$): Clean bilateral 3D eye avatar with clinical interpupillary distance $PD = 62.0\text{ mm}$ (pivoting at $\pm 31\text{ mm}$), physiological $24.0\text{ mm}$ globe diameter, prolate cornea cap, and $32$ procedural high-contrast radial iris crypts guaranteeing visible cyclotorsion tracking.
+  - `web/src/data/canalPaths.ts`: Semicircular canal data loader and continuous 3D interpolation functions.
+  - Verification: Automated suite `scripts/test_canal_paths.py` (100% pass across 4 suites), `npm test` (hearing + radiology passing 100%), and `npm run build` (0 errors).
+
+
+---
+
 ## 2. Key Architecture & Engineering Decisions (ADRs)
 
 ### ADR-001: Right-Anterior-Superior (RAS) Stereotaxic Coordinate Frame
@@ -87,7 +99,12 @@
 - **Decision:** Derive all 4 clinical radiological planes using strict orthonormal triads $(\mathbf{u}, \mathbf{v}, \mathbf{n})$ where $\mathbf{u} \times \mathbf{v} = \mathbf{n}$ and unit-normalized normals ($\|\mathbf{n}\| = 1.0$), with uniform translation $u_{\text{ClipConstant}} = -(C \cdot \mathbf{n} + s)$ relative to otic capsule centroid $C = [4.40, 2.01, -0.31]\text{ mm}$.
 - **Rationale:** Prevents floating-point metric drift in GPU fragment shader clipping and guarantees that 2D CT canvas orientations (`AS`/`PI`, `PL`/`AM`, `A`/`P`/`M`/`L`, `S`/`I`/`L`/`M`) accurately reflect standard neuroradiology viewing conventions without mirror image inversions.
 
+### ADR-007: Procedural Radial Iris Crypts for 3-DOF Cyclotorsion Tracking
+- **Decision:** Generate 32 radial high-contrast iris crypts and perilimbal microvascular branching directly into the 3D eye avatar texture (`assets/iemap/eye_avatar.glb`).
+- **Rationale:** On a generic spherical eyeball or solid iris color, roll/cyclotorsion (rotation around the line of sight) is completely invisible. In posterior canal BPPV (Dix-Hallpike) and vertical canal pathology, the pathognomonic diagnostic sign is torsional nystagmus. High-contrast radial trabeculae make subtle cyclorotation immediately obvious to clinicians and students without requiring external telemetry text overlays.
+
 ---
+
 
 ## 3. Directory & File Memory Map
 
@@ -105,15 +122,19 @@
 │   ├── UI_DESIGN_SPEC.md   # Modal Workbench UI/UX spec & progressive disclosure
 │   ├── CLINICAL_PILLARS.md # 4 expansion pillars (Hearing, Vestibular, CT, Surgery)
 │   ├── STAGE2_PLAN.md      # Stage 2 implementation blueprint & mathematical derivations
+│   ├── STAGE3_PLAN.md      # Stage 3 implementation blueprint & multi-canal VOR architecture
 │   └── MEMORY.md           # This file: chronological memory & ADRs
 │
 ├── scripts/                # Verification, headless test & render scripts
 │   ├── test_hearing_engine.js   # Stage 1 unit test suite (7 suites)
 │   ├── test_radiology_engine.js # Stage 2 mathematical & clinical verification (52 tests)
+│   ├── test_canal_paths.py      # Stage 3 Step 1 multi-canal spline & eye avatar verifier
+│   ├── generate_multicanal_splines.py # Continuous 3D spline generator for Horizontal & Anterior canals
+│   ├── export_eye_avatar_glb.py # CC0 sculpted eye extractor & cyclotorsion texture generator
 │   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test
 │
 ├── assets/
-│   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, paths, and metadata
+│   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, canal splines, eye avatar, and metadata
 │   └── iemap_bundle_extracted/ # Source Otsu segmentations
 │
 ├── src/                    # Python Blender & physics pipeline
@@ -131,12 +152,18 @@
         ├── data/
         │   ├── ontology.ts # 27-part clinical metadata, presets, innervation
         │   ├── objLoader.ts# Three.js OBJ buffer loader & cache
-        │   └── fcsvParser.ts# 3D Slicer markups & path parser
+        │   ├── fcsvParser.ts# 3D Slicer markups & path parser
+        │   ├── canalPaths.ts# Multi-canal 3D spline loader & interpolation
+        │   ├── greenwoodEngine.ts # Stage 1 tonotopy math engine
+        │   └── radiologyEngine.ts # Stage 2 MPR planes & SCDS math
         ├── physics/
         │   └── epleyPhysics.ts # TypeScript BPPV kinematics & steps
         ├── render/
         │   ├── DualStageScene.ts # Core Three.js render loop & camera controller
         │   └── gate3Materials.ts # Custom GLSL shaders & analytic clipping
         └── ui/
-            └── AppHUD.ts   # DOM manager, search, floating inspector, bottom dock
+            ├── AppHUD.ts        # DOM manager, search, floating inspector, bottom dock
+            ├── AudiogramDrawer.ts # Interactive clinical audiogram drawer
+            └── CTSliceDrawer.ts # Interactive 2D CT MPR canvas slice viewer
 ```
+

@@ -1,8 +1,15 @@
 # Project Status: Inner Ear 3D Lab (Gate 3 Medaium)
 
-## Current Phase: Active — Stage 2 (Virtual Temporal Bone Radiology & SCDS Third-Window) Complete & Verified
+## Current Phase: Active — Stage 3 (Multi-Canal Vestibular Dynamics & 3D VOR Eye Avatar) In Progress
+### Current Milestone: Stage 3 — Step 1 (Geometric & Asset Foundation) Complete & Verified
 
 ### WebGL Inner Ear 3D Lab Milestones
+- [x] **Stage 3 — Step 1: Geometric & Asset Foundation (Complete & Verified)**:
+  - Generated continuous 3D centerline splines for all 3 semicircular canals: `horizontal_canal_path.json` ($150$ knots, $15.46\text{ mm}$, mean clearance $0.234\text{ mm}$) and `anterior_canal_path.json` ($150$ knots, $19.19\text{ mm}$, mean clearance $0.270\text{ mm}$), linking seamlessly to Common Crus and Utricle.
+  - Exported authentic bilateral 3D eye avatar `assets/iemap/eye_avatar.glb` ($274.9\text{ kB}$) with physiological $PD = 62.0\text{ mm}$, $24.0\text{ mm}$ globe diameter, transparent cornea dome, and $32$ procedural high-contrast radial iris crypts for unmistakable cyclotorsion tracking.
+  - Built TypeScript data loaders and continuous 3D interpolation in `web/src/data/canalPaths.ts`.
+  - Verified 100% pass in `scripts/test_canal_paths.py` (all tests passing) and `npm run build` (0 errors).
+
 - [x] **Stage 0: Pure 3D Anatomy Lab MVP**:
   - Ingested 27 authentic IE-Map v1.0.0 surface meshes in RAS millimeter coordinates.
   - Built single-stage 60fps Three.js canvas, Gate 3 rim-lit shaders with backface culling, bone peel slider ($0\text{–}100\%$), exploded view slider ($0\text{–}100\%$), 27-part ontology with Latin names and clinical pearls.

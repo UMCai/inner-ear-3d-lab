@@ -69,9 +69,19 @@ def main():
         shutil.copy2(src_obj, dst_obj)
         copied_meshes += 1
 
-    # Copy metadata, look-config, spline path, and fiducials
-    for fname in ["iemap_Metadata.json", "look-config.json", "posterior_canal_path.json"]:
-        shutil.copy2(src_iemap / fname, dst_iemap / fname)
+    # Copy metadata, look-config, spline paths, eye avatar, and fiducials
+    for fname in [
+        "iemap_Metadata.json",
+        "look-config.json",
+        "posterior_canal_path.json",
+        "horizontal_canal_path.json",
+        "anterior_canal_path.json",
+        "eye_avatar.glb",
+    ]:
+        src_file = src_iemap / fname
+        if src_file.exists():
+            shutil.copy2(src_file, dst_iemap / fname)
+
 
     for fcsv_file in sorted((src_iemap / "fcsv").glob("*.fcsv")):
         shutil.copy2(fcsv_file, dst_iemap_fcsv / fcsv_file.name)
