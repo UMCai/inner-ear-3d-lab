@@ -1,0 +1,12 @@
+{
+  "name": "radiant-darwin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Inner Ear 3D Lab (Gate 3 Medaium) - WebGL 3D Anatomy & Clinical Simulation Platform",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "preview": "npm --prefix web run preview"
+  }
+}

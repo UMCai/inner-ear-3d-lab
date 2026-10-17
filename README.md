@@ -1,8 +1,46 @@
-# Epley Maneuver for Right-Ear Posterior-Canal BPPV — Gate 3 3D Clinical & Anatomical Educational Video
+# Inner Ear 3D Lab (Gate 3 Medaium) & Epley Maneuver Simulation
 
-A reproducible, code-driven 1080p (`1920x1080`, `30 fps`, `110.20s`) clinical educational animation explaining and demonstrating the **Epley Maneuver (Canalith Repositioning Procedure) for Right-Ear Posterior-Canal BPPV** using the **Gate 3 (`Medaium-BPPV-001` / `lemo-opuscar`)** visual design language.
+An interactive WebGL 3D anatomy and clinical simulation platform, paired with a reproducible 1080p (`1920x1080`, `30 fps`, `110.20s`) clinical educational animation for the **Epley Maneuver (Canalith Repositioning Procedure) for Right-Ear Posterior-Canal BPPV** using the **Gate 3 (`Medaium-BPPV-001` / `lemo-opuscar`)** visual design language.
 
 ---
+
+## ⚡ Quick Start: Running the 3D Web Application
+
+The interactive web application runs on **Vite**, **TypeScript**, and **Three.js**, featuring real-time 3D anatomy exploration, Greenwood tonotopy audio synthesis, pure-tone audiometry, and virtual temporal bone CT multi-planar reformatting (MPR).
+
+### 1. Prerequisites
+- [Node.js](https://nodejs.org/) (v18+ recommended)
+- `npm`
+
+### 2. Launch Development Server
+
+Run directly from the repository root:
+```bash
+npm run dev
+```
+
+Or from the `web/` directory:
+```bash
+cd web
+npm install    # (only needed on initial clone)
+npm run dev
+```
+
+Open your browser at:
+👉 **http://127.0.0.1:5173/** (or http://localhost:5173/)
+
+### 3. Build & Preview
+
+```bash
+# Compile TypeScript & bundle production assets with Vite
+npm run build
+
+# Preview the production build locally
+npm run preview
+```
+
+---
+
 
 ## 1. Visual Architecture & Core Teaching Mechanism
 
@@ -69,8 +107,28 @@ $$\text{3/4 Clinical Patient Pose \& Doctor Layer} \;\longleftrightarrow\; \text
 
 ---
 
-## 4. Reproducible Build Commands
+## 4. Reproducible Build & Verification Commands
 
+### A. WebGL 3D Application (Interactive Atlas)
+```bash
+# 1. Start local dev server (Vite @ http://127.0.0.1:5173/)
+npm run dev
+# (or: cd web && npm run dev)
+
+# 2. Type-check & build production bundle
+npm run build
+# (or: cd web && npm run build)
+
+# 3. Preview production build
+npm run preview
+# (or: cd web && npm run preview)
+
+# 4. Run automated test suites (Hearing & Radiology engines)
+node scripts/test_hearing_engine.js
+node scripts/test_radiology_engine.js
+```
+
+### B. Headless Blender 5.2 LTS Editorial Video Pipeline
 ```bash
 # 1. Generate IE-Map meshes, fiducials, 3D canal centerline, and Gate 3 look-config.json
 /Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 src/anatomy/prepare_iemap.py

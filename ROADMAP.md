@@ -124,6 +124,9 @@ Enable medical students, ENT residents, and neuroradiologists to master multipla
 ### Objective
 Expand vestibular simulation beyond the posterior canal to encompass all 3 semicircular canals, complex BPPV maneuvers, caloric irrigation, and a synchronized 3D eye avatar demonstrating the vestibulo-ocular reflex.
 
+> **Blueprint & Derivation Spec:** [`docs/STAGE3_PLAN.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/STAGE3_PLAN.md)  
+> **Status:** Phase 3A Architecture & Preparation Active
+
 ### Task Breakdown
 - [ ] **Step 3.1: Multi-Canal BPPV & Maneuver Presets**:
   - Horizontal Canal BPPV: Geotropic (canalithiasis) and Apogeotropic (cupulolithiasis) with Gufoni maneuver and Lempert 360° Barbecue roll.
