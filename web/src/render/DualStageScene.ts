@@ -21,6 +21,15 @@ import {
   greenwoodPosition,
   interpolateGreenwoodXFromIntersection,
 } from '../data/greenwoodEngine';
+import {
+  RadiologyPlaneId,
+  CTWindowMode,
+  RADIOLOGY_PLANES,
+  RADIOLOGY_LANDMARKS,
+  SCDS_PARAMETERS,
+  getShaderClipUniforms,
+  SlicingPlaneDefinition,
+} from '../data/radiologyEngine';
 
 export type LabelDensityMode = 'off' | 'key' | 'all';
 export type ReadingDepth = 'simple' | 'detailed';
@@ -32,6 +41,15 @@ export interface HearingLabState {
   isPlaying: boolean;
   activePresetId: string | null;
   lossSector: [number, number] | null;
+}
+
+export interface RadiologyLabState {
+  activePlane: RadiologyPlaneId;
+  sliceDepthMm: number;
+  clipInverted: boolean;
+  showPlaneHelper: boolean;
+  scdsActive: boolean;
+  windowMode: CTWindowMode;
 }
 
 export interface ProjectedPin2D {
@@ -51,6 +69,7 @@ export interface ProjectedPin2D {
 export interface LabSceneSnapshot {
   labMode: LabMode;
   hearingState: HearingLabState;
+  radiologyState: RadiologyLabState;
   selectedMesh: string | null;
   hoveredMesh: string | null;
   visibilityMap: Record<string, VisibilityState>;
@@ -98,6 +117,8 @@ export class DualStageScene {
     toPos: THREE.Vector3;
     fromTarget: THREE.Vector3;
     toTarget: THREE.Vector3;
+    fromUp?: THREE.Vector3;
+    toUp?: THREE.Vector3;
   } | null = null;
 
   // Undo History Stack for Dissection Operations
@@ -110,12 +131,20 @@ export class DualStageScene {
     bonyPeelPercent: number;
     cameraPos: THREE.Vector3;
     controlsTarget: THREE.Vector3;
+    cameraUp: THREE.Vector3;
   } | null = null;
   private lossRangeVector = new THREE.Vector2(0, 0);
   private onHearingToneRequestCallbacks: Array<(freqHz: number) => void> = [];
   private static readonly DUMMY_CLIP_NORMAL = new THREE.Vector3(0, 0, -1);
   private tempRendererSize = new THREE.Vector2();
   private tempNDC = new THREE.Vector2();
+
+  // Radiology 3D Helpers & SCDS Visualizer
+  private radiologyPlaneHelperGroup: THREE.Group | null = null;
+  private scdsVisualizerGroup: THREE.Group | null = null;
+  private scdsWaveArcs: Array<{ mesh: THREE.Mesh; initialScale: number; phaseOffset: number }> = [];
+  private clipNormalVec = new THREE.Vector3(0, 0, 1);
+  private tempPlaneMatrix = new THREE.Matrix4();
 
   // Reactive State
   private state: LabSceneSnapshot = {
@@ -126,6 +155,14 @@ export class DualStageScene {
       isPlaying: false,
       activePresetId: null,
       lossSector: null,
+    },
+    radiologyState: {
+      activePlane: 'poschl',
+      sliceDepthMm: 1.2,
+      clipInverted: false,
+      showPlaneHelper: true,
+      scdsActive: false,
+      windowMode: 'bone',
     },
     selectedMesh: 'ls_Hsapiens_Sp',
     hoveredMesh: null,
@@ -227,6 +264,7 @@ export class DualStageScene {
     this.tonotopyCursorMesh.visible = false;
     this.labyrinthRoot.add(this.tonotopyCursorMesh);
 
+    this.initRadiology3DHelpers();
     this.setupPointerInteractions();
   }
 
@@ -336,7 +374,26 @@ export class DualStageScene {
     } = this.state;
 
     const isHearingMode = labMode === 'hearing';
+    const isRadiologyMode = labMode === 'radiology';
     const explodeFactor = explodePercent / 100.0;
+
+    // Radiology clipping uniforms calculation
+    let clipActive = false;
+    let clipNormal = DualStageScene.DUMMY_CLIP_NORMAL;
+    let clipConstant = 1000.0;
+
+    if (isRadiologyMode) {
+      clipActive = true;
+      const planeDef = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+      const clipUniforms = getShaderClipUniforms(
+        planeDef,
+        this.state.radiologyState.sliceDepthMm,
+        this.state.radiologyState.clipInverted
+      );
+      this.clipNormalVec.set(...clipUniforms.uClipNormal);
+      clipNormal = this.clipNormalVec;
+      clipConstant = clipUniforms.uClipConstant;
+    }
 
     for (const [meshName, entry] of this.meshEntries.entries()) {
       const { ontology, mesh, material, tetherLine, tetherPositions } = entry;
@@ -367,6 +424,15 @@ export class DualStageScene {
           // Vestibular system ghosted to 15% opacity
           effState = 'ghost';
           overrideOpacity = 0.15;
+        }
+      } else if (isRadiologyMode) {
+        // Outer Bony Capsule remains solid/translucent bone (85% opacity) to reveal internal cavities upon slicing
+        if (ontology.systemGroup === 'bony_capsule') {
+          effState = 'visible';
+          overrideOpacity = 0.85;
+        } else {
+          effState = 'visible';
+          overrideOpacity = Math.max(0.75, ontology.baseAlpha);
         }
       } else {
         // Outer Bone Shell Peel (0% = solid, 25-95% = transparent glass, >=96% = hidden)
@@ -423,9 +489,9 @@ export class DualStageScene {
         baseAlpha: ontology.baseAlpha,
         overrideOpacity,
         highlightLevel,
-        clipActive: false,
-        clipNormal: DualStageScene.DUMMY_CLIP_NORMAL,
-        clipConstant: 1000.0,
+        clipActive,
+        clipNormal,
+        clipConstant,
         tonotopyMode,
         activeGreenwoodX,
         waveAmplitude,
@@ -445,12 +511,20 @@ export class DualStageScene {
         this.tonotopyCursorMesh.visible = false;
       }
     }
+
+    // Update Radiology 3D Helpers
+    this.updateRadiologyHelpers();
   }
 
   // ===========================================================================
   // CAMERA FLY-TO ANIMATION
   // ===========================================================================
-  private startCameraFly(toPos: THREE.Vector3, toTarget: THREE.Vector3, durationMs = 500): void {
+  private startCameraFly(
+    toPos: THREE.Vector3,
+    toTarget: THREE.Vector3,
+    durationMs = 500,
+    toUp?: THREE.Vector3
+  ): void {
     this.flyAnim = {
       active: true,
       startTime: performance.now(),
@@ -459,6 +533,8 @@ export class DualStageScene {
       toPos,
       fromTarget: this.controls.target.clone(),
       toTarget,
+      fromUp: this.camera.up.clone(),
+      toUp: toUp ? toUp.clone() : undefined,
     };
   }
 
@@ -487,7 +563,8 @@ export class DualStageScene {
     this.startCameraFly(
       new THREE.Vector3(22.5, -10.5, 7.5),
       new THREE.Vector3(4.5, 1.5, 0.2),
-      500
+      500,
+      new THREE.Vector3(0, 0, 1)
     );
     this.state.isIsolated = false;
     const prevSelected = this.state.selectedMesh;
@@ -499,19 +576,48 @@ export class DualStageScene {
   }
 
   // ===========================================================================
-  // HEARING LAB & TONOTOPY ENGINE API
+  // LAB MODE TRANSITIONS (Anatomy Atlas, Hearing Tonotopy, Virtual Radiology)
   // ===========================================================================
   public setLabMode(mode: LabMode): void {
     if (this.state.labMode === mode) return;
 
-    if (mode === 'hearing') {
+    if (mode === 'radiology') {
       // Save current anatomy state for lossless restoration
-      this.savedAnatomyState = {
-        visibilityMap: { ...this.state.visibilityMap },
-        bonyPeelPercent: this.state.bonyPeelPercent,
-        cameraPos: this.camera.position.clone(),
-        controlsTarget: this.controls.target.clone(),
-      };
+      if (!this.savedAnatomyState) {
+        this.savedAnatomyState = {
+          visibilityMap: { ...this.state.visibilityMap },
+          bonyPeelPercent: this.state.bonyPeelPercent,
+          cameraPos: this.camera.position.clone(),
+          controlsTarget: this.controls.target.clone(),
+          cameraUp: this.camera.up.clone(),
+        };
+      }
+
+      this.state.labMode = 'radiology';
+
+      // If SCDS defect was already enabled, ensure Poschl plane
+      if (this.state.radiologyState.scdsActive) {
+        this.state.radiologyState.activePlane = 'poschl';
+      }
+
+      const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+      this.startCameraFly(
+        new THREE.Vector3(...plane.cameraPosRAS),
+        new THREE.Vector3(...plane.cameraTargetRAS),
+        550,
+        new THREE.Vector3(...plane.cameraUpRAS)
+      );
+    } else if (mode === 'hearing') {
+      // Save current anatomy state for lossless restoration
+      if (!this.savedAnatomyState) {
+        this.savedAnatomyState = {
+          visibilityMap: { ...this.state.visibilityMap },
+          bonyPeelPercent: this.state.bonyPeelPercent,
+          cameraPos: this.camera.position.clone(),
+          controlsTarget: this.controls.target.clone(),
+          cameraUp: this.camera.up.clone(),
+        };
+      }
 
       this.state.labMode = 'hearing';
       this.state.selectedMesh = 'mesh_david_cochlea';
@@ -519,7 +625,7 @@ export class DualStageScene {
       // Anterolateral cochlear perspective fly-to
       const targetRAS = new THREE.Vector3(1.77, 6.38, -2.96);
       const camPos = new THREE.Vector3(13.5, 14.0, 2.5);
-      this.startCameraFly(camPos, targetRAS, 550);
+      this.startCameraFly(camPos, targetRAS, 550, new THREE.Vector3(0, 0, 1));
     } else if (mode === 'anatomy') {
       this.state.labMode = 'anatomy';
       if (this.savedAnatomyState) {
@@ -528,7 +634,8 @@ export class DualStageScene {
         this.startCameraFly(
           this.savedAnatomyState.cameraPos,
           this.savedAnatomyState.controlsTarget,
-          500
+          500,
+          this.savedAnatomyState.cameraUp
         );
       }
     }
@@ -592,6 +699,228 @@ export class DualStageScene {
 
   public onHearingToneRequest(cb: (freqHz: number) => void): void {
     this.onHearingToneRequestCallbacks.push(cb);
+  }
+
+  // ===========================================================================
+  // VIRTUAL RADIOLOGY & SCDS ENGINE API
+  // ===========================================================================
+  private initRadiology3DHelpers(): void {
+    // 1. 3D Technical Cutting Plane Quad Helper (24x24 mm)
+    this.radiologyPlaneHelperGroup = new THREE.Group();
+
+    const planeGeom = new THREE.PlaneGeometry(24, 24);
+    const planeMat = new THREE.MeshBasicMaterial({
+      color: 0x52dcf2,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const planeMesh = new THREE.Mesh(planeGeom, planeMat);
+    this.radiologyPlaneHelperGroup.add(planeMesh);
+
+    const edges = new THREE.EdgesGeometry(planeGeom);
+    const edgeLine = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({
+        color: 0x52dcf2,
+        transparent: true,
+        opacity: 0.85,
+      })
+    );
+    this.radiologyPlaneHelperGroup.add(edgeLine);
+
+    // Subtle center crosshairs
+    const crossPoints = [
+      new THREE.Vector3(-12, 0, 0.01),
+      new THREE.Vector3(12, 0, 0.01),
+      new THREE.Vector3(0, -12, 0.01),
+      new THREE.Vector3(0, 12, 0.01),
+    ];
+    const crossGeom = new THREE.BufferGeometry().setFromPoints(crossPoints);
+    const crossLine = new THREE.LineSegments(
+      crossGeom,
+      new THREE.LineBasicMaterial({
+        color: 0x52dcf2,
+        transparent: true,
+        opacity: 0.35,
+      })
+    );
+    this.radiologyPlaneHelperGroup.add(crossLine);
+    this.radiologyPlaneHelperGroup.visible = false;
+    this.scene.add(this.radiologyPlaneHelperGroup);
+
+    // 2. SCDS 3D Defect Visualizer & Sound Shunting Arcs
+    this.scdsVisualizerGroup = new THREE.Group();
+
+    // Amber glowing collar around apex defect [3.85, 0.45, 4.30]
+    const apex = SCDS_PARAMETERS.apexRAS;
+    const collarGeom = new THREE.TorusGeometry(0.85, 0.16, 16, 32);
+    const collarMat = new THREE.MeshBasicMaterial({
+      color: 0xf0aa62,
+      transparent: true,
+      opacity: 0.95,
+      side: THREE.DoubleSide,
+    });
+    const collarMesh = new THREE.Mesh(collarGeom, collarMat);
+    collarMesh.position.set(apex[0], apex[1], apex[2]);
+    collarMesh.rotation.x = Math.PI * 0.45;
+    this.scdsVisualizerGroup.add(collarMesh);
+
+    // Canal roof beacon marker [5.72, 1.28, 7.56]
+    const roofApex = SCDS_PARAMETERS.canalRoofApexRAS;
+    const roofMarkerGeom = new THREE.SphereGeometry(0.32, 16, 16);
+    const roofMarkerMat = new THREE.MeshBasicMaterial({
+      color: 0xffb74d,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const roofMarker = new THREE.Mesh(roofMarkerGeom, roofMarkerMat);
+    roofMarker.position.set(roofApex[0], roofApex[1], roofApex[2]);
+    this.scdsVisualizerGroup.add(roofMarker);
+
+    // 3 Concentric acoustic sound dispersion arcs radiating towards middle cranial fossa (+Z)
+    for (let i = 0; i < 3; i++) {
+      const ringGeom = new THREE.RingGeometry(0.7, 0.95, 32, 1, 0, Math.PI);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xf0aa62,
+        transparent: true,
+        opacity: 0.65,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const arcMesh = new THREE.Mesh(ringGeom, ringMat);
+      arcMesh.position.set(apex[0], apex[1], apex[2] + 0.3);
+      arcMesh.rotation.x = -Math.PI * 0.35;
+      this.scdsVisualizerGroup.add(arcMesh);
+      this.scdsWaveArcs.push({
+        mesh: arcMesh,
+        initialScale: 1.0 + i * 0.45,
+        phaseOffset: i * 0.33,
+      });
+    }
+
+    this.scdsVisualizerGroup.visible = false;
+    this.scene.add(this.scdsVisualizerGroup);
+  }
+
+  private updateRadiologyHelpers(): void {
+    const isRadiology = this.state.labMode === 'radiology';
+
+    if (this.radiologyPlaneHelperGroup) {
+      if (isRadiology && this.state.radiologyState.showPlaneHelper) {
+        const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+        const s = this.state.radiologyState.sliceDepthMm;
+        this.tempPlaneMatrix.makeBasis(
+          new THREE.Vector3(...plane.inPlaneX),
+          new THREE.Vector3(...plane.inPlaneY),
+          new THREE.Vector3(...plane.normalRAS)
+        );
+        this.radiologyPlaneHelperGroup.setRotationFromMatrix(this.tempPlaneMatrix);
+        this.radiologyPlaneHelperGroup.position.set(
+          plane.centerRAS[0] + s * plane.normalRAS[0],
+          plane.centerRAS[1] + s * plane.normalRAS[1],
+          plane.centerRAS[2] + s * plane.normalRAS[2]
+        );
+        this.radiologyPlaneHelperGroup.visible = true;
+      } else {
+        this.radiologyPlaneHelperGroup.visible = false;
+      }
+    }
+
+    if (this.scdsVisualizerGroup) {
+      this.scdsVisualizerGroup.visible = isRadiology && this.state.radiologyState.scdsActive;
+    }
+  }
+
+  public setRadiologyPlane(planeId: RadiologyPlaneId): void {
+    const plane = RADIOLOGY_PLANES[planeId];
+    if (!plane) return;
+
+    this.state.radiologyState.activePlane = planeId;
+    this.state.radiologyState.sliceDepthMm = plane.defaultDepthMm;
+
+    this.startCameraFly(
+      new THREE.Vector3(...plane.cameraPosRAS),
+      new THREE.Vector3(...plane.cameraTargetRAS),
+      550,
+      new THREE.Vector3(...plane.cameraUpRAS)
+    );
+
+    this.applySceneStateToMeshes();
+    this.emitState();
+  }
+
+  public setRadiologyDepth(depthMm: number): void {
+    const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+    const clamped = Math.max(plane.minDepthMm, Math.min(plane.maxDepthMm, depthMm));
+    this.state.radiologyState.sliceDepthMm = clamped;
+
+    if (this.state.labMode === 'radiology') {
+      const clipUniforms = getShaderClipUniforms(
+        plane,
+        clamped,
+        this.state.radiologyState.clipInverted
+      );
+      // Fast O(1) in-place uniform update for 60fps scrubbing without GC
+      for (const entry of this.meshEntries.values()) {
+        entry.material.uniforms.uClipConstant.value = clipUniforms.uClipConstant;
+      }
+      this.updateRadiologyHelpers();
+    }
+
+    this.emitState();
+  }
+
+  public setRadiologyClipInverted(inverted: boolean): void {
+    this.state.radiologyState.clipInverted = inverted;
+    if (this.state.labMode === 'radiology') {
+      const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+      const clipUniforms = getShaderClipUniforms(
+        plane,
+        this.state.radiologyState.sliceDepthMm,
+        inverted
+      );
+      this.clipNormalVec.set(...clipUniforms.uClipNormal);
+      for (const entry of this.meshEntries.values()) {
+        entry.material.uniforms.uClipNormal.value.copy(this.clipNormalVec);
+        entry.material.uniforms.uClipConstant.value = clipUniforms.uClipConstant;
+      }
+    }
+    this.emitState();
+  }
+
+  public setRadiologyPlaneHelperVisible(visible: boolean): void {
+    this.state.radiologyState.showPlaneHelper = visible;
+    this.updateRadiologyHelpers();
+    this.emitState();
+  }
+
+  public setSCDSActive(active: boolean): void {
+    this.state.radiologyState.scdsActive = active;
+    if (active) {
+      // Snap to Pöschl's plane and +1.2 mm halo peak
+      this.state.radiologyState.activePlane = 'poschl';
+      this.state.radiologyState.sliceDepthMm = 1.2;
+      const plane = RADIOLOGY_PLANES.poschl;
+      this.startCameraFly(
+        new THREE.Vector3(...plane.cameraPosRAS),
+        new THREE.Vector3(...plane.cameraTargetRAS),
+        550,
+        new THREE.Vector3(...plane.cameraUpRAS)
+      );
+    }
+    this.applySceneStateToMeshes();
+    this.emitState();
+  }
+
+  public setCTWindowMode(mode: CTWindowMode): void {
+    this.state.radiologyState.windowMode = mode;
+    this.emitState();
+  }
+
+  public getRadiologyState(): RadiologyLabState {
+    return { ...this.state.radiologyState };
   }
 
   // ===========================================================================
@@ -1085,8 +1414,27 @@ export class DualStageScene {
           this.flyAnim.toTarget,
           ease
         );
+        if (this.flyAnim.fromUp && this.flyAnim.toUp) {
+          this.camera.up.lerpVectors(this.flyAnim.fromUp, this.flyAnim.toUp, ease).normalize();
+        }
         if (u >= 1.0) {
           this.flyAnim.active = false;
+        }
+      }
+
+      // Animate SCDS Sound Shunting Dispersion Waves
+      if (
+        this.state.labMode === 'radiology' &&
+        this.state.radiologyState.scdsActive &&
+        this.scdsWaveArcs.length > 0
+      ) {
+        const t = now * 0.0025;
+        for (const arc of this.scdsWaveArcs) {
+          const phase = (t + arc.phaseOffset) % 1.0;
+          const s = arc.initialScale + phase * 0.75;
+          arc.mesh.scale.set(s, s, s);
+          const mat = arc.mesh.material as THREE.MeshBasicMaterial;
+          mat.opacity = (1.0 - phase) * 0.65;
         }
       }
 

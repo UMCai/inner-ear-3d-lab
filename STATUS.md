@@ -1,6 +1,6 @@
 # Project Status: Inner Ear 3D Lab (Gate 3 Medaium)
 
-## Current Phase: Active — Stage 1 (Audio-Visual Tonotopy Engine & Hearing Lab) Complete & Verified
+## Current Phase: Active — Stage 2 (Virtual Temporal Bone Radiology & SCDS Third-Window) Complete & Verified
 
 ### WebGL Inner Ear 3D Lab Milestones
 - [x] **Stage 0: Pure 3D Anatomy Lab MVP**:
@@ -14,6 +14,14 @@
   - Dynamic tonotopy shader with 7-stop perceptual rainbow heatmap, von Békésy asymmetric traveling wave simulation, and audiogram pathology crimson desaturation mask.
   - Mode switcher (`[ 🏛️ Anatomy Atlas ] [ 🎵 Hearing & Tonotopy ]`), contextual bottom dock morphing to Hearing Workbench, and electrophysiology badges.
   - Automated verification: `scripts/test_hearing_engine.js` (100% pass across 7 suites) and `scripts/verify_mvp_cdp.js` (100% pass across 4 viewports with 0 errors).
+- [x] **Stage 2: Virtual Temporal Bone Radiology & SCDS Third-Window (Complete & Verified)**:
+  - Exposed GPU fragment shader analytic half-space clipping uniforms (`uClipActive`, `uClipNormal`, `uClipConstant`) across all 27 meshes in `DualStageScene.ts`.
+  - Implemented `web/src/data/radiologyEngine.ts`: 4 canonical clinical planes (Pöschl, Stenvers, Axial, Coronal) with right-handed orthonormal triads, continuous 100% landmark dictionary (0 gaps), GPU clip constant calculation, and SCDS defect definitions.
+  - Implemented `web/src/ui/CTSliceDrawer.ts`: Synchronized 2D CT MPR Canvas slice viewer with Bone Window ($W:4000, L:+700\text{ HU}$) and T2 MRI CISS modes, orientation tokens, 5 mm scale bar, interactive drag scrubbing, and SCDS defect caliper.
+  - Integrated Mode 3 `[ 🩻 Virtual Radiology ]` into Top Header switcher and contextual bottom dock in `AppHUD.ts` and `style.css` (plane chips, depth slider, landmark readout, flip cut, guide plane, SCDS toggle, CT card toggle).
+  - Implemented SCDS Third-Window Biomechanics box in Floating Inspector with Tullio phenomenon, Hennebert's sign, autophony, and link to SCDS audiogram preset in `AudiogramDrawer.ts`.
+  - Enforced strict drawer mutual exclusivity (CT drawer, Audiogram drawer, 27-Parts drawer).
+  - Verified 100% pass across: `test_radiology_engine.js` (52/52 tests), `test_hearing_engine.js` (7/7 suites), `npm run build` (0 errors), and `verify_mvp_cdp.js` across all 4 viewports with 0 console errors and generated visual screenshots.
 
 ### Headless Blender Editorial Video Milestones (Phase 0)
 - [x] **Authentic IE-Map v1.0.0 Asset Ingestion (`src/anatomy/prepare_iemap.py`, `src/anatomy/export_glb_and_preview.py`)**:

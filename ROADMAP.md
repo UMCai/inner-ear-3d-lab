@@ -12,8 +12,8 @@
 flowchart LR
     S0["Stage 0: Pure 3D Anatomy Lab<br/><b>[DONE]</b><br/>• 27 Authentic Meshes<br/>• Bone Peel & Explode<br/>• 60fps WebGL MVP"] 
     --> S1["Stage 1: Hearing & Tonotopy<br/><b>[DONE]</b><br/>• Greenwood Place Map<br/>• Web Audio Pure Tones<br/>• Interactive Audiogram<br/>• Mode Switcher"]
-    --> S2["Stage 2: Virtual Radiology<br/><b>[NEXT]</b><br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• SCDS Third-Window"]
-    --> S3["Stage 3: Vestibular & VOR<br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS Convection"]
+    --> S2["Stage 2: Virtual Radiology<br/><b>[DONE]</b><br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• 2D CT MPR Canvas<br/>• SCDS Third-Window"]
+    --> S3["Stage 3: Vestibular & VOR<br/><b>[NEXT]</b><br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS Convection"]
     --> S4["Stage 4: Surgical Scenarios<br/>• Cochlear Implant Insertion<br/>• Scalar Translocation Risk<br/>• Acoustic Neuroma Staging"]
 ```
 
@@ -77,25 +77,45 @@ Transform the static cochlea into an interactive frequency analyzer driven by th
 
 ---
 
-## Stage 2: Virtual Temporal Bone Radiology & SCDS Third-Window
+## Stage 2: Virtual Temporal Bone Radiology & SCDS Third-Window — ✅ COMPLETE
 
 ### Objective
-Enable medical students and ENT residents to master multiplanar CT/MRI cross-sections of the petrous temporal bone directly against the 3D anatomical model.
+Enable medical students, ENT residents, and neuroradiologists to master multiplanar CT/MRI cross-sections of the petrous temporal bone directly against the 3D anatomical model.
+
+> **Blueprint & Derivation Spec:** [`docs/STAGE2_PLAN.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/STAGE2_PLAN.md)  
+> **Verification Suite:** `scripts/test_radiology_engine.js` (52/52 tests passing)
 
 ### Task Breakdown
-- [ ] **Step 2.1: Analytic Shader Slicing Integration**:
-  - Expose the existing GLSL clipping plane uniforms in `gate3Materials.ts` to `DualStageScene.ts`.
-- [ ] **Step 2.2: Clinical Slicing Plane Presets**:
-  - **Pöschl's Plane**: Oblique sagittal parallel to the superior semicircular canal (gold standard for SSCD).
+- [x] **Step 2.1: Analytic Shader Slicing & 3D Helpers (`DualStageScene.ts`)**:
+  - Exposed $O(1)$ GPU fragment clipping plane uniforms (`uClipActive`, `uClipNormal`, `uClipConstant`) across all 27 meshes.
+  - Built 3D semi-transparent quad plane guide helper with Medaium cyan edge highlighting.
+  - Implemented smooth camera fly-to perspective angles along plane normals.
+  - Implemented SCDS 3D apical bone defect boundary with radiating acoustic sound wave arcs.
+- [x] **Step 2.2: Stereotaxic Radiology Engine (`web/src/data/radiologyEngine.ts`)**:
+  - **Pöschl's Plane**: Oblique sagittal parallel to the superior semicircular canal (gold standard for SSCD, default $+1.2\text{ mm}$ halo center).
   - **Stenvers' Plane**: Oblique coronal perpendicular to Pöschl's plane (profiles canal arch & vestibular aqueduct).
   - **True Axial Plane**: Horizontal canal signet ring and internal auditory canal (IAC).
-  - **True Coronal Plane**: Cochlear modiolus and round window niche.
-- [ ] **Step 2.3: Contextual CT Bottom Dock & Depth Slider**:
-  - Single depth slider scrubbing through the temporal bone with live millimeter readout.
-- [ ] **Step 2.4: Synchronized 2D CT Slice Card**:
-  - Side-by-side or docked mini-CT display showing corresponding authentic HRCT slices.
-- [ ] **Step 2.5: Superior Canal Dehiscence (SCDS) Defect Toggle**:
-  - Interactive bone defect toggle displaying acoustic/hydraulic sound shunting, Tullio phenomenon, and autophony.
+  - **True Coronal Plane**: Cochlear modiolus and round window niche (right-handed convention $\mathbf{u} = [-1, 0, 0]$ Medial).
+  - 100% continuous landmark dictionaries for all 4 planes with zero depth gaps.
+- [x] **Step 2.3: Contextual Radiology Bottom Dock & Controls (`AppHUD.ts`, `style.css`)**:
+  - Mode 3 switcher pill `[ 🩻 Virtual Radiology ]` in top header.
+  - 4 Segmented plane chips (`Pöschl`, `Stenvers`, `True Axial`, `True Coronal`).
+  - Continuous depth scrubber with live landmark readout and $\pm 0.5\text{ mm}$ step bump buttons.
+  - Quick action toggles: `[⇄ Flip Cut]`, `[📐 Guide Plane]`, `[⚡ SCDS Defect]`, and `[🩻 2D CT Card ▾]`.
+- [x] **Step 2.4: Synchronized 2D CT MPR Slice Drawer (`CTSliceDrawer.ts`)**:
+  - Docked $360\times 360$ ($720\times 720$ physical retina) 2D canvas cross-sectional slice viewer.
+  - Bone Window ($W:4000, L:+700\text{ HU}$) and T2 CISS MRI modes.
+  - Standard radiological orientation tokens (`AS`/`PI`, `PL`/`AM`, `A`/`P`/`M`/`L`, `S`/`I`/`L`/`M`).
+  - Precision 5 mm scale bar with 1 mm ticks and landmark crosshair.
+  - Bi-directional horizontal drag scrubbing synchronized with 3D cutting plane.
+- [x] **Step 2.5: Superior Canal Dehiscence (SCDS) Defect Simulation**:
+  - Interactive bone defect toggle displaying $1.5\text{ mm}$ apical bone roof breach on Pöschl view.
+  - Third-window biomechanics box in Floating Inspector detailing the clinical triad (Tullio phenomenon, Hennebert's sign, autophony).
+  - Link to SCDS Audiogram preset demonstrating the low-frequency pseudo-conductive air-bone gap.
+- [x] **Step 2.6: Verification & QA**:
+  - Mathematical & mesh unit test suite `scripts/test_radiology_engine.js` (52/52 tests passing 100%).
+  - Multi-viewport headless Chrome CDP test suite `scripts/verify_mvp_cdp.js` (Desktop $1440\times 900$, Desktop $1280\times 800$, Tablet $768\times 1024$, Mobile $390\times 844$) with 0 errors.
+  - Production build clean compile (`cd web && npm run build`, 0 TypeScript/Vite errors).
 
 ---
 

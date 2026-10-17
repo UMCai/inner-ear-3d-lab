@@ -56,6 +56,15 @@ export const AUDIOGRAM_PRESETS: Record<string, AudiogramPreset> = {
     lossSector: [0.0, 0.35], // < 1 kHz, apical turn
     description: 'Fluctuating low-frequency threshold shift at the compliant apex caused by endolymphatic hydrops pressure and Reissner’s membrane distension.',
   },
+  scds: {
+    id: 'scds',
+    title: 'SSCD Third Window',
+    shortLabel: 'SSCD',
+    subtitle: 'Low-frequency pseudo-conductive air-bone gap',
+    thresholds: { 125: 35, 250: 30, 500: 20, 1000: 15, 2000: 10, 4000: 10, 8000: 10 },
+    lossSector: [0.0, 0.25], // < 1 kHz, acoustic energy leakage
+    description: 'Third-window acoustic energy leakage causes low-frequency conductive loss on air conduction (25–30 dB HL at 250 Hz) while bone conduction remains supranormal (-5 to 0 dB HL).',
+  },
 };
 
 export class AudiogramDrawer {

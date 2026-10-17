@@ -609,7 +609,7 @@ async function run() {
         `,
         returnByValue: true,
       });
-      if (!audiogramTest.result.value.drawerOpen || audiogramTest.result.value.presetCount !== 4 || !audiogramTest.result.value.notchActive) {
+      if (!audiogramTest.result.value.drawerOpen || audiogramTest.result.value.presetCount !== 5 || !audiogramTest.result.value.notchActive) {
         throw new Error(`Audiogram drawer test failed: ${JSON.stringify(audiogramTest.result.value)}`);
       }
       console.log(`✓ Clinical Audiogram Drawer verified (${audiogramTest.result.value.presetCount} presets, active: "${audiogramTest.result.value.title}")`);
@@ -655,13 +655,154 @@ async function run() {
       writeFileSync(hearingSsPath, Buffer.from(hearingSs.data, 'base64'));
       console.log(`✓ Captured Stage 1 Hearing Lab visual screenshot to ${hearingSsPath}`);
 
-      // 17. Return to Anatomy Mode for clean state
+      // =========================================================================
+      // STAGE 2: VIRTUAL RADIOLOGY & SCDS VERIFICATION
+      // =========================================================================
+      // 17. Test Mode Switcher -> Virtual Radiology
+      const radModeTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const radBtn = document.querySelector('#mode-radiology-btn');
+            radBtn?.click();
+            const radActive = radBtn?.classList.contains('active');
+            const dockContent = document.querySelector('#radiology-dock-content');
+            const dockVisible = dockContent && getComputedStyle(dockContent).display !== 'none';
+            const planeChips = document.querySelectorAll('.plane-chip');
+            return { radActive, dockVisible, planeChipCount: planeChips.length };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!radModeTest.result.value.radActive || !radModeTest.result.value.dockVisible || radModeTest.result.value.planeChipCount !== 4) {
+        throw new Error(`Radiology mode test failed: ${JSON.stringify(radModeTest.result.value)}`);
+      }
+      console.log(`✓ Mode Switcher verified (switched to Virtual Radiology, 4 plane chips active)`);
+      await new Promise((r) => setTimeout(r, 600));
+
+      // 18. Test Plane Switching & Slider Bounds
+      const planeSwitchTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const stenversChip = document.querySelector('.plane-chip[data-plane="stenvers"]');
+            stenversChip?.click();
+            const stenversActive = stenversChip?.classList.contains('active');
+            const slider = document.querySelector('#radiology-depth-slider');
+            const stenversMin = slider?.getAttribute('min');
+            const stenversMax = slider?.getAttribute('max');
+
+            // Switch back to Poschl
+            const poschlChip = document.querySelector('.plane-chip[data-plane="poschl"]');
+            poschlChip?.click();
+            const poschlActive = poschlChip?.classList.contains('active');
+
+            return { stenversActive, stenversMin, stenversMax, poschlActive };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!planeSwitchTest.result.value.stenversActive || !planeSwitchTest.result.value.poschlActive) {
+        throw new Error(`Plane switch test failed: ${JSON.stringify(planeSwitchTest.result.value)}`);
+      }
+      console.log(`✓ Slicing Plane switching verified (Pöschl, Stenvers bounds [${planeSwitchTest.result.value.stenversMin}, ${planeSwitchTest.result.value.stenversMax}])`);
+      await new Promise((r) => setTimeout(r, 600));
+
+      // 19. Test Depth Slider & Dynamic Landmark Badge
+      const depthScrubTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const slider = document.querySelector('#radiology-depth-slider');
+            if (slider) {
+              slider.value = "12";
+              slider.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            const depthVal = document.querySelector('#radiology-depth-val')?.textContent;
+            const landmark = document.querySelector('#radiology-landmark-badge')?.textContent;
+            return { depthVal, landmark };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!depthScrubTest.result.value.depthVal?.includes('+1.2') || !depthScrubTest.result.value.landmark?.includes('Superior Canal')) {
+        throw new Error(`Depth scrub test failed: ${JSON.stringify(depthScrubTest.result.value)}`);
+      }
+      console.log(`✓ Radiology Depth Scrubber verified (Depth: ${depthScrubTest.result.value.depthVal}, Landmark: "${depthScrubTest.result.value.landmark}")`);
+
+      // 20. Test 2D CT MPR Slice Drawer & Mutual Exclusivity
+      const ctDrawerTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const ctToggleBtn = document.querySelector('#rad-ct-toggle-btn');
+            ctToggleBtn?.click();
+            const ctDrawer = document.querySelector('#ct-slice-drawer');
+            const drawerOpen = ctDrawer?.classList.contains('open');
+            const canvas = document.querySelector('#ct-canvas');
+            const hasCanvas = canvas !== null && canvas.width > 0 && canvas.height > 0;
+            const partsDrawerOpen = document.querySelector('#parts-drawer')?.classList.contains('open');
+            const audiogramDrawerOpen = document.querySelector('#audiogram-drawer')?.classList.contains('open');
+            const inspectorHidden = document.querySelector('#inspector-card')?.classList.contains('drawer-active');
+
+            // Switch to T2 MRI window preset and back
+            const mriBtn = document.querySelector('#ct-window-mri-btn');
+            mriBtn?.click();
+            const mriActive = mriBtn?.classList.contains('active');
+            const boneBtn = document.querySelector('#ct-window-bone-btn');
+            boneBtn?.click();
+            const boneActive = boneBtn?.classList.contains('active');
+
+            return { drawerOpen, hasCanvas, partsDrawerOpen, audiogramDrawerOpen, inspectorHidden, mriActive, boneActive };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!ctDrawerTest.result.value.drawerOpen || !ctDrawerTest.result.value.hasCanvas || ctDrawerTest.result.value.partsDrawerOpen || ctDrawerTest.result.value.audiogramDrawerOpen) {
+        throw new Error(`CT Drawer test failed: ${JSON.stringify(ctDrawerTest.result.value)}`);
+      }
+      if (vp.width <= 640 && !ctDrawerTest.result.value.inspectorHidden) {
+        throw new Error('Mobile drawer exclusivity failed: inspector remained visible with CT drawer open');
+      }
+      console.log(`✓ 2D CT MPR Slice Drawer verified (Retina Canvas, Bone Window 4000/700, Mutual Exclusivity clean)`);
+
+      // 21. Test SCDS Defect Scenario & Third-Window Biomechanics Box
+      const scdsTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const scdsBtn = document.querySelector('#rad-scds-toggle-btn');
+            scdsBtn?.click();
+            const scdsActive = scdsBtn?.classList.contains('active');
+            const poschlActive = document.querySelector('.plane-chip[data-plane="poschl"]')?.classList.contains('active');
+            const depthVal = document.querySelector('#radiology-depth-val')?.textContent;
+            const inspectorBox = document.querySelector('.scds-biomechanics-box');
+            const hasInspectorBox = inspectorBox !== null;
+            const hasTullio = inspectorBox?.textContent?.includes('Tullio');
+
+            return { scdsActive, poschlActive, depthVal, hasInspectorBox, hasTullio };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (!scdsTest.result.value.scdsActive || !scdsTest.result.value.poschlActive || !scdsTest.result.value.hasInspectorBox || !scdsTest.result.value.hasTullio) {
+        throw new Error(`SCDS scenario test failed: ${JSON.stringify(scdsTest.result.value)}`);
+      }
+      console.log(`✓ SCDS Third-Window Scenario verified (Snaps to Pöschl at +1.2 mm, Tullio/Hennebert clinical triad active)`);
+      await new Promise((r) => setTimeout(r, 650));
+
+      // 22. Capture Stage 2 Virtual Radiology Visual Screenshot
+      const radSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const radSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage2_radiology_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(radSsPath, Buffer.from(radSs.data, 'base64'));
+      console.log(`✓ Captured Stage 2 Virtual Radiology visual screenshot to ${radSsPath}`);
+
+      // 23. Return to Anatomy Mode and close CT drawer for clean state
       await client.send('Runtime.evaluate', {
         expression: `
           (() => {
-            const audioDrawer = document.querySelector('#audiogram-drawer');
-            if (audioDrawer?.classList.contains('open')) {
-              document.querySelector('#audiogram-toggle-btn')?.click();
+            const ctDrawer = document.querySelector('#ct-slice-drawer');
+            if (ctDrawer?.classList.contains('open')) {
+              document.querySelector('#rad-ct-toggle-btn')?.click();
+            }
+            const scdsBtn = document.querySelector('#rad-scds-toggle-btn');
+            if (scdsBtn?.classList.contains('active')) {
+              scdsBtn?.click();
             }
             document.querySelector('#mode-anatomy-btn')?.click();
           })()

@@ -45,6 +45,18 @@
 
 ---
 
+### 2026-10-15: Stage 2 — Virtual Temporal Bone Radiology & SCDS Third-Window (Completed & Verified)
+- **Objective:** Build an authentic temporal bone multiplanar reformation (MPR) engine and Superior Semicircular Canal Dehiscence (SCDS / Minor's Syndrome) third-window simulator.
+- **Key Milestones Achieved:**
+  - `web/src/data/radiologyEngine.ts`: Derived and validated 4 canonical clinical MPR planes (Pöschl, Stenvers, Axial, Coronal) using PCA on authentic IE-Map meshes. Enforced strict right-handed orthonormal triads $(\mathbf{u}, \mathbf{v}, \mathbf{n})$ where $\mathbf{u} \times \mathbf{v} = \mathbf{n}$ with Coronal $\mathbf{u} = [-1, 0, 0]$ (Medial) and unit-normalized normals. Built continuous 100% landmark tables across calibrated depth ranges.
+  - `web/src/render/DualStageScene.ts`: Exposed GPU fragment shader analytic half-space clipping uniforms (`uClipActive`, `uClipNormal`, `uClipConstant`) across all 27 meshes. Built 3D plane quad helper with Medaium cyan edge highlighting, camera fly-to perspective angles, and SCDS 3D apical defect with radiating acoustic wave visualization.
+  - `web/src/ui/CTSliceDrawer.ts`: Synchronized 2D CT MPR Canvas slice viewer ($360\times 360$ logical, $720\times 720$ physical retina) supporting Bone Window ($W:4000, L:+700\text{ HU}$) and T2 CISS MRI modes, standard orientation tokens (`AS`/`PI`, `PL`/`AM`, `A`/`P`/`M`/`L`, `S`/`I`/`L`/`M`), 5 mm precision scale bar, interactive drag scrubbing, and SCDS defect caliper.
+  - `web/src/ui/AppHUD.ts` & `web/src/style.css`: Mode 3 `[ 🩻 Virtual Radiology ]` in Top Header switcher, contextual bottom dock Radiology Workbench (plane chips, depth scrubber with live landmark readout, flip cut, guide plane, SCDS toggle, CT card toggle). SCDS Third-Window Biomechanics box in Floating Inspector (Tullio phenomenon, Hennebert's sign, autophony, and link to SCDS audiogram). Strict drawer mutual exclusivity.
+  - `web/src/ui/AudiogramDrawer.ts`: Added 5th clinical preset: SSCD Third Window (low-frequency pseudo-conductive air-bone gap).
+  - Automated verification: `scripts/test_radiology_engine.js` (52/52 tests passing 100%), `scripts/test_hearing_engine.js` (7/7 suites passing 100%), `npm run build` (0 errors), and `scripts/verify_mvp_cdp.js` (100% pass across all 4 viewports with 0 errors and visual screenshots captured).
+
+---
+
 ## 2. Key Architecture & Engineering Decisions (ADRs)
 
 ### ADR-001: Right-Anterior-Superior (RAS) Stereotaxic Coordinate Frame
@@ -71,6 +83,10 @@
 - **Decision:** 3D structure pins are calculated via Three.js vector projection to 2D HTML elements, equipped with raycast/depth buffer occlusion flags.
 - **Rationale:** Allows responsive, styled HTML typography for labels that automatically fade when a structure rotates behind opaque bone, avoiding 3D billboard texture blur.
 
+### ADR-006: Stereotaxic Multiplanar Reformatting (MPR) Planes & Coordinate Orthonormality
+- **Decision:** Derive all 4 clinical radiological planes using strict orthonormal triads $(\mathbf{u}, \mathbf{v}, \mathbf{n})$ where $\mathbf{u} \times \mathbf{v} = \mathbf{n}$ and unit-normalized normals ($\|\mathbf{n}\| = 1.0$), with uniform translation $u_{\text{ClipConstant}} = -(C \cdot \mathbf{n} + s)$ relative to otic capsule centroid $C = [4.40, 2.01, -0.31]\text{ mm}$.
+- **Rationale:** Prevents floating-point metric drift in GPU fragment shader clipping and guarantees that 2D CT canvas orientations (`AS`/`PI`, `PL`/`AM`, `A`/`P`/`M`/`L`, `S`/`I`/`L`/`M`) accurately reflect standard neuroradiology viewing conventions without mirror image inversions.
+
 ---
 
 ## 3. Directory & File Memory Map
@@ -88,7 +104,13 @@
 ├── docs/                   # Architectural & clinical design specifications
 │   ├── UI_DESIGN_SPEC.md   # Modal Workbench UI/UX spec & progressive disclosure
 │   ├── CLINICAL_PILLARS.md # 4 expansion pillars (Hearing, Vestibular, CT, Surgery)
+│   ├── STAGE2_PLAN.md      # Stage 2 implementation blueprint & mathematical derivations
 │   └── MEMORY.md           # This file: chronological memory & ADRs
+│
+├── scripts/                # Verification, headless test & render scripts
+│   ├── test_hearing_engine.js   # Stage 1 unit test suite (7 suites)
+│   ├── test_radiology_engine.js # Stage 2 mathematical & clinical verification (52 tests)
+│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test
 │
 ├── assets/
 │   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, paths, and metadata

@@ -14,10 +14,20 @@ import {
   LabSceneSnapshot,
   ProjectedPin2D,
   ReadingDepth,
+  RadiologyLabState,
 } from '../render/DualStageScene';
 import { ToneSynthesizer } from '../audio/ToneSynthesizer';
 import { AudiogramDrawer } from './AudiogramDrawer';
+import { CTSliceDrawer } from './CTSliceDrawer';
 import { getAcousticLandmark, getDistanceApexMm, greenwoodPosition } from '../data/greenwoodEngine';
+import {
+  RadiologyPlaneId,
+  CTWindowMode,
+  RADIOLOGY_PLANES,
+  RADIOLOGY_LANDMARKS,
+  SCDS_PARAMETERS,
+  getLandmarkForDepth,
+} from '../data/radiologyEngine';
 
 export class AppHUD {
   private root: HTMLElement;
@@ -29,6 +39,7 @@ export class AppHUD {
   // Mode Switcher Elements
   private modeAnatomyBtn!: HTMLButtonElement;
   private modeHearingBtn!: HTMLButtonElement;
+  private modeRadiologyBtn!: HTMLButtonElement;
 
   // Header Elements
   private searchInput!: HTMLInputElement;
@@ -46,6 +57,7 @@ export class AppHUD {
   private bottomBar!: HTMLElement;
   private anatomyDockContent!: HTMLElement;
   private hearingDockContent!: HTMLElement;
+  private radiologyDockContent!: HTMLElement;
 
   // Anatomy Dock Controls
   private boneSlider!: HTMLInputElement;
@@ -68,9 +80,23 @@ export class AppHUD {
   private audiogramToggleBtn!: HTMLButtonElement;
   private audiogramArrowEl!: HTMLElement;
 
-  // Hearing Services
+  // Radiology Workbench Dock Controls
+  private planeChips: HTMLButtonElement[] = [];
+  private radiologyDepthSlider!: HTMLInputElement;
+  private radiologyDepthValEl!: HTMLElement;
+  private radiologyLandmarkBadgeEl!: HTMLElement;
+  private depthDecBtn!: HTMLButtonElement;
+  private depthIncBtn!: HTMLButtonElement;
+  private radiologyFlipBtn!: HTMLButtonElement;
+  private radiologyGuideBtn!: HTMLButtonElement;
+  private radiologyScdsBtn!: HTMLButtonElement;
+  private radiologyCtToggleBtn!: HTMLButtonElement;
+  private ctCardArrowEl!: HTMLElement;
+
+  // Lab Services
   private toneSynth = ToneSynthesizer.getInstance();
   private audiogramDrawer!: AudiogramDrawer;
+  private ctSliceDrawer!: CTSliceDrawer;
 
   // Modals & Overlays
   private aboutModal!: HTMLElement;
@@ -190,6 +216,18 @@ export class AppHUD {
             >
               <span class="mode-icon">🎵</span>
               <span class="mode-label">Hearing &amp; Tonotopy</span>
+            </button>
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-radiology-btn"
+              role="tab"
+              aria-selected="false"
+              aria-controls="radiology-dock-content"
+              title="Virtual Temporal Bone Radiology &amp; SCDS Simulation"
+            >
+              <span class="mode-icon">🩻</span>
+              <span class="mode-label">Virtual Radiology</span>
             </button>
           </nav>
 
@@ -401,6 +439,97 @@ export class AppHUD {
               <span class="audiogram-arrow" id="audiogram-arrow">▸</span>
             </button>
           </div>
+
+          <!-- 4C. Radiology Workbench Dock Content -->
+          <div class="radiology-dock-content" id="radiology-dock-content" style="display: none;">
+            <!-- 4 Canonical Plane Selection Chips -->
+            <div class="radiology-plane-group" id="rad-plane-chips" role="group" aria-label="Radiological Slicing Planes">
+              <button type="button" class="plane-chip active" data-plane="poschl" title="Pöschl's Oblique Sagittal (Parallel to SSC)">
+                <span class="chip-icon">📐</span>
+                <span class="chip-label">Pöschl (SSCD)</span>
+              </button>
+              <button type="button" class="plane-chip" data-plane="stenvers" title="Stenvers' Oblique Coronal (Perpendicular to SSC)">
+                <span class="chip-icon">📐</span>
+                <span class="chip-label">Stenvers (Arch)</span>
+              </button>
+              <button type="button" class="plane-chip" data-plane="axial" title="True Axial Transverse MPR (Lateral Canal Signet Ring)">
+                <span class="chip-icon">📐</span>
+                <span class="chip-label">True Axial</span>
+              </button>
+              <button type="button" class="plane-chip" data-plane="coronal" title="True Coronal Frontal MPR (Cochlear Modiolus 2.5 Turns)">
+                <span class="chip-icon">📐</span>
+                <span class="chip-label">True Coronal</span>
+              </button>
+            </div>
+
+            <!-- Continuous Depth Slider & Live Landmark Badge -->
+            <div class="radiology-depth-wrap">
+              <div class="radiology-depth-header">
+                <span class="depth-title">Slice Depth</span>
+                <div class="depth-readout-cluster">
+                  <span class="depth-val" id="radiology-depth-val">+1.2 mm</span>
+                  <span class="depth-landmark-badge" id="radiology-landmark-badge">Superior Canal Osseous Halo (SSCD Gold Standard)</span>
+                </div>
+              </div>
+              <div class="depth-slider-row">
+                <button type="button" class="depth-bump-btn" id="depth-dec-btn" title="Step -0.5 mm">◀</button>
+                <input
+                  type="range"
+                  class="radiology-depth-slider"
+                  id="radiology-depth-slider"
+                  min="-90"
+                  max="90"
+                  value="12"
+                  aria-label="Radiology Slice Depth in Millimeters"
+                />
+                <button type="button" class="depth-bump-btn" id="depth-inc-btn" title="Step +0.5 mm">▶</button>
+              </div>
+            </div>
+
+            <!-- Action & Scenario Buttons -->
+            <div class="radiology-actions-group">
+              <button
+                type="button"
+                class="rad-action-btn"
+                id="rad-flip-btn"
+                title="Invert clipping half-space normal direction"
+              >
+                <span class="rad-btn-icon">⇄</span>
+                <span class="rad-btn-text">Flip Cut</span>
+              </button>
+
+              <button
+                type="button"
+                class="rad-action-btn active"
+                id="rad-guide-btn"
+                title="Toggle 3D semi-transparent cutting plane quad"
+              >
+                <span class="rad-btn-icon">📐</span>
+                <span class="rad-btn-text">Guide Plane</span>
+              </button>
+
+              <button
+                type="button"
+                class="rad-action-btn scds-toggle-btn"
+                id="rad-scds-toggle-btn"
+                title="Toggle Superior Canal Dehiscence Syndrome (1.5 mm apical defect &amp; third-window leak)"
+              >
+                <span class="rad-btn-icon">⚡</span>
+                <span class="rad-btn-text">SCDS Defect</span>
+              </button>
+
+              <button
+                type="button"
+                class="rad-action-btn ct-card-toggle-btn"
+                id="rad-ct-toggle-btn"
+                title="Toggle Synchronized 2D CT MPR Slice Drawer"
+              >
+                <span class="rad-btn-icon">🩻</span>
+                <span class="rad-btn-text">2D CT Card</span>
+                <span class="ct-card-arrow" id="ct-card-arrow">▾</span>
+              </button>
+            </div>
+          </div>
         </nav>
 
         <!-- Collapsible 27 Parts Drawer -->
@@ -478,6 +607,7 @@ export class AppHUD {
     this.pinsLayer = this.root.querySelector('#pins-layer') as HTMLElement;
     this.modeAnatomyBtn = this.root.querySelector('#mode-anatomy-btn') as HTMLButtonElement;
     this.modeHearingBtn = this.root.querySelector('#mode-hearing-btn') as HTMLButtonElement;
+    this.modeRadiologyBtn = this.root.querySelector('#mode-radiology-btn') as HTMLButtonElement;
     this.searchInput = this.root.querySelector('#search-input') as HTMLInputElement;
     this.searchClearBtn = this.root.querySelector('#search-clear-btn') as HTMLButtonElement;
     this.searchDropdown = this.root.querySelector('#search-dropdown') as HTMLElement;
@@ -487,6 +617,7 @@ export class AppHUD {
     this.bottomBar = this.root.querySelector('#bottom-bar') as HTMLElement;
     this.anatomyDockContent = this.root.querySelector('#anatomy-dock-content') as HTMLElement;
     this.hearingDockContent = this.root.querySelector('#hearing-dock-content') as HTMLElement;
+    this.radiologyDockContent = this.root.querySelector('#radiology-dock-content') as HTMLElement;
 
     // Anatomy Controls
     this.boneSlider = this.root.querySelector('#bone-peel-slider') as HTMLInputElement;
@@ -507,9 +638,38 @@ export class AppHUD {
     this.audiogramArrowEl = this.root.querySelector('#audiogram-arrow') as HTMLElement;
     this.octaveChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.octave-chip'));
 
-    // Audiogram Drawer Initialization
+    // Radiology Controls
+    this.planeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.plane-chip'));
+    this.radiologyDepthSlider = this.root.querySelector('#radiology-depth-slider') as HTMLInputElement;
+    this.radiologyDepthValEl = this.root.querySelector('#radiology-depth-val') as HTMLElement;
+    this.radiologyLandmarkBadgeEl = this.root.querySelector('#radiology-landmark-badge') as HTMLElement;
+    this.depthDecBtn = this.root.querySelector('#depth-dec-btn') as HTMLButtonElement;
+    this.depthIncBtn = this.root.querySelector('#depth-inc-btn') as HTMLButtonElement;
+    this.radiologyFlipBtn = this.root.querySelector('#rad-flip-btn, #radiology-flip-btn') as HTMLButtonElement;
+    this.radiologyGuideBtn = this.root.querySelector('#rad-guide-btn, #radiology-guide-btn') as HTMLButtonElement;
+    this.radiologyScdsBtn = this.root.querySelector('#rad-scds-toggle-btn, #radiology-scds-btn') as HTMLButtonElement;
+    this.radiologyCtToggleBtn = this.root.querySelector('#rad-ct-toggle-btn, #radiology-ct-toggle-btn') as HTMLButtonElement;
+    this.ctCardArrowEl = this.root.querySelector('#ct-card-arrow') as HTMLElement;
+
+    // Lab Drawers Initialization
     const labShell = this.root.querySelector('.lab-shell') as HTMLElement;
     this.audiogramDrawer = new AudiogramDrawer(labShell);
+    this.ctSliceDrawer = new CTSliceDrawer(labShell);
+
+    this.ctSliceDrawer.onDepthChange((depthMm) => {
+      this.scene.setRadiologyDepth(depthMm);
+      this.syncRadiologyDepthUI(depthMm);
+    });
+
+    this.ctSliceDrawer.onWindowModeChange((mode) => {
+      this.scene.setCTWindowMode(mode);
+    });
+
+    this.ctSliceDrawer.onClose(() => {
+      this.radiologyCtToggleBtn.classList.remove('open');
+      this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
+      this.ctCardArrowEl.textContent = '▾';
+    });
 
     this.aboutModal = this.root.querySelector('#about-modal') as HTMLElement;
     this.loadingOverlay = this.root.querySelector('#loading-overlay') as HTMLElement;
@@ -590,6 +750,10 @@ export class AppHUD {
       if (this.settingsOpen && !this.settingsPopover.contains(ev.target as Node) && !this.settingsBtn.contains(ev.target as Node)) {
         this.closeSettingsPopover();
       }
+    });
+
+    window.addEventListener('resize', () => {
+      this.updateMobileDrawerExclusivity();
     });
 
     // -------------------------------------------------------------------------
@@ -761,6 +925,79 @@ export class AppHUD {
     this.audiogramDrawer.onFrequencySelect((freqHz) => {
       this.handleFrequencyChange(freqHz, true);
     });
+
+    // -------------------------------------------------------------------------
+    // Radiology Workbench Controls
+    // -------------------------------------------------------------------------
+    this.modeRadiologyBtn.addEventListener('click', () => {
+      this.switchLabMode('radiology');
+    });
+
+    this.planeChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const planeId = chip.getAttribute('data-plane') as RadiologyPlaneId;
+        if (planeId) {
+          this.planeChips.forEach((c) => c.classList.toggle('active', c === chip));
+          this.scene.setRadiologyPlane(planeId);
+          const p = RADIOLOGY_PLANES[planeId];
+          this.radiologyDepthSlider.min = String(Math.round(p.minDepthMm * 10));
+          this.radiologyDepthSlider.max = String(Math.round(p.maxDepthMm * 10));
+          this.radiologyDepthSlider.value = String(Math.round(p.defaultDepthMm * 10));
+          this.syncRadiologyDepthUI(p.defaultDepthMm);
+        }
+      });
+    });
+
+    this.radiologyDepthSlider.addEventListener('input', () => {
+      const val = parseInt(this.radiologyDepthSlider.value, 10);
+      const depthMm = val / 10.0;
+      this.scene.setRadiologyDepth(depthMm);
+      this.syncRadiologyDepthUI(depthMm);
+    });
+
+    this.depthDecBtn.addEventListener('click', () => {
+      const current = this.scene.getSnapshot().radiologyState.sliceDepthMm;
+      const next = Math.round((current - 0.5) * 10) / 10;
+      this.scene.setRadiologyDepth(next);
+      this.syncRadiologyDepthUI(next);
+    });
+
+    this.depthIncBtn.addEventListener('click', () => {
+      const current = this.scene.getSnapshot().radiologyState.sliceDepthMm;
+      const next = Math.round((current + 0.5) * 10) / 10;
+      this.scene.setRadiologyDepth(next);
+      this.syncRadiologyDepthUI(next);
+    });
+
+    this.radiologyFlipBtn.addEventListener('click', () => {
+      const inverted = !this.scene.getSnapshot().radiologyState.clipInverted;
+      this.scene.setRadiologyClipInverted(inverted);
+      this.radiologyFlipBtn.classList.toggle('active', inverted);
+    });
+
+    this.radiologyGuideBtn.addEventListener('click', () => {
+      const visible = !this.scene.getSnapshot().radiologyState.showPlaneHelper;
+      this.scene.setRadiologyPlaneHelperVisible(visible);
+      this.radiologyGuideBtn.classList.toggle('active', visible);
+    });
+
+    this.radiologyScdsBtn.addEventListener('click', () => {
+      const active = !this.scene.getSnapshot().radiologyState.scdsActive;
+      this.scene.setSCDSActive(active);
+      this.radiologyScdsBtn.classList.toggle('active', active);
+      if (active) {
+        this.planeChips.forEach((c) =>
+          c.classList.toggle('active', c.getAttribute('data-plane') === 'poschl')
+        );
+        this.syncRadiologyDepthUI(1.2);
+        this.scene.selectStructure('ls_Hsapiens_Sa', false);
+      }
+      this.renderInspectorCard(this.scene.getSnapshot().selectedMesh);
+    });
+
+    this.radiologyCtToggleBtn.addEventListener('click', () => {
+      this.toggleCTDrawer();
+    });
   }
 
   // ===========================================================================
@@ -859,8 +1096,13 @@ export class AppHUD {
   // PARTS DRAWER TOGGLE
   // ===========================================================================
   private togglePartsDrawer(): void {
-    if (!this.partsDrawerOpen && this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
+    if (!this.partsDrawerOpen) {
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
     }
     this.partsDrawerOpen = !this.partsDrawerOpen;
     this.partsDrawer.classList.toggle('open', this.partsDrawerOpen);
@@ -870,9 +1112,7 @@ export class AppHUD {
     if (arrowEl) {
       arrowEl.textContent = this.partsDrawerOpen ? '▾' : '▸';
     }
-    if (window.innerWidth <= 640) {
-      this.inspectorCard.classList.toggle('drawer-active', this.partsDrawerOpen);
-    }
+    this.updateMobileDrawerExclusivity();
     try {
       localStorage.setItem(AppHUD.STORAGE_KEYS.partsDrawerOpen, String(this.partsDrawerOpen));
     } catch {
@@ -885,7 +1125,7 @@ export class AppHUD {
     this.partsDrawer.classList.remove('open');
     this.partsToggleBtn.classList.remove('open');
     this.partsToggleBtn.setAttribute('aria-expanded', 'false');
-    this.inspectorCard.classList.remove('drawer-active');
+    this.updateMobileDrawerExclusivity();
     const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
     if (arrowEl) {
       arrowEl.textContent = '▸';
@@ -897,6 +1137,18 @@ export class AppHUD {
     }
   }
 
+  private updateMobileDrawerExclusivity(): void {
+    if (window.innerWidth <= 640) {
+      const anyDrawerOpen =
+        this.partsDrawerOpen ||
+        (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) ||
+        (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen());
+      this.inspectorCard.classList.toggle('drawer-active', anyDrawerOpen);
+    } else {
+      this.inspectorCard.classList.remove('drawer-active');
+    }
+  }
+
   // ===========================================================================
   // AUDIOGRAM DRAWER TOGGLE & HEARING LAB HELPERS
   // ===========================================================================
@@ -904,10 +1156,28 @@ export class AppHUD {
     if (this.partsDrawerOpen) {
       this.closePartsDrawer();
     }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
     const isOpen = this.audiogramDrawer.toggle();
     this.audiogramToggleBtn.classList.toggle('open', isOpen);
     this.audiogramToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     this.audiogramArrowEl.textContent = isOpen ? '▾' : '▸';
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private openAudiogramDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    this.audiogramDrawer.open();
+    this.audiogramToggleBtn.classList.add('open');
+    this.audiogramToggleBtn.setAttribute('aria-expanded', 'true');
+    this.audiogramArrowEl.textContent = '▾';
+    this.updateMobileDrawerExclusivity();
   }
 
   private closeAudiogramDrawer(): void {
@@ -915,19 +1185,117 @@ export class AppHUD {
     this.audiogramToggleBtn.classList.remove('open');
     this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
     this.audiogramArrowEl.textContent = '▸';
+    this.updateMobileDrawerExclusivity();
+  }
+
+  // ===========================================================================
+  // 2D CT MPR DRAWER TOGGLE & RADIOLOGY WORKBENCH HELPERS
+  // ===========================================================================
+  private toggleCTDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    this.ctSliceDrawer.toggle();
+    const isOpen = this.ctSliceDrawer.getIsOpen();
+    this.radiologyCtToggleBtn.classList.toggle('open', isOpen);
+    this.radiologyCtToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    this.ctCardArrowEl.textContent = isOpen ? '▾' : '▸';
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private closeCTDrawer(): void {
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.ctSliceDrawer.close();
+      this.radiologyCtToggleBtn.classList.remove('open');
+      this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
+      this.ctCardArrowEl.textContent = '▸';
+      this.updateMobileDrawerExclusivity();
+    }
+  }
+
+  private syncRadiologyDepthUI(depthMm: number): void {
+    const snap = this.scene.getSnapshot();
+    const planeId = snap.radiologyState.activePlane;
+    const sign = depthMm > 0 ? '+' : '';
+    this.radiologyDepthValEl.textContent = `${sign}${depthMm.toFixed(1)} mm`;
+    const lm = getLandmarkForDepth(planeId, depthMm);
+    this.radiologyLandmarkBadgeEl.textContent = lm.label;
+    if (document.activeElement !== this.radiologyDepthSlider) {
+      this.radiologyDepthSlider.value = String(Math.round(depthMm * 10));
+    }
+    if (this.ctSliceDrawer) {
+      this.ctSliceDrawer.update(
+        planeId,
+        depthMm,
+        snap.radiologyState.scdsActive,
+        snap.radiologyState.windowMode
+      );
+    }
+  }
+
+  public syncRadiologyUI(radState: RadiologyLabState): void {
+    this.planeChips.forEach((chip) => {
+      chip.classList.toggle('active', chip.getAttribute('data-plane') === radState.activePlane);
+    });
+
+    const plane = RADIOLOGY_PLANES[radState.activePlane];
+    this.radiologyDepthSlider.min = String(Math.round(plane.minDepthMm * 10));
+    this.radiologyDepthSlider.max = String(Math.round(plane.maxDepthMm * 10));
+
+    this.radiologyFlipBtn.classList.toggle('active', radState.clipInverted);
+    this.radiologyGuideBtn.classList.toggle('active', radState.showPlaneHelper);
+    this.radiologyScdsBtn.classList.toggle('active', radState.scdsActive);
+
+    this.syncRadiologyDepthUI(radState.sliceDepthMm);
   }
 
   public switchLabMode(mode: LabMode): void {
-    if (mode === 'hearing') {
+    if (mode === 'radiology') {
       if (this.partsDrawerOpen) {
         this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.toneSynth.getIsPlaying()) {
+        this.toneSynth.pause();
+        this.scene.setHearingPlayback(false);
+        this.updateTonePlayButton(false);
+      }
+      this.scene.setLabMode('radiology');
+      this.modeAnatomyBtn.classList.remove('active');
+      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
+      this.modeHearingBtn.classList.remove('active');
+      this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeRadiologyBtn.classList.add('active');
+      this.modeRadiologyBtn.setAttribute('aria-selected', 'true');
+
+      this.anatomyDockContent.style.display = 'none';
+      this.hearingDockContent.style.display = 'none';
+      this.radiologyDockContent.style.display = 'flex';
+
+      const snap = this.scene.getSnapshot();
+      this.syncRadiologyUI(snap.radiologyState);
+    } else if (mode === 'hearing') {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
       }
       this.scene.setLabMode('hearing');
       this.modeAnatomyBtn.classList.remove('active');
       this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
+      this.modeRadiologyBtn.classList.remove('active');
+      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
       this.modeHearingBtn.classList.add('active');
       this.modeHearingBtn.setAttribute('aria-selected', 'true');
+
       this.anatomyDockContent.style.display = 'none';
+      this.radiologyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'flex';
 
       const snap = this.scene.getSnapshot();
@@ -935,6 +1303,9 @@ export class AppHUD {
     } else {
       if (this.audiogramDrawer.getIsOpen()) {
         this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
       }
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.pause();
@@ -944,9 +1315,13 @@ export class AppHUD {
       this.scene.setLabMode('anatomy');
       this.modeHearingBtn.classList.remove('active');
       this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeRadiologyBtn.classList.remove('active');
+      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
       this.modeAnatomyBtn.classList.add('active');
       this.modeAnatomyBtn.setAttribute('aria-selected', 'true');
+
       this.hearingDockContent.style.display = 'none';
+      this.radiologyDockContent.style.display = 'none';
       this.anatomyDockContent.style.display = 'flex';
     }
   }
@@ -1014,6 +1389,12 @@ export class AppHUD {
         ? item.physiologicalFunction
         : item.patientSummary;
 
+    const showSCDSBox =
+      snap.radiologyState.scdsActive ||
+      snap.labMode === 'radiology' ||
+      item.meshName === 'ls_Hsapiens_Sa' ||
+      item.meshName === 'segT2_th1.07_Otsu';
+
     this.inspectorCard.innerHTML = `
       <div class="inspector-header">
         <span class="system-badge" style="background: ${groupMeta?.accentHex ?? '#52dcf2'}22; color: ${groupMeta?.accentHex ?? '#52dcf2'}; border-color: ${groupMeta?.accentHex ?? '#52dcf2'}66;">
@@ -1067,6 +1448,50 @@ export class AppHUD {
             `
                 : ''
             }
+          </div>
+        </div>
+      `
+          : ''
+      }
+
+       ${
+        showSCDSBox
+          ? `
+        <div class="scds-biomechanics-box">
+          <div class="scds-box-header">
+            <span class="scds-icon">⚡</span>
+            <div class="scds-title-group">
+              <span class="scds-title">SSCD Third-Window Biomechanics</span>
+              <span class="scds-sub">Minor's Syndrome · Arcuate Eminence Defect (1.5 mm)</span>
+            </div>
+          </div>
+          <div class="scds-triad-grid">
+            <div class="scds-triad-item">
+              <div class="triad-item-header">
+                <span class="triad-icon">🔊</span>
+                <span class="triad-name">Tullio Phenomenon</span>
+              </div>
+              <p class="triad-desc">${SCDS_PARAMETERS.triad.tullio}</p>
+            </div>
+            <div class="scds-triad-item">
+              <div class="triad-item-header">
+                <span class="triad-icon">💨</span>
+                <span class="triad-name">Hennebert's Sign</span>
+              </div>
+              <p class="triad-desc">${SCDS_PARAMETERS.triad.hennebert}</p>
+            </div>
+            <div class="scds-triad-item">
+              <div class="triad-item-header">
+                <span class="triad-icon">👁️</span>
+                <span class="triad-name">Autophony &amp; Hyperacusis</span>
+              </div>
+              <p class="triad-desc">${SCDS_PARAMETERS.triad.autophony}</p>
+            </div>
+          </div>
+          <div class="scds-box-actions">
+            <button type="button" class="scds-audiogram-btn" id="scds-view-audiogram-btn">
+              📊 View SCDS Audiogram (Air-Bone Gap)
+            </button>
           </div>
         </div>
       `
@@ -1151,6 +1576,13 @@ export class AppHUD {
       this.searchInput.value = '';
       this.searchClearBtn.style.display = 'none';
       this.scene.resetView();
+    });
+
+    const scdsAudiogramBtn = this.inspectorCard.querySelector('#scds-view-audiogram-btn') as HTMLButtonElement;
+    scdsAudiogramBtn?.addEventListener('click', () => {
+      this.switchLabMode('hearing');
+      this.openAudiogramDrawer();
+      this.audiogramDrawer.setActivePreset('scds');
     });
 
     const accordionBtn = this.inspectorCard.querySelector('#accordion-toggle-btn') as HTMLButtonElement;
