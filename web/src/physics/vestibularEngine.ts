@@ -1212,36 +1212,36 @@ export class VestibularDynamicsEngine {
       if (this.canalId === 'posterior') {
         if (deltaEff > 0) {
           nystagmusState = 'Excitatory Upbeat-Torsional';
-          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: -25.0 * deltaEff, torsional: 25.0 * deltaEff };
+          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: -25.0 * deltaEff, torsional: -25.0 * deltaEff };
           fastPhaseBeatDirection = 'Upbeating + Right Torsional';
           ewaldLawActive = "Ewald's 3rd Law: Ampullofugal flow excites posterior canal";
         } else {
           nystagmusState = 'Inhibitory Reversal';
-          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: -25.0 * deltaEff, torsional: 25.0 * deltaEff };
+          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: -25.0 * deltaEff, torsional: -25.0 * deltaEff };
           fastPhaseBeatDirection = 'Downbeating + Left Torsional';
           ewaldLawActive = "Ewald's 3rd Law: Ampullopetal flow inhibits posterior canal";
         }
       } else if (this.canalId === 'horizontal') {
         if (deltaEff > 0) {
           nystagmusState = 'Excitatory Right-Beating (Geotropic)';
-          slowPhaseVelocityDegPerSec = { horizontal: 35.0 * deltaEff, vertical: 0, torsional: 0 };
+          slowPhaseVelocityDegPerSec = { horizontal: -35.0 * deltaEff, vertical: 0, torsional: 0 };
           fastPhaseBeatDirection = 'Right-Beating Horizontal (Geotropic)';
           ewaldLawActive = "Ewald's 2nd Law: Ampullopetal flow excites horizontal canal";
         } else {
           nystagmusState = 'Inhibitory Left-Beating (Apogeotropic)';
-          slowPhaseVelocityDegPerSec = { horizontal: 35.0 * deltaEff, vertical: 0, torsional: 0 };
+          slowPhaseVelocityDegPerSec = { horizontal: -35.0 * deltaEff, vertical: 0, torsional: 0 };
           fastPhaseBeatDirection = 'Left-Beating Horizontal (Apogeotropic)';
           ewaldLawActive = "Ewald's 2nd Law: Ampullofugal flow inhibits horizontal canal";
         }
       } else {
         if (deltaEff > 0) {
           nystagmusState = 'Excitatory Downbeat-Torsional';
-          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: 25.0 * deltaEff, torsional: 25.0 * deltaEff };
+          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: 25.0 * deltaEff, torsional: -25.0 * deltaEff };
           fastPhaseBeatDirection = 'Downbeating + Right Torsional';
           ewaldLawActive = "Ewald's 3rd Law: Ampullofugal flow excites anterior canal";
         } else {
           nystagmusState = 'Inhibitory Upbeat-Torsional';
-          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: 25.0 * deltaEff, torsional: 25.0 * deltaEff };
+          slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: 25.0 * deltaEff, torsional: -25.0 * deltaEff };
           fastPhaseBeatDirection = 'Upbeating + Left Torsional';
           ewaldLawActive = "Ewald's 3rd Law: Ampullopetal flow inhibits anterior canal";
         }

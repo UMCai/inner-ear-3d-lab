@@ -1,9 +1,17 @@
 # Project Status: Inner Ear 3D Lab (Gate 3 Medaium)
 
 ## Current Phase: Active — Stage 3 (Multi-Canal Vestibular Dynamics & 3D VOR Eye Avatar) In Progress
-### Current Milestone: Stage 3 — Step 2 (Multi-Canal BPPV Physics Engine) Complete & Verified
+### Current Milestone: Stage 3 — Step 3 (3D Eye Avatar & VOR Kinematics Engine) Complete & Verified
 
 ### WebGL Inner Ear 3D Lab Milestones
+- [x] **Stage 3 — Step 3: 3D Eye Avatar & VOR Kinematics Engine (`web/src/render/eyeAvatar.ts`) (Complete & Verified)**:
+  - Scene Graph & Asset Pipeline: Three.js GLTFLoader pipeline ingesting `assets/iemap/eye_avatar.glb` ($274.9\text{ kB}$), traversing and caching nodes (`EyeAvatarRoot`, `EyePivot_R`, `EyePivot_L`, `Iris_R`, `Iris_L`, `PupilBacking_R`, `PupilBacking_L`, `Sclera_R`, `Sclera_L`, and cornea meshes). Anterior perspective camera placed at $[0.0, 0.0, -0.22\text{ m}]$ looking toward $[0, 0, 0]$ with `camera.up.set(0, 1, 0)` matching the $-Z$ optical axis.
+  - 3-DOF Listing's Law Kinematics: Analytical single-axis Listing plane rotation ($\mathbf{u} = [\theta_v/\Theta, -\psi_h/\Theta, 0]$, $q_z \equiv 0$) with active vestibular cyclotorsion around $-Z$ ($\mathbf{q}_{\text{torsion}} = [0, 0, -\sin(\phi_t/2), \cos(\phi_t/2)]$).
+  - Bilateral Cyclovergent Coupling: Right extorsion ($+\phi_t$ temporal) and Left intorsion ($+\phi_t$ nasal) tilting both upper iris poles toward patient right ($+X$) during upbeat-right torsional nystagmus, conjugate horizontal yaw, conjugate vertical pitch.
+  - Sawtooth Nystagmus Waveform & Neural Integrator: Peripheral slow drift integration from `VestibularTelemetryState.slowPhaseVelocityDegPerSec`, central ballistic saccadic burst generator ($400\text{–}700^\circ/\text{s}$, $25\text{–}40\text{ ms}$, anti-parallel reset with $-10\%$ overshoot), retinal slip threshold ($3.0^\circ\text{–}6.0^\circ$), inter-saccadic timeout ($200\text{–}350\text{ ms}$), and brainstem neural integrator elastic leak ($\tau_{\text{leak}} = 0.8\text{ s}$).
+  - Infrared VNG Mode & P-CR Telemetry: Monochromatic NIR shader toggle ($850\text{–}940\text{ nm}$ luminance with high-contrast pupil isolation), 3D-to-2D pupil centroid projection $\oplus$, and closed-form paraxial Purkinje glint reflection $\ast$ on corneal sphere ($R_c = 7.8\text{ mm}$, virtual IR source at $[0.02, 0.04, -0.20\text{ m}]$).
+  - 60fps Zero-Allocation Ring Buffer: `NystagmogramRingBuffer` using pre-allocated typed arrays (`Float32Array(600)`, `Uint8Array(600)`) with scalar `push(time, h, v, t, spv, isFastPhase)` method and pre-allocated static scratch math buffers generating 0 per-frame heap allocations.
+  - Deep Verification Suite: Standalone Node.js ESM test suite `scripts/test_eye_avatar_vor.js` with 50 assertions across 7 test suites passing 100% (GLTF integrity, Listing's law, bilateral VOR, sawtooth dynamics, NIR telemetry, ring buffer, build integrity), integrated into root `package.json` (`npm run test:eye-avatar` and `npm test` passing all 4 suites).
 - [x] **Stage 3 — Step 2: Multi-Canal BPPV Physics Engine (`web/src/physics/vestibularEngine.ts`) (Complete & Verified)**:
   - 3-DOF Head Kinematics: Analytical orthonormal $R_{\text{head}}(\psi, \theta, \gamma) \in SO(3)$ with strict right-ear down ($\gamma = +90^\circ$) and left-ear down ($\gamma = -90^\circ$) lateral roll.
   - Multi-Canal Semicircular Dynamics: Continuous 3D Stokes sedimentation across all 3 canals (Posterior, Horizontal, Anterior) with stiction deadzone ($|g_{\text{proj}}| < 0.045$), terminal velocity bounding ($\le 48.0^\circ/\text{s}$), and 5-particle cloud tracking with utricular fan-out.

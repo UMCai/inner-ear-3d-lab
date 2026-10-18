@@ -81,9 +81,27 @@
   - Root `package.json`: Added `test:vestibular` and integrated into root `npm test`.
   - Verification: `npm test` (all 3 suites: hearing, radiology, vestibular passing 100%) and `npm run build` (clean 0 errors).
 
+### 2026-10-18: Stage 3 — Step 3: 3D Eye Avatar & VOR Kinematics Engine (Completed & Verified)
+- **Objective:** Construct the 3D ocular avatar and VOR kinematics engine driving authentic nystagmus (slow drift + resetting ballistic saccades) with 3-DOF Listing's law kinematics, bilateral cyclovergent coupling, and infrared VNG telemetry.
+- **Key Deliverables Achieved:**
+  - `web/src/render/eyeAvatar.ts`:
+    - Scene Graph & Asset Ingestion: Three.js GLTFLoader pipeline ingesting `assets/iemap/eye_avatar.glb` ($274.9\text{ kB}$), caching `EyeAvatarRoot`, `EyePivot_R`, `EyePivot_L`, `Iris_R`, `Iris_L`, `PupilBacking_R`, `PupilBacking_L`, `Sclera_R`, `Sclera_L`, and cornea meshes. Exposes both `load()` and `loadAvatar()` aliases. Camera positioned at $[0.0, 0.0, -0.22\text{ m}]$ looking towards $[0, 0, 0]$ with `camera.up.set(0, 1, 0)` matching the $-Z$ optical axis.
+    - 3-DOF Listing's Law Kinematics: Single-axis Listing plane rotation ($\mathbf{u} = [\theta_v/\Theta, -\psi_h/\Theta, 0]$, $q_z \equiv 0$) with active vestibular cyclotorsion around $-Z$ ($\mathbf{q}_{\text{torsion}} = [0, 0, -\sin(\phi_t/2), \cos(\phi_t/2)]$).
+    - Bilateral Cyclovergent Coupling: Right extorsion ($+\phi_t$ temporal) and Left intorsion ($+\phi_t$ nasal) tilting both upper poles rightward ($+X$) during upbeat-right torsional nystagmus, conjugate horizontal yaw, conjugate vertical pitch.
+    - Sawtooth Nystagmus Waveform & Neural Integrator: Slow drift integration from `VestibularTelemetryState.slowPhaseVelocityDegPerSec`, central ballistic saccadic burst generator ($400\text{–}700^\circ/\text{s}$, $25\text{–}40\text{ ms}$, anti-parallel reset with $-10\%$ overshoot), retinal slip threshold ($3.0^\circ\text{–}6.0^\circ$), inter-saccadic timeout ($200\text{–}350\text{ ms}$), and brainstem neural integrator elastic leak ($\tau_{\text{leak}} = 0.8\text{ s}$).
+    - Infrared VNG Mode & P-CR Telemetry: Monochromatic NIR shader toggle ($850\text{–}940\text{ nm}$ luminance with high-contrast pupil isolation), deduplicated material shader compilation preventing uniform redefinition errors, 3D-to-2D pupil centroid projection $\oplus$, and closed-form paraxial Purkinje glint reflection $\ast$ on corneal sphere ($R_c = 7.8\text{ mm}$, virtual IR source at $[0.02, 0.04, -0.20\text{ m}]$).
+    - 60fps Zero-Allocation Ring Buffer: `NystagmogramRingBuffer` using pre-allocated typed arrays (`Float32Array(600)`, `Uint8Array(600)`) with scalar `push(time, h, v, t, spv, isFastPhase)` method and pre-allocated static scratch math buffers generating 0 per-frame heap allocations.
+  - `scripts/test_eye_avatar_vor.js`: Standalone Node.js ESM test suite with 50 assertions across 7 test suites passing 100% (GLTF integrity, Listing's law, bilateral VOR, sawtooth dynamics, NIR telemetry, ring buffer, build integrity).
+  - Root `package.json`: Added `test:eye-avatar` and integrated into root `npm test`.
+  - Verification: `npm test` (all 4 suites: hearing, radiology, vestibular, eye-avatar passing 100%) and `npm run build` (clean 0 errors).
+
 ---
 
 ## 2. Key Architecture & Engineering Decisions (ADRs)
+
+### ADR-008: 3-DOF Listing's Law Kinematics & Sawtooth VOR Avatar Engine
+- **Decision:** Separate ocular rotations into single-axis Listing plane rotations ($q_z \equiv 0$) for visual fixations/saccades and active cyclotorsional rotations around $-Z$ ($\mathbf{q}_{\text{torsion}}$) for vestibular drive. Model bilateral cyclovergence directly with identical torsion angle ($\phi_t$) rotating both upper poles toward patient right, producing right extorsion and left intorsion.
+- **Rationale:** Prevents false kinematic gimbal torsion inherent in Euler angle compositions. Accurately simulates the physiological diagnostic hallmark of posterior canal BPPV (torsional-upbeating nystagmus with lateral iris crypt displacement) at 60fps with zero allocations.
 
 ### ADR-007: 3-DOF Head Kinematics & Two-Phase Steinhausen Plunger Model
 - **Decision:** Model 3-DOF head orientation via analytical $R_{\text{head}}(\psi, \theta, \gamma) = R_x(\theta) R_z(\psi) R_y(\gamma) \in SO(3)$ and cupular deflection via a two-phase ODE distinguishing active sediment drag coupling ($\kappa_{\text{drag}} = 2.2\text{ s}^{-1}$) from passive elastic restoration ($\tau_{\text{return}} = 1.8\text{ s}$) with Ewald asymmetry ($2.75\times$).
