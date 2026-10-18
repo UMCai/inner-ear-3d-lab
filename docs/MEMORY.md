@@ -67,9 +67,27 @@
   - Verification: Automated suite `scripts/test_canal_paths.py` (100% pass across 4 suites), `npm test` (hearing + radiology passing 100%), and `npm run build` (0 errors).
 
 
+### 2026-10-18: Stage 3 — Step 2: Multi-Canal BPPV Physics Engine (Completed & Verified)
+- **Objective:** Generalize the 2-DOF prototype simulator into a multi-canal, 3-DOF head kinematics, continuous Stokes sedimentation, and Steinhausen cupular plunger physics engine modeling Ewald's 2nd & 3rd laws and CN VIII neurophysiology across all 6 clinical maneuvers.
+- **Key Deliverables Achieved:**
+  - `web/src/physics/vestibularEngine.ts`:
+    - 3-DOF Analytical Head Kinematics: $R_{\text{head}}(\psi, \theta, \gamma) = R_x(\theta) R_z(\psi) R_y(\gamma) \in SO(3)$, correctly orienting $+X_{\text{head}}$ (right ear) to $-Z_{\text{world}}$ when $\gamma = +90^\circ$ (right-ear down decubitus) and to $+Z_{\text{world}}$ when $\gamma = -90^\circ$ (left-ear down decubitus). Reducible to 2-DOF prototype when $\gamma = 0^\circ$.
+    - Continuous 3D Stokes Sedimentation ODE: Overdamped terminal sedimentation $v_{\text{sed}} \propto g_{\text{proj}} = -t_{\text{world}, z}$ along continuous 3D RAS splines with viscous stiction deadzone ($|g_{\text{proj}}| < 0.045$), terminal velocity bounding ($\le 48.0^\circ/\text{s}$), and 5-particle cloud tracking with utricular fan-out.
+    - Steinhausen Cupular Plunger Model: Two-phase ODE with active fluid drag coupling ($\kappa_{\text{drag}} = 2.2\text{ s}^{-1}$) and authentic passive elastic restoration ($\tau_{\text{return}} = 1.8\text{ s}$), plus lumen-narrowing factors (duct: 1.0, crus: 0.35, utricle: 0.02).
+    - Ewald's 2nd & 3rd Laws Neurophysiology: CN VIII afferent firing rate ($10\dots 310\text{ sp/s}$, resting $90\text{ sp/s}$) respecting canal-specific polarities (horizontal ampullopetal excitatory; vertical ampullofugal excitatory) and authentic $2.75\times$ physiological asymmetry, driving 3D slow-phase eye velocity and fast-phase nystagmus vectors.
+    - 6 Clinical Maneuvers & Presets: Epley (5 steps), Semont (3 steps), Gufoni Geotropic (4 steps), Gufoni Apogeotropic (4 steps), Lempert 360° Barbecue Roll (5 steps), and Yacovino (4 steps).
+    - Backward Compatibility: Drop-in `RealtimeEpleySimulator` wrapper matching all static helpers, formulas, and legacy types, supporting flexible 4-arg and 5-arg `stepPhysics` calls without NaN corruption.
+  - `scripts/test_vestibular_engine.js`: Standalone Node.js ESM test suite with 72 assertions across 8 test suites passing 100%, deeply verifying SO(3) kinematics, multi-canal splines, Stokes ODE, Steinhausen plunger decay, Ewald's laws/CN VIII firing, and all 6 clinical maneuvers.
+  - Root `package.json`: Added `test:vestibular` and integrated into root `npm test`.
+  - Verification: `npm test` (all 3 suites: hearing, radiology, vestibular passing 100%) and `npm run build` (clean 0 errors).
+
 ---
 
 ## 2. Key Architecture & Engineering Decisions (ADRs)
+
+### ADR-007: 3-DOF Head Kinematics & Two-Phase Steinhausen Plunger Model
+- **Decision:** Model 3-DOF head orientation via analytical $R_{\text{head}}(\psi, \theta, \gamma) = R_x(\theta) R_z(\psi) R_y(\gamma) \in SO(3)$ and cupular deflection via a two-phase ODE distinguishing active sediment drag coupling ($\kappa_{\text{drag}} = 2.2\text{ s}^{-1}$) from passive elastic restoration ($\tau_{\text{return}} = 1.8\text{ s}$) with Ewald asymmetry ($2.75\times$).
+- **Rationale:** Supports true lateral side-lying maneuvers (Semont, Gufoni, Lempert Barbecue Roll) with exact gravitational projections ($g_{\text{proj}} = -t_{\text{world}, z}$ in $O(1)$) and accurately reproduces clinical nystagmus latency, crescendo, and decrescendo decay.
 
 ### ADR-001: Right-Anterior-Superior (RAS) Stereotaxic Coordinate Frame
 - **Decision:** All 27 anatomical meshes and 3D paths are anchored in millimeters using the standard medical RAS stereotaxic coordinate system.

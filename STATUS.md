@@ -1,9 +1,18 @@
 # Project Status: Inner Ear 3D Lab (Gate 3 Medaium)
 
 ## Current Phase: Active — Stage 3 (Multi-Canal Vestibular Dynamics & 3D VOR Eye Avatar) In Progress
-### Current Milestone: Stage 3 — Step 1 (Geometric & Asset Foundation) Complete & Verified
+### Current Milestone: Stage 3 — Step 2 (Multi-Canal BPPV Physics Engine) Complete & Verified
 
 ### WebGL Inner Ear 3D Lab Milestones
+- [x] **Stage 3 — Step 2: Multi-Canal BPPV Physics Engine (`web/src/physics/vestibularEngine.ts`) (Complete & Verified)**:
+  - 3-DOF Head Kinematics: Analytical orthonormal $R_{\text{head}}(\psi, \theta, \gamma) \in SO(3)$ with strict right-ear down ($\gamma = +90^\circ$) and left-ear down ($\gamma = -90^\circ$) lateral roll.
+  - Multi-Canal Semicircular Dynamics: Continuous 3D Stokes sedimentation across all 3 canals (Posterior, Horizontal, Anterior) with stiction deadzone ($|g_{\text{proj}}| < 0.045$), terminal velocity bounding ($\le 48.0^\circ/\text{s}$), and 5-particle cloud tracking with utricular fan-out.
+  - Steinhausen Cupular Plunger Model: Two-phase ODE with active drag coupling ($\kappa_{\text{drag}} = 2.2\text{ s}^{-1}$), passive elastic restoration ($\tau_{\text{return}} = 1.8\text{ s}$), and lumen-narrowing factors (duct: 1.0, crus: 0.35, utricle: 0.02).
+  - Ewald's 2nd & 3rd Laws Neurophysiology: CN VIII primary afferent firing rate ($10\dots 310\text{ sp/s}$, resting $90\text{ sp/s}$) respecting canal-specific polarities and $2.75\times$ physiological asymmetry, driving 3D slow-phase eye velocity and fast-phase nystagmus vectors.
+  - 6 Clinical Maneuvers & Presets: Epley (5 steps), Semont (3 steps), Gufoni Geotropic (4 steps), Gufoni Apogeotropic (4 steps), Lempert 360° Barbecue Roll (5 steps), and Yacovino (4 steps).
+  - Backward Compatibility: Drop-in `RealtimeEpleySimulator` wrapper matching all static helpers, formulas, and legacy types.
+  - Automated Deep Verification: Standalone Node.js ESM test suite `scripts/test_vestibular_engine.js` passing 100% (72/72 assertions across 8 suites), integrated into root `npm test` and `test:vestibular`, with clean production build (`npm run build`, 0 errors).
+
 - [x] **Stage 3 — Step 1: Geometric & Asset Foundation (Complete & Verified)**:
   - Generated continuous 3D centerline splines for all 3 semicircular canals: `horizontal_canal_path.json` ($150$ knots, $15.46\text{ mm}$, mean clearance $0.234\text{ mm}$) and `anterior_canal_path.json` ($150$ knots, $19.19\text{ mm}$, mean clearance $0.270\text{ mm}$), linking seamlessly to Common Crus and Utricle.
   - Exported authentic bilateral 3D eye avatar `assets/iemap/eye_avatar.glb` ($274.9\text{ kB}$) with physiological $PD = 62.0\text{ mm}$, $24.0\text{ mm}$ globe diameter, transparent cornea dome, and $32$ procedural high-contrast radial iris crypts for unmistakable cyclotorsion tracking.

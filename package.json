@@ -10,7 +10,8 @@
     "preview": "npm --prefix web run preview",
     "test:hearing": "node scripts/test_hearing_engine.js",
     "test:radiology": "node scripts/test_radiology_engine.js",
-    "test": "npm run test:hearing && npm run test:radiology"
+    "test:vestibular": "node scripts/test_vestibular_engine.js",
+    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular"
   }
 }
 
