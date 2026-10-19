@@ -12,7 +12,8 @@
     "test:radiology": "node scripts/test_radiology_engine.js",
     "test:vestibular": "node scripts/test_vestibular_engine.js",
     "test:eye-avatar": "node scripts/test_eye_avatar_vor.js",
-    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular && npm run test:eye-avatar"
+    "test:workbench": "node scripts/test_vor_workbench.js",
+    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular && npm run test:eye-avatar && npm run test:workbench"
   }
 }
 

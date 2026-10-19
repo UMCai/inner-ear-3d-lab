@@ -792,10 +792,240 @@ async function run() {
       writeFileSync(radSsPath, Buffer.from(radSs.data, 'base64'));
       console.log(`✓ Captured Stage 2 Virtual Radiology visual screenshot to ${radSsPath}`);
 
-      // 23. Return to Anatomy Mode and close CT drawer for clean state
+      // =========================================================================
+      // 23. Test Mode Switcher -> Vestibular & VOR Lab (Mode 4)
+      const vestModeTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const vestBtn = document.querySelector('#mode-vestibular-btn');
+            vestBtn?.click();
+            const vestActive = vestBtn?.classList.contains('active');
+            const dockContent = document.querySelector('#vestibular-dock-content');
+            const dockVisible = dockContent && getComputedStyle(dockContent).display !== 'none';
+            const chips = document.querySelectorAll('.protocol-chip');
+            const radDockHidden = document.querySelector('#radiology-dock-content')?.style.display === 'none';
+            const hearingDockHidden = document.querySelector('#hearing-dock-content')?.style.display === 'none';
+            const ctDrawerClosed = !document.querySelector('#ct-slice-drawer')?.classList.contains('open');
+            return { vestActive, dockVisible, chipCount: chips.length, radDockHidden, hearingDockHidden, ctDrawerClosed };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (
+        !vestModeTest.result.value.vestActive ||
+        !vestModeTest.result.value.dockVisible ||
+        vestModeTest.result.value.chipCount !== 6 ||
+        !vestModeTest.result.value.ctDrawerClosed
+      ) {
+        throw new Error(`Vestibular mode test failed: ${JSON.stringify(vestModeTest.result.value)}`);
+      }
+      console.log(`✓ Mode Switcher verified (switched to Vestibular & VOR, 6 maneuver chips, CT closed)`);
+      await new Promise((r) => setTimeout(r, 600));
+
+      // 24. Test Maneuver Protocol Switching & Dynamic Step Slider Bounds
+      const maneuverSwitchTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const semontChip = document.querySelector('.protocol-chip[data-maneuver="semont"]');
+            semontChip?.click();
+            const semontActive = semontChip?.classList.contains('active');
+            const slider = document.querySelector('#vest-step-slider');
+            const semontMax = slider?.getAttribute('max');
+
+            // Switch to Barbecue Roll
+            const bqChip = document.querySelector('.protocol-chip[data-maneuver="barbecue_roll"]');
+            bqChip?.click();
+            const bqActive = bqChip?.classList.contains('active');
+            const bqMax = slider?.getAttribute('max');
+
+            // Switch back to Epley
+            const epleyChip = document.querySelector('.protocol-chip[data-maneuver="epley"]');
+            epleyChip?.click();
+            const epleyActive = epleyChip?.classList.contains('active');
+            const epleyMax = slider?.getAttribute('max');
+
+            return { semontActive, semontMax, bqActive, bqMax, epleyActive, epleyMax };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (
+        !maneuverSwitchTest.result.value.semontActive ||
+        maneuverSwitchTest.result.value.semontMax !== '2' ||
+        !maneuverSwitchTest.result.value.bqActive ||
+        maneuverSwitchTest.result.value.bqMax !== '4' ||
+        !maneuverSwitchTest.result.value.epleyActive ||
+        maneuverSwitchTest.result.value.epleyMax !== '4'
+      ) {
+        throw new Error(`Maneuver switch test failed: ${JSON.stringify(maneuverSwitchTest.result.value)}`);
+      }
+      console.log(`✓ Clinical Maneuver switching verified (Semont 3-step, Barbecue 5-step, Epley 5-step)`);
+      await new Promise((r) => setTimeout(r, 600));
+
+      // 25. Test Timeline Step Bump & Sequencer Play/Pause
+      const sequencerTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const nextBtn = document.querySelector('#vest-step-next-btn');
+            nextBtn?.click();
+            const sliderVal = document.querySelector('#vest-step-slider')?.value;
+            const holdTimer = document.querySelector('#vest-hold-timer-badge')?.textContent;
+
+            // Test play sequencer toggle
+            const playBtn = document.querySelector('#vest-play-btn');
+            playBtn?.click();
+            const isPlaying = playBtn?.classList.contains('playing');
+            const playIcon = document.querySelector('#vest-play-icon')?.textContent;
+
+            // Pause sequencer
+            playBtn?.click();
+            const isPaused = !playBtn?.classList.contains('playing');
+            const pauseIcon = document.querySelector('#vest-play-icon')?.textContent;
+
+            // Reset back to step 0
+            document.querySelector('#vest-reset-btn')?.click();
+            const resetVal = document.querySelector('#vest-step-slider')?.value;
+
+            return { sliderVal, holdTimer, isPlaying, playIcon, isPaused, pauseIcon, resetVal };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (
+        sequencerTest.result.value.sliderVal !== '1' ||
+        !sequencerTest.result.value.holdTimer?.includes('45s') ||
+        !sequencerTest.result.value.isPlaying ||
+        sequencerTest.result.value.playIcon !== '⏸' ||
+        !sequencerTest.result.value.isPaused ||
+        sequencerTest.result.value.pauseIcon !== '▶' ||
+        sequencerTest.result.value.resetVal !== '0'
+      ) {
+        throw new Error(`Sequencer test failed: ${JSON.stringify(sequencerTest.result.value)}`);
+      }
+      console.log(`✓ Timeline scrubber, bump controls, and auto-play sequencer verified`);
+
+      // 26. Test Interactive 3-Axis Head Gyro Flyout
+      const gyroTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const gyroBtn = document.querySelector('#vest-gyro-toggle-btn');
+            gyroBtn?.click();
+            const flyout = document.querySelector('#gyro-flyout');
+            const flyoutOpen = flyout && getComputedStyle(flyout).display !== 'none';
+
+            const yawSlider = document.querySelector('#gyro-yaw-slider');
+            const pitchSlider = document.querySelector('#gyro-pitch-slider');
+            const rollSlider = document.querySelector('#gyro-roll-slider');
+            if (yawSlider && pitchSlider && rollSlider) {
+              yawSlider.value = "45";
+              yawSlider.dispatchEvent(new Event('input', { bubbles: true }));
+              pitchSlider.value = "30";
+              pitchSlider.dispatchEvent(new Event('input', { bubbles: true }));
+              rollSlider.value = "-15";
+              rollSlider.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            const yawVal = document.querySelector('#gyro-yaw-val')?.textContent;
+            const pitchVal = document.querySelector('#gyro-pitch-val')?.textContent;
+            const rollVal = document.querySelector('#gyro-roll-val')?.textContent;
+
+            // Close gyro
+            document.querySelector('#gyro-close-btn')?.click();
+            const flyoutClosed = flyout?.style.display === 'none';
+
+            return { flyoutOpen, yawVal, pitchVal, rollVal, flyoutClosed };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (
+        !gyroTest.result.value.flyoutOpen ||
+        !gyroTest.result.value.yawVal?.includes('45°') ||
+        !gyroTest.result.value.pitchVal?.includes('30°') ||
+        !gyroTest.result.value.rollVal?.includes('-15°') ||
+        !gyroTest.result.value.flyoutClosed
+      ) {
+        throw new Error(`Gyro test failed: ${JSON.stringify(gyroTest.result.value)}`);
+      }
+      console.log(`✓ Interactive 3-Axis Head Gyro verified (Yaw +45°, Pitch +30°, Roll -15°)`);
+
+      // 27. Test Docked 3D VOR Eye Avatar & Clinical VNG Drawer
+      const vorDrawerTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const vorBtn = document.querySelector('#vest-vor-toggle-btn');
+            vorBtn?.click();
+            const vorDrawer = document.querySelector('#vor-drawer');
+            const drawerOpen = vorDrawer?.classList.contains('open');
+
+            const avatarCanvas = document.querySelector('#vor-avatar-canvas');
+            const stripCanvas = document.querySelector('#vor-strip-canvas');
+            const hasAvatarCanvas = avatarCanvas !== null && avatarCanvas.width > 0 && avatarCanvas.height > 0;
+            const hasStripCanvas = stripCanvas !== null && stripCanvas.width > 0 && stripCanvas.height > 0;
+
+            // Test NIR toggle
+            const modeToggleBtn = document.querySelector('#vor-mode-toggle-btn');
+            modeToggleBtn?.click();
+            const nirActive = vorDrawer?.classList.contains('nir-active');
+            const modeLabel = document.querySelector('#vor-mode-label')?.textContent;
+
+            // Toggle back to Natural
+            modeToggleBtn?.click();
+            const naturalActive = !vorDrawer?.classList.contains('nir-active');
+
+            // 4-way Drawer Mutual Exclusivity: opening CTSliceDrawer should close VORDrawer
+            document.querySelector('#rad-ct-toggle-btn')?.click();
+            const vorClosedByCt = !vorDrawer?.classList.contains('open');
+
+            // Re-open VORDrawer should close CT
+            vorBtn?.click();
+            const vorReopened = vorDrawer?.classList.contains('open');
+            const ctClosedByVor = !document.querySelector('#ct-slice-drawer')?.classList.contains('open');
+
+            return {
+              drawerOpen,
+              hasAvatarCanvas,
+              hasStripCanvas,
+              nirActive,
+              modeLabel,
+              naturalActive,
+              vorClosedByCt,
+              vorReopened,
+              ctClosedByVor,
+            };
+          })()
+        `,
+        returnByValue: true,
+      });
+      if (
+        !vorDrawerTest.result.value.drawerOpen ||
+        !vorDrawerTest.result.value.hasAvatarCanvas ||
+        !vorDrawerTest.result.value.hasStripCanvas ||
+        !vorDrawerTest.result.value.nirActive ||
+        !vorDrawerTest.result.value.modeLabel?.includes('NIR') ||
+        !vorDrawerTest.result.value.naturalActive ||
+        !vorDrawerTest.result.value.vorClosedByCt ||
+        !vorDrawerTest.result.value.vorReopened ||
+        !vorDrawerTest.result.value.ctClosedByVor
+      ) {
+        throw new Error(`VOR Drawer test failed: ${JSON.stringify(vorDrawerTest.result.value)}`);
+      }
+      console.log(`✓ 3D VOR Eye Avatar & Clinical VNG Drawer verified (Retina Avatars, Strip Chart, NIR Goggles, 4-Way Exclusivity)`);
+      await new Promise((r) => setTimeout(r, 650));
+
+      // 28. Capture Stage 3 Vestibular & VOR Visual Screenshot
+      const vestSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const vestSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_vestibular_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(vestSsPath, Buffer.from(vestSs.data, 'base64'));
+      console.log(`✓ Captured Stage 3 Vestibular & VOR visual screenshot to ${vestSsPath}`);
+
+      // 29. Return to Anatomy Mode and close drawers for clean state
       await client.send('Runtime.evaluate', {
         expression: `
           (() => {
+            const vorDrawer = document.querySelector('#vor-drawer');
+            if (vorDrawer?.classList.contains('open')) {
+              document.querySelector('#vest-vor-toggle-btn')?.click();
+            }
             const ctDrawer = document.querySelector('#ct-slice-drawer');
             if (ctDrawer?.classList.contains('open')) {
               document.querySelector('#rad-ct-toggle-btn')?.click();

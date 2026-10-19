@@ -779,6 +779,249 @@ body,
   color: #fff;
 }
 
+/* Vestibular Telemetry & Afferent Firing Gauge Box in Inspector */
+.vestibular-telemetry-box {
+  background: rgba(10, 20, 28, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vest-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(82, 220, 242, 0.15);
+  padding-bottom: 5px;
+}
+
+.vest-box-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.vest-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.vest-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.vest-sub {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.vest-metrics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.cn8-gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cn8-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+}
+
+.cn8-label {
+  color: var(--text-muted);
+}
+
+.cn8-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.cn8-val.rate-resting {
+  color: var(--cyan);
+}
+
+.cn8-val.rate-excitation {
+  color: var(--warm);
+}
+
+.cn8-val.rate-inhibition {
+  color: #a78bfa;
+}
+
+.cn8-bar-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(17, 30, 38, 0.9);
+  border: 1px solid rgba(82, 220, 242, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cn8-bar-baseline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 2;
+}
+
+.cn8-bar-fill {
+  height: 100%;
+  transition: width 0.15s ease;
+}
+
+.cn8-bar-fill.fill-resting {
+  background: var(--cyan);
+}
+
+.cn8-bar-fill.fill-excitation {
+  background: linear-gradient(90deg, var(--cyan), var(--warm));
+}
+
+.cn8-bar-fill.fill-inhibition {
+  background: #a78bfa;
+}
+
+.cn8-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.ewald-law-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(82, 220, 242, 0.08);
+  border-left: 2px solid var(--cyan);
+  padding: 4px 6px;
+  border-radius: 0 4px 4px 0;
+}
+
+.ewald-icon {
+  font-size: 11px;
+}
+
+.ewald-text {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.vest-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.vest-status-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.vest-status-badge.sensation-calm {
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #4ade80;
+}
+
+.vest-status-badge.sensation-spinning {
+  background: rgba(240, 170, 98, 0.18);
+  border: 1px solid rgba(240, 170, 98, 0.5);
+  color: var(--warm);
+  animation: pulseSpin 1.5s infinite alternate;
+}
+
+@keyframes pulseSpin {
+  from { opacity: 0.8; }
+  to { opacity: 1; box-shadow: 0 0 8px rgba(240, 170, 98, 0.4); }
+}
+
+.vest-status-badge.sensation-cleared {
+  background: rgba(82, 220, 242, 0.2);
+  border: 1px solid rgba(82, 220, 242, 0.5);
+  color: var(--cyan);
+}
+
+.vest-clearance-pill {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.vest-clearance-pill strong {
+  color: #4ade80;
+}
+
+.vest-pearl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(17, 30, 38, 0.7);
+  padding: 4px 6px;
+  border-radius: 4px;
+  border-left: 2px solid var(--warm);
+}
+
+.vest-pearl-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--warm);
+  text-transform: uppercase;
+}
+
+.vest-pearl-desc {
+  font-size: 9px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.vest-box-actions {
+  display: flex;
+  margin-top: 2px;
+}
+
+.vest-view-vor-btn {
+  width: 100%;
+  background: rgba(82, 220, 242, 0.14);
+  border: 1px solid rgba(82, 220, 242, 0.35);
+  border-radius: 6px;
+  color: var(--cyan);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.vest-view-vor-btn:hover {
+  background: rgba(82, 220, 242, 0.25);
+  border-color: var(--cyan);
+}
+
 .inspector-summary {
   font-size: 12px;
   line-height: 1.55;
@@ -1396,6 +1639,297 @@ input[type='range']::-webkit-slider-thumb:hover {
 }
 
 /* =============================================================================
+   4D. VESTIBULAR WORKBENCH DOCK CONTROLS & GYRO FLYOUT
+   ============================================================================= */
+.vestibular-dock-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.vestibular-protocol-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.protocol-chip {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.2);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.protocol-chip:hover {
+  color: var(--text-main);
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.12);
+}
+
+.protocol-chip.active {
+  background: rgba(82, 220, 242, 0.24);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(82, 220, 242, 0.3);
+}
+
+.protocol-chip .chip-badge {
+  background: rgba(82, 220, 242, 0.18);
+  color: var(--cyan);
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.protocol-chip.active .chip-badge {
+  background: var(--cyan);
+  color: #050c12;
+}
+
+.vestibular-timeline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 380px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.timeline-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-meta-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hold-timer-badge {
+  background: rgba(240, 170, 98, 0.16);
+  border: 1px solid rgba(240, 170, 98, 0.4);
+  color: var(--warm);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.clearance-badge {
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.timeline-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-btn {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.25);
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  line-height: 1.2;
+}
+
+.timeline-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.15);
+}
+
+.timeline-btn.play-btn {
+  color: var(--cyan);
+  border-color: rgba(82, 220, 242, 0.4);
+  font-weight: 700;
+}
+
+.timeline-btn.play-btn.playing {
+  background: rgba(240, 170, 98, 0.25);
+  border-color: var(--warm);
+  color: var(--warm);
+}
+
+.vestibular-step-slider {
+  width: 100%;
+}
+
+.vestibular-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.vest-action-btn {
+  background: rgba(17, 30, 38, 0.9);
+  border: 1px solid rgba(82, 220, 242, 0.3);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.vest-action-btn:hover {
+  border-color: var(--cyan);
+  color: var(--text-main);
+  background: rgba(82, 220, 242, 0.15);
+}
+
+.vest-action-btn.active {
+  background: rgba(82, 220, 242, 0.22);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(82, 220, 242, 0.3);
+}
+
+.vor-toggle-btn.open {
+  border-color: var(--cyan);
+  background: rgba(82, 220, 242, 0.22);
+  color: var(--cyan);
+}
+
+.vor-arrow {
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.vor-toggle-btn.open .vor-arrow {
+  transform: rotate(180deg);
+}
+
+/* 3-Axis Head Orientation Gyro Flyout */
+.gyro-flyout {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  width: 320px;
+  background: rgba(14, 25, 33, 0.96);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  z-index: 35;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gyro-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(82, 220, 242, 0.15);
+  padding-bottom: 6px;
+}
+
+.gyro-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.gyro-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.gyro-close-btn:hover {
+  color: var(--text-main);
+}
+
+.gyro-controls-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gyro-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+}
+
+.gyro-axis-label {
+  width: 72px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.gyro-slider {
+  flex: 1;
+}
+
+.gyro-val-badge {
+  width: 44px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
    5. COLLAPSIBLE 27 PARTS DRAWER
    ============================================================================= */
 .parts-drawer {
@@ -1938,6 +2472,265 @@ input[type='range']::-webkit-slider-thumb:hover {
 }
 
 /* =============================================================================
+   5D. CLINICAL VNG & 3D VOR EYE AVATAR DRAWER
+   ============================================================================= */
+.vor-drawer {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 384px;
+  max-width: calc(100vw - 32px);
+  background: rgba(14, 25, 33, 0.96);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  z-index: 35;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vor-drawer.open {
+  display: flex;
+}
+
+.vor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.vor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(82, 220, 242, 0.15);
+}
+
+.vor-title-cluster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vor-icon {
+  font-size: 14px;
+}
+
+.vor-title-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.vor-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.vor-subtitle {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.vor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vor-mode-toggle-btn {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.25);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 3px 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.vor-mode-toggle-btn:hover {
+  color: var(--text-main);
+  border-color: var(--cyan);
+}
+
+.vor-mode-toggle-btn.active {
+  background: rgba(235, 87, 87, 0.22);
+  border-color: #eb5757;
+  color: #eb5757;
+}
+
+.vor-avatar-stage {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  aspect-ratio: 360 / 220;
+  background: #000;
+  border: 1px solid rgba(82, 220, 242, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.vor-avatar-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.vor-hud-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+}
+
+.vor-eye-labels {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.vor-eye-tag {
+  font-size: 8.5px;
+  font-family: var(--font-mono);
+  color: rgba(158, 192, 205, 0.75);
+  background: rgba(5, 12, 16, 0.7);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.vor-telemetry-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vor-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.vor-metric-pill {
+  background: rgba(17, 30, 38, 0.85);
+  border: 1px solid rgba(82, 220, 242, 0.15);
+  border-radius: 4px;
+  padding: 3px 4px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vor-metric-pill .m-lbl {
+  color: var(--text-muted);
+}
+
+.vor-metric-pill .m-val {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.vor-metric-pill.spv-pill .m-val {
+  color: #4ade80;
+}
+
+.vor-nystagmus-status {
+  font-size: 9.5px;
+  color: var(--text-main);
+  background: rgba(82, 220, 242, 0.08);
+  border-radius: 4px;
+  padding: 3px 6px;
+  text-align: center;
+  font-style: italic;
+}
+
+.vor-strip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vor-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.vor-strip-title {
+  font-weight: 600;
+}
+
+.vor-strip-range {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+}
+
+.vor-strip-wrap {
+  width: 100%;
+  height: 110px;
+  aspect-ratio: 360 / 110;
+  background: #0a0e14;
+  border: 1px solid rgba(82, 220, 242, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.vor-strip-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.vor-strip-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.leg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.leg-line {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.leg-line.h-line {
+  background: #52dcf2;
+}
+
+.leg-line.v-line {
+  background: #4ade80;
+}
+
+.leg-line.t-line {
+  background: #fbbf24;
+}
+
+/* =============================================================================
    6. ABOUT & CITATIONS MODAL
    ============================================================================= */
 .modal-backdrop {
@@ -2183,6 +2976,19 @@ input[type='range']::-webkit-slider-thumb:hover {
     width: 360px;
     max-width: calc(100vw - 24px);
   }
+
+  .vor-drawer {
+    right: 12px;
+    bottom: 74px;
+    width: 360px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .gyro-flyout {
+    left: 12px;
+    bottom: 74px;
+    width: 300px;
+  }
 }
 
 /* Mobile Screens (<= 640px) */
@@ -2389,6 +3195,64 @@ input[type='range']::-webkit-slider-thumb:hover {
     padding: 4px 8px;
     font-size: 10px;
     flex-shrink: 0;
+  }
+
+  /* Mobile Vestibular Dock Controls */
+  .vestibular-dock-content {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .vestibular-protocol-group {
+    order: 1;
+    overflow-x: auto;
+    width: 100%;
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+
+  .protocol-chip {
+    padding: 4px 6px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .vestibular-timeline-wrap {
+    order: 3;
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .vestibular-actions-group {
+    order: 2;
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+
+  .vest-action-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  /* Mobile 3D VOR Eye Avatar & VNG Drawer */
+  .vor-drawer {
+    left: 8px;
+    right: 8px;
+    bottom: 110px;
+    width: auto;
+    max-height: 56vh;
+    overflow-y: auto;
+  }
+
+  .gyro-flyout {
+    left: 8px;
+    right: 8px;
+    bottom: 110px;
+    width: auto;
   }
 }
 

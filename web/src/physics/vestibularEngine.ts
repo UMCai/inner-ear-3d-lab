@@ -1021,6 +1021,26 @@ export class VestibularDynamicsEngine {
     this.cupulaDeflection = Math.max(-1.0, Math.min(1.0, deflection));
   }
 
+  public getParticles(): Array<[number, number, number]> {
+    return this.computeParticlesRAS(this.phiDeg, this.canalId);
+  }
+
+  public getTelemetry(
+    psiYawDeg: number,
+    thetaPitchDeg: number,
+    gammaRollDeg: number = 0.0
+  ): VestibularTelemetryState {
+    return this.computeTelemetrySnapshot(psiYawDeg, thetaPitchDeg, gammaRollDeg);
+  }
+
+  public getCurrentPreset(): VestibularStepPreset | undefined {
+    return MANEUVER_PRESETS[this.maneuverId]?.[this.stepIndex];
+  }
+
+  public getSteps(): VestibularStepPreset[] {
+    return MANEUVER_PRESETS[this.maneuverId] ?? [];
+  }
+
   public static classifyRegion(phiDeg: number, canalId: CanalId = 'posterior'): string {
     if (canalId === 'posterior') {
       if (phiDeg < -95.0) return 'Posterior Ampulla (Cupula Barrier)';

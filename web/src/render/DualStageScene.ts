@@ -30,6 +30,17 @@ import {
   getShaderClipUniforms,
   SlicingPlaneDefinition,
 } from '../data/radiologyEngine';
+import {
+  loadAllCanalPaths,
+  type CanalId,
+  type CanalPathData,
+} from '../data/canalPaths';
+import {
+  VestibularDynamicsEngine,
+  type VestibularTelemetryState,
+  type ManeuverId,
+} from '../physics/vestibularEngine';
+import type { VORDrawer } from '../ui/VORDrawer';
 
 export type LabelDensityMode = 'off' | 'key' | 'all';
 export type ReadingDepth = 'simple' | 'detailed';
@@ -145,6 +156,15 @@ export class DualStageScene {
   private scdsWaveArcs: Array<{ mesh: THREE.Mesh; initialScale: number; phaseOffset: number }> = [];
   private clipNormalVec = new THREE.Vector3(0, 0, 1);
   private tempPlaneMatrix = new THREE.Matrix4();
+
+  // Vestibular Dynamics Engine & 3D Otoconial Cloud
+  private vestibularEngine: VestibularDynamicsEngine | null = null;
+  private otoconiaGroup: THREE.Group | null = null;
+  private otoconiaMeshes: THREE.Mesh[] = [];
+  private vorDrawer: VORDrawer | null = null;
+  private currentYaw = 0;
+  private currentPitch = 0;
+  private currentRoll = 0;
 
   // Reactive State
   private state: LabSceneSnapshot = {
@@ -265,7 +285,36 @@ export class DualStageScene {
     this.labyrinthRoot.add(this.tonotopyCursorMesh);
 
     this.initRadiology3DHelpers();
+    this.initOtoconiaVisualizer();
     this.setupPointerInteractions();
+  }
+
+  private initOtoconiaVisualizer(): void {
+    this.otoconiaGroup = new THREE.Group();
+    this.otoconiaMeshes = [];
+
+    const particleGeom = new THREE.SphereGeometry(0.135, 12, 12);
+    const particleMat = new THREE.MeshBasicMaterial({
+      color: 0xffb74d,
+      transparent: true,
+      opacity: 0.95,
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const mesh = new THREE.Mesh(particleGeom, particleMat);
+      const haloGeom = new THREE.SphereGeometry(0.22, 8, 8);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: 0xff9800,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      });
+      mesh.add(new THREE.Mesh(haloGeom, haloMat));
+      this.otoconiaGroup.add(mesh);
+      this.otoconiaMeshes.push(mesh);
+    }
+    this.otoconiaGroup.visible = false;
+    this.labyrinthRoot.add(this.otoconiaGroup);
   }
 
   // ===========================================================================
@@ -284,74 +333,86 @@ export class DualStageScene {
       this.emitState();
     };
 
-    // Parallel load of all 27 IE-Map OBJ meshes
-    await Promise.all(
-      IEMAP_STRUCTURES.map(async (item) => {
-        const url = `/assets/iemap/obj/${item.meshName}.obj`;
-        const geometry = await fetchObjGeometry(url);
-
-        if (item.meshName === 'mesh_david_cochlea') {
-          const greenwoodX = computeMeshGreenwoodX(geometry);
-          geometry.setAttribute('aGreenwoodX', new THREE.BufferAttribute(greenwoodX, 1));
-        }
-
-        const material = createGate3StructureMaterial({
-          colorHex: item.colorHex,
-          baseAlpha: item.baseAlpha,
-          emissionStrength: item.emissionStrength,
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.name = item.meshName;
-        mesh.userData.meshName = item.meshName;
-
-        if (item.systemGroup === 'ampullae_cupulae' && item.meshName.includes('_Cup_')) {
-          mesh.renderOrder = 1;
-        } else if (
-          item.systemGroup === 'cochlear_system' &&
-          item.meshName !== 'mesh_david_cochlea'
-        ) {
-          mesh.renderOrder = 2;
-        } else if (item.systemGroup === 'otolith_vestibule') {
-          mesh.renderOrder = 3;
-        } else if (
-          item.systemGroup === 'semicircular_ducts' ||
-          item.systemGroup === 'ampullae_cupulae'
-        ) {
-          mesh.renderOrder = 4;
-        } else if (item.meshName === 'mesh_david_cochlea') {
-          mesh.renderOrder = 5;
-        } else {
-          mesh.renderOrder = 6;
-        }
-
-        const tetherPositions = new Float32Array(6);
-        const tetherGeom = new THREE.BufferGeometry();
-        tetherGeom.setAttribute('position', new THREE.BufferAttribute(tetherPositions, 3));
-        const tetherMat = new THREE.LineBasicMaterial({
-          color: new THREE.Color(item.colorHex),
-          transparent: true,
-          opacity: 0.55,
-          depthWrite: false,
-        });
-        const tetherLine = new THREE.Line(tetherGeom, tetherMat);
-        tetherLine.visible = false;
-
-        this.labyrinthRoot.add(mesh);
-        this.labyrinthRoot.add(tetherLine);
-        this.pickableMeshes.push(mesh);
-
-        this.meshEntries.set(item.meshName, {
-          ontology: item,
-          mesh,
-          material,
-          tetherLine,
-          tetherPositions,
-        });
-
-        bumpProgress(`Loaded RAS mesh: ${item.displayName} (${item.meshName}.obj)`);
+    // Pre-load all 3 semicircular canal paths concurrently with meshes
+    const canalPathsPromise = loadAllCanalPaths()
+      .then((canalPaths) => {
+        this.vestibularEngine = new VestibularDynamicsEngine(canalPaths, 'posterior', 'epley');
       })
-    );
+      .catch((err) => {
+        console.warn('DualStageScene: Failed to load canal paths', err);
+      });
+
+    // Parallel load of all 27 IE-Map OBJ meshes and 3 canal paths
+    await Promise.all([
+      Promise.all(
+        IEMAP_STRUCTURES.map(async (item) => {
+          const url = `/assets/iemap/obj/${item.meshName}.obj`;
+          const geometry = await fetchObjGeometry(url);
+
+          if (item.meshName === 'mesh_david_cochlea') {
+            const greenwoodX = computeMeshGreenwoodX(geometry);
+            geometry.setAttribute('aGreenwoodX', new THREE.BufferAttribute(greenwoodX, 1));
+          }
+
+          const material = createGate3StructureMaterial({
+            colorHex: item.colorHex,
+            baseAlpha: item.baseAlpha,
+            emissionStrength: item.emissionStrength,
+          });
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.name = item.meshName;
+          mesh.userData.meshName = item.meshName;
+
+          if (item.systemGroup === 'ampullae_cupulae' && item.meshName.includes('_Cup_')) {
+            mesh.renderOrder = 1;
+          } else if (
+            item.systemGroup === 'cochlear_system' &&
+            item.meshName !== 'mesh_david_cochlea'
+          ) {
+            mesh.renderOrder = 2;
+          } else if (item.systemGroup === 'otolith_vestibule') {
+            mesh.renderOrder = 3;
+          } else if (
+            item.systemGroup === 'semicircular_ducts' ||
+            item.systemGroup === 'ampullae_cupulae'
+          ) {
+            mesh.renderOrder = 4;
+          } else if (item.meshName === 'mesh_david_cochlea') {
+            mesh.renderOrder = 5;
+          } else {
+            mesh.renderOrder = 6;
+          }
+
+          const tetherPositions = new Float32Array(6);
+          const tetherGeom = new THREE.BufferGeometry();
+          tetherGeom.setAttribute('position', new THREE.BufferAttribute(tetherPositions, 3));
+          const tetherMat = new THREE.LineBasicMaterial({
+            color: new THREE.Color(item.colorHex),
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+          });
+          const tetherLine = new THREE.Line(tetherGeom, tetherMat);
+          tetherLine.visible = false;
+
+          this.labyrinthRoot.add(mesh);
+          this.labyrinthRoot.add(tetherLine);
+          this.pickableMeshes.push(mesh);
+
+          this.meshEntries.set(item.meshName, {
+            ontology: item,
+            mesh,
+            material,
+            tetherLine,
+            tetherPositions,
+          });
+
+          bumpProgress(`Loaded RAS mesh: ${item.displayName} (${item.meshName}.obj)`);
+        })
+      ),
+      canalPathsPromise,
+    ]);
 
     this.state.isLoaded = true;
     this.state.loadingProgress = 100;
@@ -375,6 +436,7 @@ export class DualStageScene {
 
     const isHearingMode = labMode === 'hearing';
     const isRadiologyMode = labMode === 'radiology';
+    const isVestibularMode = labMode === 'vestibular';
     const explodeFactor = explodePercent / 100.0;
 
     // Radiology clipping uniforms calculation
@@ -433,6 +495,20 @@ export class DualStageScene {
         } else {
           effState = 'visible';
           overrideOpacity = Math.max(0.75, ontology.baseAlpha);
+        }
+      } else if (isVestibularMode) {
+        // Vestibular Mode: Semicircular canals and vestibular system full visibility (95% opacity)
+        // Cochlea (mesh_david_cochlea) and Bony Capsule (segT2_th1.07_Otsu) ghosted to 15% opacity (depthWrite: false)
+        if (
+          ontology.systemGroup === 'semicircular_ducts' ||
+          ontology.systemGroup === 'ampullae_cupulae' ||
+          ontology.systemGroup === 'otolith_vestibule'
+        ) {
+          effState = 'visible';
+          overrideOpacity = 0.95;
+        } else {
+          effState = 'ghost';
+          overrideOpacity = 0.15;
         }
       } else {
         // Outer Bone Shell Peel (0% = solid, 25-95% = transparent glass, >=96% = hidden)
@@ -626,6 +702,24 @@ export class DualStageScene {
       const targetRAS = new THREE.Vector3(1.77, 6.38, -2.96);
       const camPos = new THREE.Vector3(13.5, 14.0, 2.5);
       this.startCameraFly(camPos, targetRAS, 550, new THREE.Vector3(0, 0, 1));
+    } else if (mode === 'vestibular') {
+      // Save current anatomy state for lossless restoration
+      if (!this.savedAnatomyState) {
+        this.savedAnatomyState = {
+          visibilityMap: { ...this.state.visibilityMap },
+          bonyPeelPercent: this.state.bonyPeelPercent,
+          cameraPos: this.camera.position.clone(),
+          controlsTarget: this.controls.target.clone(),
+          cameraUp: this.camera.up.clone(),
+        };
+      }
+
+      this.state.labMode = 'vestibular';
+
+      // Optimal labyrinth vestibular perspective fly-to
+      const camPos = new THREE.Vector3(21.5, -11.5, 7.2);
+      const targetRAS = new THREE.Vector3(4.5, 1.5, 0.2);
+      this.startCameraFly(camPos, targetRAS, 550, new THREE.Vector3(0, 0, 1));
     } else if (mode === 'anatomy') {
       this.state.labMode = 'anatomy';
       if (this.savedAnatomyState) {
@@ -638,6 +732,13 @@ export class DualStageScene {
           this.savedAnatomyState.cameraUp
         );
       }
+    }
+
+    if (this.otoconiaGroup) {
+      this.otoconiaGroup.visible = this.state.labMode === 'vestibular';
+    }
+    if (this.tonotopyCursorMesh) {
+      this.tonotopyCursorMesh.visible = this.state.labMode === 'hearing';
     }
 
     this.applySceneStateToMeshes();
@@ -1336,6 +1437,10 @@ export class DualStageScene {
 
     if (this.state.labMode === 'hearing') {
       candidates = candidates.filter((c) => c.pin.meshName.includes('coch'));
+    } else if (this.state.labMode === 'vestibular') {
+      candidates = candidates.filter(
+        (c) => !c.pin.meshName.includes('coch') && !c.pin.meshName.includes('segT2')
+      );
     }
 
     // Filter distance & avoid collisions
@@ -1438,6 +1543,27 @@ export class DualStageScene {
         }
       }
 
+      // Advance Vestibular Physics & Otoconia Particles in Vestibular Mode
+      if (this.state.labMode === 'vestibular' && this.vestibularEngine) {
+        const simDt = Math.min(dt, 0.033);
+        this.vestibularEngine.stepPhysics(simDt, this.currentYaw, this.currentPitch, this.currentRoll);
+        const particles = this.vestibularEngine.getParticles();
+        for (let i = 0; i < 5; i++) {
+          const p = particles[i];
+          if (p && this.otoconiaMeshes[i]) {
+            this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+          }
+        }
+        if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+          const telem = this.vestibularEngine.getTelemetry(
+            this.currentYaw,
+            this.currentPitch,
+            this.currentRoll
+          );
+          this.vorDrawer.updateTelemetry(telem, simDt);
+        }
+      }
+
       this.controls.update();
 
       const canvasW = this.container.clientWidth;
@@ -1490,6 +1616,53 @@ export class DualStageScene {
     const snap = this.getSnapshot();
     for (const cb of this.onStateChangeCallbacks) {
       cb(snap);
+    }
+  }
+
+  public getVestibularEngine(): VestibularDynamicsEngine | null {
+    return this.vestibularEngine;
+  }
+
+  public setVestibularEngine(engine: VestibularDynamicsEngine): void {
+    this.vestibularEngine = engine;
+  }
+
+  public getOtoconiaGroup(): THREE.Group | null {
+    return this.otoconiaGroup;
+  }
+
+  public getOtoconiaMeshes(): THREE.Mesh[] {
+    return this.otoconiaMeshes;
+  }
+
+  public setHeadOrientation(yaw: number, pitch: number, roll: number): void {
+    this.currentYaw = yaw;
+    this.currentPitch = pitch;
+    this.currentRoll = roll;
+  }
+
+  public getHeadOrientation(): { yaw: number; pitch: number; roll: number } {
+    return { yaw: this.currentYaw, pitch: this.currentPitch, roll: this.currentRoll };
+  }
+
+  public setVORDrawer(drawer: VORDrawer | null): void {
+    this.vorDrawer = drawer;
+  }
+
+  public getVORDrawer(): VORDrawer | null {
+    return this.vorDrawer;
+  }
+
+  public resetVestibularCrystals(): void {
+    if (this.vestibularEngine) {
+      this.vestibularEngine.resetStateToManeuver(this.vestibularEngine.getManeuver());
+      const particles = this.vestibularEngine.getParticles();
+      for (let i = 0; i < 5; i++) {
+        const p = particles[i];
+        if (p && this.otoconiaMeshes[i]) {
+          this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+        }
+      }
     }
   }
 

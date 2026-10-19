@@ -19,6 +19,13 @@ import {
 import { ToneSynthesizer } from '../audio/ToneSynthesizer';
 import { AudiogramDrawer } from './AudiogramDrawer';
 import { CTSliceDrawer } from './CTSliceDrawer';
+import { VORDrawer } from './VORDrawer';
+import {
+  MANEUVER_PRESETS,
+  type ManeuverId,
+  type VestibularStepPreset,
+  type VestibularTelemetryState,
+} from '../physics/vestibularEngine';
 import { getAcousticLandmark, getDistanceApexMm, greenwoodPosition } from '../data/greenwoodEngine';
 import {
   RadiologyPlaneId,
@@ -40,6 +47,7 @@ export class AppHUD {
   private modeAnatomyBtn!: HTMLButtonElement;
   private modeHearingBtn!: HTMLButtonElement;
   private modeRadiologyBtn!: HTMLButtonElement;
+  private modeVestibularBtn!: HTMLButtonElement;
 
   // Header Elements
   private searchInput!: HTMLInputElement;
@@ -58,6 +66,7 @@ export class AppHUD {
   private anatomyDockContent!: HTMLElement;
   private hearingDockContent!: HTMLElement;
   private radiologyDockContent!: HTMLElement;
+  private vestibularDockContent!: HTMLElement;
 
   // Anatomy Dock Controls
   private boneSlider!: HTMLInputElement;
@@ -93,10 +102,43 @@ export class AppHUD {
   private radiologyCtToggleBtn!: HTMLButtonElement;
   private ctCardArrowEl!: HTMLElement;
 
+  // Vestibular Workbench Dock Controls
+  private vestProtocolChips: HTMLButtonElement[] = [];
+  private vestStepTitleEl!: HTMLElement;
+  private vestHoldTimerBadgeEl!: HTMLElement;
+  private vestClearanceBadgeEl!: HTMLElement;
+  private vestStepPrevBtn!: HTMLButtonElement;
+  private vestStepNextBtn!: HTMLButtonElement;
+  private vestPlayBtn!: HTMLButtonElement;
+  private vestPlayIconEl!: HTMLElement;
+  private vestStepSlider!: HTMLInputElement;
+  private vestGyroToggleBtn!: HTMLButtonElement;
+  private vestResetBtn!: HTMLButtonElement;
+  private vestVorToggleBtn!: HTMLButtonElement;
+  private vorArrowEl!: HTMLElement;
+
+  // Gyro Flyout Controls
+  private gyroFlyout!: HTMLElement;
+  private gyroCloseBtn!: HTMLButtonElement;
+  private gyroYawSlider!: HTMLInputElement;
+  private gyroPitchSlider!: HTMLInputElement;
+  private gyroRollSlider!: HTMLInputElement;
+  private gyroYawValEl!: HTMLElement;
+  private gyroPitchValEl!: HTMLElement;
+  private gyroRollValEl!: HTMLElement;
+
   // Lab Services
   private toneSynth = ToneSynthesizer.getInstance();
   private audiogramDrawer!: AudiogramDrawer;
   private ctSliceDrawer!: CTSliceDrawer;
+  private vorDrawer!: VORDrawer;
+
+  // Vestibular Sequencer & Hold Timer State
+  private activeManeuverId: ManeuverId = 'epley';
+  private currentStepIdx = 0;
+  private isSequencerPlaying = false;
+  private sequencerTimerId: number | null = null;
+  private remainingHoldSec = 30;
 
   // Modals & Overlays
   private aboutModal!: HTMLElement;
@@ -126,6 +168,7 @@ export class AppHUD {
     this.loadSavedPreferences();
     this.buildDOM();
     this.scene = new DualStageScene(this.canvasHost);
+    this.scene.setVORDrawer(this.vorDrawer);
     this.renderPartsTree();
 
     this.scene.onStateChange((snap) => this.renderState(snap));
@@ -228,6 +271,19 @@ export class AppHUD {
             >
               <span class="mode-icon">🩻</span>
               <span class="mode-label">Virtual Radiology</span>
+            </button>
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-vestibular-btn"
+              data-mode="vestibular"
+              role="tab"
+              aria-selected="false"
+              aria-controls="vestibular-dock-content"
+              title="Multi-Canal Vestibular Dynamics &amp; 3D VOR"
+            >
+              <span class="mode-icon">🌀</span>
+              <span class="mode-label">Vestibular &amp; VOR</span>
             </button>
           </nav>
 
@@ -530,7 +586,131 @@ export class AppHUD {
               </button>
             </div>
           </div>
+
+          <!-- 4D. Vestibular & VOR Workbench Dock Content -->
+          <div class="vestibular-dock-content" id="vestibular-dock-content" style="display: none;">
+            <!-- 1. Protocol Selector Chips (Grouped by Canal) -->
+            <div class="vestibular-protocol-group" id="vest-protocol-chips" role="group" aria-label="BPPV Clinical Protocols">
+              <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal Canalithiasis - 5 Steps)">
+                <span class="chip-badge">Post</span>
+                <span class="chip-label">Epley (5s)</span>
+              </button>
+              <button type="button" class="protocol-chip" data-maneuver="semont" title="Semont Liberatory Maneuver (Posterior Canal - 3 Steps)">
+                <span class="chip-badge">Post</span>
+                <span class="chip-label">Semont (3s)</span>
+              </button>
+              <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Canal Geotropic - 4 Steps)">
+                <span class="chip-badge">Horiz</span>
+                <span class="chip-label">Gufoni Geo</span>
+              </button>
+              <button type="button" class="protocol-chip" data-maneuver="gufoni_apogeotropic" title="Gufoni Maneuver (Horizontal Canal Apogeotropic - 4 Steps)">
+                <span class="chip-badge">Horiz</span>
+                <span class="chip-label">Gufoni Apo</span>
+              </button>
+              <button type="button" class="protocol-chip" data-maneuver="barbecue_roll" title="Lempert 360° Barbecue Roll (Horizontal Canal - 5 Steps)">
+                <span class="chip-badge">Horiz</span>
+                <span class="chip-label">Barbecue 360°</span>
+              </button>
+              <button type="button" class="protocol-chip" data-maneuver="yacovino" title="Yacovino Maneuver (Anterior Canal - 4 Steps)">
+                <span class="chip-badge">Ant</span>
+                <span class="chip-label">Yacovino (4s)</span>
+              </button>
+            </div>
+
+            <!-- 2. Timeline Step Scrubber & Sequence Controls -->
+            <div class="vestibular-timeline-wrap">
+              <div class="timeline-header">
+                <span class="timeline-title" id="vest-step-title">Step 1 of 5: Start Sitting Upright</span>
+                <div class="timeline-meta-cluster">
+                  <span class="hold-timer-badge" id="vest-hold-timer-badge" title="Recommended Clinical Position Hold Timer">⏱️ 30s</span>
+                  <span class="clearance-badge" id="vest-clearance-badge">0% Cleared</span>
+                </div>
+              </div>
+              <div class="timeline-slider-row">
+                <button type="button" class="timeline-btn" id="vest-step-prev-btn" title="Previous Step">◀</button>
+                <button type="button" class="timeline-btn play-btn" id="vest-play-btn" title="Auto-advance Maneuver with Timed Holds">
+                  <span class="play-icon" id="vest-play-icon">▶</span>
+                </button>
+                <input
+                  type="range"
+                  class="vestibular-step-slider"
+                  id="vest-step-slider"
+                  min="0"
+                  max="4"
+                  value="0"
+                  step="1"
+                  aria-label="Clinical Maneuver Step Progress"
+                />
+                <button type="button" class="timeline-btn" id="vest-step-next-btn" title="Next Step">▶</button>
+              </div>
+            </div>
+
+            <!-- 3. Actions & Modals: 3-Axis Gyro, Reset, VOR Eyes Toggle -->
+            <div class="vestibular-actions-group">
+              <button
+                type="button"
+                class="vest-action-btn gyro-toggle-btn"
+                id="vest-gyro-toggle-btn"
+                title="Toggle Interactive 3-Axis Head Gyro Sliders"
+                aria-expanded="false"
+              >
+                <span class="vest-btn-icon">🕹️</span>
+                <span class="vest-btn-text">Head Gyro</span>
+              </button>
+
+              <button
+                type="button"
+                class="vest-action-btn reset-crystals-btn"
+                id="vest-reset-btn"
+                title="Reset Otoconia to Initial Cupular Resting Position"
+              >
+                <span class="vest-btn-icon">⚡</span>
+                <span class="vest-btn-text">Reset</span>
+              </button>
+
+              <button
+                type="button"
+                class="vest-action-btn vor-toggle-btn"
+                id="vest-vor-toggle-btn"
+                title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
+                aria-expanded="false"
+                aria-controls="vor-drawer"
+              >
+                <span class="vest-btn-icon">👁️</span>
+                <span class="vest-btn-text">VOR Eyes</span>
+                <span class="vor-arrow" id="vor-arrow">▾</span>
+              </button>
+            </div>
+          </div>
         </nav>
+
+        <!-- 4. Interactive 3-Axis Head Gyro Flyout Panel -->
+        <div class="gyro-flyout" id="gyro-flyout" style="display: none;" role="region" aria-label="3-Axis Head Orientation Gyro">
+          <div class="gyro-header">
+            <span class="gyro-title">3-DOF Head Orientation</span>
+            <button type="button" class="gyro-close-btn" id="gyro-close-btn" aria-label="Close Gyro Controls">✕</button>
+          </div>
+          <div class="gyro-controls-body">
+            <!-- Yaw Slider: -180° to +180° -->
+            <div class="gyro-slider-row">
+              <span class="gyro-axis-label">Yaw (ψ):</span>
+              <input type="range" class="gyro-slider" id="gyro-yaw-slider" min="-180" max="180" value="0" />
+              <span class="gyro-val-badge" id="gyro-yaw-val">0°</span>
+            </div>
+            <!-- Pitch / Recline Slider: -30° to +120° -->
+            <div class="gyro-slider-row">
+              <span class="gyro-axis-label">Pitch (θ):</span>
+              <input type="range" class="gyro-slider" id="gyro-pitch-slider" min="-30" max="120" value="0" />
+              <span class="gyro-val-badge" id="gyro-pitch-val">0°</span>
+            </div>
+            <!-- Roll Slider: -90° to +90° -->
+            <div class="gyro-slider-row">
+              <span class="gyro-axis-label">Roll (γ):</span>
+              <input type="range" class="gyro-slider" id="gyro-roll-slider" min="-90" max="90" value="0" />
+              <span class="gyro-val-badge" id="gyro-roll-val">0°</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Collapsible 27 Parts Drawer -->
         <div class="parts-drawer ${this.partsDrawerOpen ? 'open' : ''}" id="parts-drawer" role="region" aria-label="Anatomical Parts List">
@@ -651,10 +831,39 @@ export class AppHUD {
     this.radiologyCtToggleBtn = this.root.querySelector('#rad-ct-toggle-btn, #radiology-ct-toggle-btn') as HTMLButtonElement;
     this.ctCardArrowEl = this.root.querySelector('#ct-card-arrow') as HTMLElement;
 
+    this.modeVestibularBtn = this.root.querySelector('#mode-vestibular-btn') as HTMLButtonElement;
+    this.vestibularDockContent = this.root.querySelector('#vestibular-dock-content') as HTMLElement;
+
+    // Vestibular Controls
+    this.vestProtocolChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.protocol-chip'));
+    this.vestStepTitleEl = this.root.querySelector('#vest-step-title') as HTMLElement;
+    this.vestHoldTimerBadgeEl = this.root.querySelector('#vest-hold-timer-badge') as HTMLElement;
+    this.vestClearanceBadgeEl = this.root.querySelector('#vest-clearance-badge') as HTMLElement;
+    this.vestStepPrevBtn = this.root.querySelector('#vest-step-prev-btn') as HTMLButtonElement;
+    this.vestStepNextBtn = this.root.querySelector('#vest-step-next-btn') as HTMLButtonElement;
+    this.vestPlayBtn = this.root.querySelector('#vest-play-btn') as HTMLButtonElement;
+    this.vestPlayIconEl = this.root.querySelector('#vest-play-icon') as HTMLElement;
+    this.vestStepSlider = this.root.querySelector('#vest-step-slider') as HTMLInputElement;
+    this.vestGyroToggleBtn = this.root.querySelector('#vest-gyro-toggle-btn') as HTMLButtonElement;
+    this.vestResetBtn = this.root.querySelector('#vest-reset-btn') as HTMLButtonElement;
+    this.vestVorToggleBtn = this.root.querySelector('#vest-vor-toggle-btn') as HTMLButtonElement;
+    this.vorArrowEl = this.root.querySelector('#vor-arrow') as HTMLElement;
+
+    // Gyro Flyout
+    this.gyroFlyout = this.root.querySelector('#gyro-flyout') as HTMLElement;
+    this.gyroCloseBtn = this.root.querySelector('#gyro-close-btn') as HTMLButtonElement;
+    this.gyroYawSlider = this.root.querySelector('#gyro-yaw-slider') as HTMLInputElement;
+    this.gyroPitchSlider = this.root.querySelector('#gyro-pitch-slider') as HTMLInputElement;
+    this.gyroRollSlider = this.root.querySelector('#gyro-roll-slider') as HTMLInputElement;
+    this.gyroYawValEl = this.root.querySelector('#gyro-yaw-val') as HTMLElement;
+    this.gyroPitchValEl = this.root.querySelector('#gyro-pitch-val') as HTMLElement;
+    this.gyroRollValEl = this.root.querySelector('#gyro-roll-val') as HTMLElement;
+
     // Lab Drawers Initialization
     const labShell = this.root.querySelector('.lab-shell') as HTMLElement;
     this.audiogramDrawer = new AudiogramDrawer(labShell);
     this.ctSliceDrawer = new CTSliceDrawer(labShell);
+    this.vorDrawer = new VORDrawer(labShell);
 
     this.ctSliceDrawer.onDepthChange((depthMm) => {
       this.scene.setRadiologyDepth(depthMm);
@@ -669,6 +878,16 @@ export class AppHUD {
       this.radiologyCtToggleBtn.classList.remove('open');
       this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
       this.ctCardArrowEl.textContent = '▾';
+      this.updateMobileDrawerExclusivity();
+    });
+
+    this.vorDrawer.onClose(() => {
+      this.vestVorToggleBtn.classList.remove('open');
+      this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
+      if (this.vorArrowEl) {
+        this.vorArrowEl.textContent = '▾';
+      }
+      this.updateMobileDrawerExclusivity();
     });
 
     this.aboutModal = this.root.querySelector('#about-modal') as HTMLElement;
@@ -916,6 +1135,7 @@ export class AppHUD {
       this.audiogramToggleBtn.classList.remove('open');
       this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
       this.audiogramArrowEl.textContent = '▸';
+      this.updateMobileDrawerExclusivity();
     });
 
     this.audiogramDrawer.onPresetChange((presetId, lossSector) => {
@@ -997,6 +1217,74 @@ export class AppHUD {
 
     this.radiologyCtToggleBtn.addEventListener('click', () => {
       this.toggleCTDrawer();
+    });
+
+    // -------------------------------------------------------------------------
+    // Vestibular & VOR Workbench Controls
+    // -------------------------------------------------------------------------
+    this.modeVestibularBtn.addEventListener('click', () => {
+      this.switchLabMode('vestibular');
+    });
+
+    this.vestProtocolChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const maneuver = chip.getAttribute('data-maneuver') as ManeuverId;
+        if (maneuver) {
+          this.selectManeuver(maneuver);
+        }
+      });
+    });
+
+    this.vestStepPrevBtn?.addEventListener('click', () => {
+      this.pauseSequencer();
+      this.stepManeuver(-1);
+    });
+
+    this.vestStepNextBtn?.addEventListener('click', () => {
+      this.pauseSequencer();
+      this.stepManeuver(1);
+    });
+
+    this.vestPlayBtn?.addEventListener('click', () => {
+      this.toggleSequencer();
+    });
+
+    this.vestStepSlider?.addEventListener('input', () => {
+      this.pauseSequencer();
+      const step = parseInt(this.vestStepSlider.value, 10);
+      this.goToStep(step);
+    });
+
+    this.vestGyroToggleBtn?.addEventListener('click', () => {
+      this.toggleGyroFlyout();
+    });
+
+    this.gyroCloseBtn?.addEventListener('click', () => {
+      this.closeGyroFlyout();
+    });
+
+    const updateGyroFromSliders = () => {
+      this.pauseSequencer();
+      const yaw = parseFloat(this.gyroYawSlider.value);
+      const pitch = parseFloat(this.gyroPitchSlider.value);
+      const roll = parseFloat(this.gyroRollSlider.value);
+      this.gyroYawValEl.textContent = `${Math.round(yaw)}°`;
+      this.gyroPitchValEl.textContent = `${Math.round(pitch)}°`;
+      this.gyroRollValEl.textContent = `${Math.round(roll)}°`;
+      this.scene.setHeadOrientation(yaw, pitch, roll);
+      this.renderInspectorCard(this.scene.getSnapshot().selectedMesh);
+    };
+
+    this.gyroYawSlider?.addEventListener('input', updateGyroFromSliders);
+    this.gyroPitchSlider?.addEventListener('input', updateGyroFromSliders);
+    this.gyroRollSlider?.addEventListener('input', updateGyroFromSliders);
+
+    this.vestResetBtn?.addEventListener('click', () => {
+      this.resetVestibular();
+    });
+
+    this.vestVorToggleBtn?.addEventListener('click', () => {
+      this.toggleVORDrawer();
     });
   }
 
@@ -1103,6 +1391,9 @@ export class AppHUD {
       if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
         this.closeCTDrawer();
       }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
     }
     this.partsDrawerOpen = !this.partsDrawerOpen;
     this.partsDrawer.classList.toggle('open', this.partsDrawerOpen);
@@ -1142,7 +1433,8 @@ export class AppHUD {
       const anyDrawerOpen =
         this.partsDrawerOpen ||
         (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) ||
-        (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen());
+        (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) ||
+        (this.vorDrawer && this.vorDrawer.getIsOpen());
       this.inspectorCard.classList.toggle('drawer-active', anyDrawerOpen);
     } else {
       this.inspectorCard.classList.remove('drawer-active');
@@ -1159,6 +1451,9 @@ export class AppHUD {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
     }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
     const isOpen = this.audiogramDrawer.toggle();
     this.audiogramToggleBtn.classList.toggle('open', isOpen);
     this.audiogramToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -1172,6 +1467,9 @@ export class AppHUD {
     }
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
+    }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
     }
     this.audiogramDrawer.open();
     this.audiogramToggleBtn.classList.add('open');
@@ -1198,6 +1496,9 @@ export class AppHUD {
     if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
       this.closeAudiogramDrawer();
     }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
     this.ctSliceDrawer.toggle();
     const isOpen = this.ctSliceDrawer.getIsOpen();
     this.radiologyCtToggleBtn.classList.toggle('open', isOpen);
@@ -1212,6 +1513,60 @@ export class AppHUD {
       this.radiologyCtToggleBtn.classList.remove('open');
       this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
       this.ctCardArrowEl.textContent = '▸';
+      this.updateMobileDrawerExclusivity();
+    }
+  }
+
+  // ===========================================================================
+  // 3D VOR & CLINICAL VNG EYE AVATAR DRAWER TOGGLE
+  // ===========================================================================
+  private toggleVORDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    this.vorDrawer.toggle();
+    const isOpen = this.vorDrawer.getIsOpen();
+    this.vestVorToggleBtn.classList.toggle('open', isOpen);
+    this.vestVorToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    if (this.vorArrowEl) {
+      this.vorArrowEl.textContent = isOpen ? '▾' : '▸';
+    }
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private openVORDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    this.vorDrawer.open();
+    this.vestVorToggleBtn.classList.add('open');
+    this.vestVorToggleBtn.setAttribute('aria-expanded', 'true');
+    if (this.vorArrowEl) {
+      this.vorArrowEl.textContent = '▾';
+    }
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private closeVORDrawer(): void {
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.vorDrawer.close();
+      this.vestVorToggleBtn.classList.remove('open');
+      this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
+      if (this.vorArrowEl) {
+        this.vorArrowEl.textContent = '▾';
+      }
       this.updateMobileDrawerExclusivity();
     }
   }
@@ -1253,13 +1608,56 @@ export class AppHUD {
   }
 
   public switchLabMode(mode: LabMode): void {
-    if (mode === 'radiology') {
+    if (mode === 'vestibular') {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
+      if (this.toneSynth.getIsPlaying()) {
+        this.toneSynth.pause();
+        this.scene.setHearingPlayback(false);
+        this.updateTonePlayButton(false);
+      }
+      this.scene.setLabMode('vestibular');
+      this.modeAnatomyBtn.classList.remove('active');
+      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
+      this.modeHearingBtn.classList.remove('active');
+      this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeRadiologyBtn.classList.remove('active');
+      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
+      this.modeVestibularBtn.classList.add('active');
+      this.modeVestibularBtn.setAttribute('aria-selected', 'true');
+
+      this.anatomyDockContent.style.display = 'none';
+      this.hearingDockContent.style.display = 'none';
+      this.radiologyDockContent.style.display = 'none';
+      this.vestibularDockContent.style.display = 'flex';
+
+      const curr = this.scene.getSelectedMesh();
+      if (!curr || curr === 'mesh_david_cochlea' || curr.includes('segT2')) {
+        this.scene.selectStructure('ls_Hsapiens_Sp', false);
+      }
+
+      this.syncVestibularUI();
+      this.renderInspectorCard(this.scene.getSelectedMesh());
+    } else if (mode === 'radiology') {
       if (this.partsDrawerOpen) {
         this.closePartsDrawer();
       }
       if (this.audiogramDrawer.getIsOpen()) {
         this.closeAudiogramDrawer();
       }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      this.closeGyroFlyout();
+      this.pauseSequencer();
+
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.pause();
         this.scene.setHearingPlayback(false);
@@ -1270,11 +1668,14 @@ export class AppHUD {
       this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
       this.modeHearingBtn.classList.remove('active');
       this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeVestibularBtn.classList.remove('active');
+      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
       this.modeRadiologyBtn.classList.add('active');
       this.modeRadiologyBtn.setAttribute('aria-selected', 'true');
 
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
+      this.vestibularDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'flex';
 
       const snap = this.scene.getSnapshot();
@@ -1286,16 +1687,25 @@ export class AppHUD {
       if (this.ctSliceDrawer.getIsOpen()) {
         this.closeCTDrawer();
       }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      this.closeGyroFlyout();
+      this.pauseSequencer();
+
       this.scene.setLabMode('hearing');
       this.modeAnatomyBtn.classList.remove('active');
       this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
       this.modeRadiologyBtn.classList.remove('active');
       this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
+      this.modeVestibularBtn.classList.remove('active');
+      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
       this.modeHearingBtn.classList.add('active');
       this.modeHearingBtn.setAttribute('aria-selected', 'true');
 
       this.anatomyDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
+      this.vestibularDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'flex';
 
       const snap = this.scene.getSnapshot();
@@ -1307,6 +1717,12 @@ export class AppHUD {
       if (this.ctSliceDrawer.getIsOpen()) {
         this.closeCTDrawer();
       }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      this.closeGyroFlyout();
+      this.pauseSequencer();
+
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.pause();
         this.scene.setHearingPlayback(false);
@@ -1317,13 +1733,165 @@ export class AppHUD {
       this.modeHearingBtn.setAttribute('aria-selected', 'false');
       this.modeRadiologyBtn.classList.remove('active');
       this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
+      this.modeVestibularBtn.classList.remove('active');
+      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
       this.modeAnatomyBtn.classList.add('active');
       this.modeAnatomyBtn.setAttribute('aria-selected', 'true');
 
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
+      this.vestibularDockContent.style.display = 'none';
       this.anatomyDockContent.style.display = 'flex';
     }
+  }
+
+  // ===========================================================================
+  // VESTIBULAR WORKBENCH & CLINICAL MANEUVERS HELPERS
+  // ===========================================================================
+  private selectManeuver(maneuverId: ManeuverId): void {
+    this.activeManeuverId = maneuverId;
+    this.vestProtocolChips.forEach((chip) => {
+      chip.classList.toggle('active', chip.getAttribute('data-maneuver') === maneuverId);
+    });
+
+    const eng = this.scene.getVestibularEngine();
+    if (eng) {
+      eng.setManeuver(maneuverId);
+    }
+
+    // Auto-select corresponding 3D canal mesh
+    const targetCanal = eng?.getCanal() || 'posterior';
+    if (targetCanal === 'posterior') {
+      this.scene.selectStructure('ls_Hsapiens_Sp', false);
+    } else if (targetCanal === 'horizontal') {
+      this.scene.selectStructure('ls_Hsapiens_Sl', false);
+    } else {
+      this.scene.selectStructure('ls_Hsapiens_Sa', false);
+    }
+
+    const steps = MANEUVER_PRESETS[maneuverId] || [];
+    this.vestStepSlider.min = '0';
+    this.vestStepSlider.max = String(Math.max(0, steps.length - 1));
+    this.pauseSequencer();
+    this.goToStep(0);
+  }
+
+  private goToStep(stepIdx: number): void {
+    const steps = MANEUVER_PRESETS[this.activeManeuverId] || [];
+    const clamped = Math.max(0, Math.min(steps.length - 1, stepIdx));
+    this.currentStepIdx = clamped;
+    this.vestStepSlider.value = String(clamped);
+
+    const eng = this.scene.getVestibularEngine();
+    if (eng) {
+      eng.setStepIndex(clamped);
+    }
+
+    const preset = steps[clamped];
+    if (preset) {
+      this.setHeadOrientationUI(preset.targetYawDeg, preset.targetPitchDeg, preset.targetRollDeg);
+      this.scene.setHeadOrientation(preset.targetYawDeg, preset.targetPitchDeg, preset.targetRollDeg);
+
+      this.vestStepTitleEl.textContent = preset.clinicalTitle || preset.shortTitle;
+      this.remainingHoldSec = preset.durationSec || 30;
+      this.vestHoldTimerBadgeEl.textContent = `⏱️ ${this.remainingHoldSec}s`;
+
+      const telem = eng ? eng.getTelemetry(preset.targetYawDeg, preset.targetPitchDeg, preset.targetRollDeg) : null;
+      const clearance = telem ? telem.clearancePercent : 0;
+      this.vestClearanceBadgeEl.textContent = `${clearance}% Cleared`;
+      this.renderInspectorCard(this.scene.getSelectedMesh());
+    }
+  }
+
+  private stepManeuver(delta: number): void {
+    this.goToStep(this.currentStepIdx + delta);
+  }
+
+  private toggleSequencer(): void {
+    if (this.isSequencerPlaying) {
+      this.pauseSequencer();
+    } else {
+      this.startSequencer();
+    }
+  }
+
+  private startSequencer(): void {
+    const steps = MANEUVER_PRESETS[this.activeManeuverId] || [];
+    if (this.currentStepIdx >= steps.length - 1 && this.remainingHoldSec <= 0) {
+      this.goToStep(0);
+    }
+
+    this.isSequencerPlaying = true;
+    this.vestPlayIconEl.textContent = '⏸';
+    this.vestPlayBtn.classList.add('playing');
+
+    if (this.sequencerTimerId !== null) {
+      clearInterval(this.sequencerTimerId);
+    }
+
+    this.sequencerTimerId = window.setInterval(() => {
+      if (this.remainingHoldSec > 0) {
+        this.remainingHoldSec--;
+        this.vestHoldTimerBadgeEl.textContent = `⏱️ ${this.remainingHoldSec}s`;
+      } else {
+        const steps = MANEUVER_PRESETS[this.activeManeuverId] || [];
+        if (this.currentStepIdx < steps.length - 1) {
+          this.goToStep(this.currentStepIdx + 1);
+        } else {
+          this.pauseSequencer();
+        }
+      }
+    }, 1000);
+  }
+
+  private pauseSequencer(): void {
+    this.isSequencerPlaying = false;
+    this.vestPlayIconEl.textContent = '▶';
+    this.vestPlayBtn.classList.remove('playing');
+    if (this.sequencerTimerId !== null) {
+      clearInterval(this.sequencerTimerId);
+      this.sequencerTimerId = null;
+    }
+  }
+
+  private resetVestibular(): void {
+    this.pauseSequencer();
+    this.scene.resetVestibularCrystals();
+    this.goToStep(0);
+  }
+
+  private toggleGyroFlyout(): void {
+    const isVisible = this.gyroFlyout.style.display !== 'none';
+    if (isVisible) {
+      this.closeGyroFlyout();
+    } else {
+      this.openGyroFlyout();
+    }
+  }
+
+  private openGyroFlyout(): void {
+    this.gyroFlyout.style.display = 'block';
+    this.vestGyroToggleBtn.classList.add('active');
+    this.vestGyroToggleBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  private closeGyroFlyout(): void {
+    this.gyroFlyout.style.display = 'none';
+    this.vestGyroToggleBtn.classList.remove('active');
+    this.vestGyroToggleBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  private setHeadOrientationUI(yaw: number, pitch: number, roll: number): void {
+    this.gyroYawSlider.value = String(yaw);
+    this.gyroPitchSlider.value = String(pitch);
+    this.gyroRollSlider.value = String(roll);
+    this.gyroYawValEl.textContent = `${Math.round(yaw)}°`;
+    this.gyroPitchValEl.textContent = `${Math.round(pitch)}°`;
+    this.gyroRollValEl.textContent = `${Math.round(roll)}°`;
+  }
+
+  public syncVestibularUI(): void {
+    this.selectManeuver(this.activeManeuverId);
   }
 
   private handleFrequencyChange(freq: number, updateSlider: boolean): void {
@@ -1394,6 +1962,123 @@ export class AppHUD {
       snap.labMode === 'radiology' ||
       item.meshName === 'ls_Hsapiens_Sa' ||
       item.meshName === 'segT2_th1.07_Otsu';
+
+    const isVestibularMode = snap.labMode === 'vestibular';
+    const isVestibularPart =
+      item.systemGroup === 'semicircular_ducts' ||
+      item.systemGroup === 'ampullae_cupulae' ||
+      item.systemGroup === 'otolith_vestibule';
+    const showVestibularBox = isVestibularMode || isVestibularPart;
+
+    let vestBoxHtml = '';
+    if (showVestibularBox) {
+      const vestEngine = this.scene.getVestibularEngine();
+      const head = this.scene.getHeadOrientation();
+      const telem = vestEngine ? vestEngine.getTelemetry(head.yaw, head.pitch, head.roll) : null;
+      const currPreset = vestEngine ? vestEngine.getCurrentPreset() : null;
+
+      let canalTitle = 'Posterior Semicircular Canal';
+      let canalPlane = 'RALP Plane — 45° Oblique';
+      const canalId = telem?.canalId ?? (item.meshName.includes('Hsapiens_Sl') ? 'horizontal' : item.meshName.includes('Hsapiens_Sa') ? 'anterior' : 'posterior');
+      if (canalId === 'horizontal') {
+        canalTitle = 'Horizontal Semicircular Canal';
+        canalPlane = 'Axial Plane — 30° Anterior-Superior';
+      } else if (canalId === 'anterior') {
+        canalTitle = 'Anterior Semicircular Canal';
+        canalPlane = 'LARP Plane — 45° Oblique';
+      } else {
+        canalTitle = 'Posterior Semicircular Canal';
+        canalPlane = 'RALP Plane — 45° Oblique';
+      }
+
+      const firingRate = telem ? telem.afferentSpikesPerSec : 90;
+      const clampedRate = Math.max(10, Math.min(310, firingRate));
+      const firingPercent = ((clampedRate - 10) / (310 - 10)) * 100;
+      let firingClass = 'rate-resting';
+      let firingFillClass = 'fill-resting';
+      if (firingRate > 150) {
+        firingClass = 'rate-excitation';
+        firingFillClass = 'fill-excitation';
+      } else if (firingRate < 45) {
+        firingClass = 'rate-inhibition';
+        firingFillClass = 'fill-inhibition';
+      }
+
+      const ewaldLaw = telem?.ewaldLawActive || "Ewald's 3rd Law: Ampullofugal flow excites vertical canal";
+      const clearancePercent = telem ? telem.clearancePercent : 0;
+      let sensationText = 'Calm (No Spinning)';
+      let sensationBadgeClass = 'sensation-calm';
+      if (clearancePercent >= 99) {
+        sensationText = 'Cleared (Crystals in Utricle)';
+        sensationBadgeClass = 'sensation-cleared';
+      } else if (telem?.patientSensation && telem.patientSensation.includes('Spinning')) {
+        sensationText = 'Spinning Vertigo (Crystals Moving)';
+        sensationBadgeClass = 'sensation-spinning';
+      }
+
+      const pearlText = currPreset?.clinicalPearl || item.clinicalPearl;
+
+      vestBoxHtml = `
+        <div class="vestibular-telemetry-box">
+          <div class="vest-box-header">
+            <span class="vest-box-icon">🌀</span>
+            <div class="vest-title-group">
+              <span class="vest-title">${canalTitle}</span>
+              <span class="vest-sub">${canalPlane}</span>
+            </div>
+          </div>
+
+          <div class="vest-metrics-grid">
+            <div class="vest-metric-item cn8-gauge-wrap">
+              <div class="cn8-header">
+                <span class="cn8-label">CN VIII Afferent Firing Rate</span>
+                <span class="cn8-val ${firingClass}">${firingRate.toFixed(0)} sp/s</span>
+              </div>
+              <div class="cn8-bar-track">
+                <div class="cn8-bar-baseline" title="Resting baseline: 90 sp/s" style="left: 26.67%;"></div>
+                <div class="cn8-bar-fill ${firingFillClass}" style="width: ${firingPercent.toFixed(1)}%;"></div>
+              </div>
+              <div class="cn8-scale-labels">
+                <span>10 (Inh)</span>
+                <span>90 (Rest)</span>
+                <span>310 (Exc)</span>
+              </div>
+            </div>
+
+            <div class="ewald-law-banner">
+              <span class="ewald-icon">⚖️</span>
+              <span class="ewald-text">${ewaldLaw}</span>
+            </div>
+
+            <div class="vest-status-row">
+              <div class="vest-status-badge ${sensationBadgeClass}">
+                ${sensationText}
+              </div>
+              <div class="vest-clearance-pill">
+                Clearance: <strong>${clearancePercent.toFixed(0)}%</strong>
+              </div>
+            </div>
+
+            ${
+              pearlText
+                ? `
+              <div class="vest-pearl-row">
+                <span class="vest-pearl-label">Clinical Pearl:</span>
+                <span class="vest-pearl-desc">${pearlText}</span>
+              </div>
+            `
+                : ''
+            }
+          </div>
+
+          <div class="vest-box-actions">
+            <button type="button" class="vest-view-vor-btn" id="vest-view-vor-btn">
+              👁️ View 3D VOR &amp; VNG Eyes
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     this.inspectorCard.innerHTML = `
       <div class="inspector-header">
@@ -1489,101 +2174,115 @@ export class AppHUD {
             </div>
           </div>
           <div class="scds-box-actions">
-            <button type="button" class="scds-audiogram-btn" id="scds-view-audiogram-btn">
-              📊 View SCDS Audiogram (Air-Bone Gap)
-            </button>
-          </div>
-        </div>
-      `
-          : ''
-      }
+             <button type="button" class="scds-audiogram-btn" id="scds-view-audiogram-btn">
+               📊 View SCDS Audiogram (Air-Bone Gap)
+             </button>
+           </div>
+         </div>
+       `
+           : ''
+       }
 
-      <p class="inspector-summary">${summaryText}</p>
+       ${
+         showVestibularBox
+           ? vestBoxHtml
+           : ''
+       }
 
-      <div class="inspector-actions">
-        <button type="button" class="btn-action ${isIsolated ? 'active' : ''}" id="btn-isolate">
-          ${isIsolated ? '👁️ Show All Parts' : '🎯 Isolate Part'}
-        </button>
-        <button type="button" class="btn-action" id="btn-reset-view">
-          ↺ Reset View
-        </button>
-      </div>
+       <p class="inspector-summary">${summaryText}</p>
 
-      <!-- Expandable Medical Details Accordion -->
-      <div class="accordion-section">
-        <button
-          type="button"
-          class="accordion-header ${this.medDetailsAccordionExpanded ? 'open' : ''}"
-          id="accordion-toggle-btn"
-          aria-expanded="${this.medDetailsAccordionExpanded ? 'true' : 'false'}"
-        >
-          <span class="acc-title">Medical Details</span>
-          <span class="acc-chevron">${this.medDetailsAccordionExpanded ? '▾' : '▸'}</span>
-        </button>
-        <div class="accordion-content ${this.medDetailsAccordionExpanded ? 'open' : ''}" id="accordion-content">
-          <div class="detail-row">
-            <span class="detail-label">Latin Term:</span>
-            <span class="detail-val"><em>${item.latinName}</em></span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Innervation:</span>
-            <span class="detail-val">${item.innervation}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Fluid Compartment:</span>
-            <span class="detail-val">${item.fluidCompartment}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Dimensions / Shape:</span>
-            <span class="detail-val">${item.morphometry}</span>
-          </div>
-          <div class="detail-row clinical-row">
-            <span class="detail-label">Clinical Pearl:</span>
-            <span class="detail-val">${item.clinicalPearl}</span>
-          </div>
-        </div>
-      </div>
-    `;
+       <div class="inspector-actions">
+         <button type="button" class="btn-action ${isIsolated ? 'active' : ''}" id="btn-isolate">
+           ${isIsolated ? '👁️ Show All Parts' : '🎯 Isolate Part'}
+         </button>
+         <button type="button" class="btn-action" id="btn-reset-view">
+           ↺ Reset View
+         </button>
+       </div>
 
-    this.inspectorCard.classList.add('visible');
+       <!-- Expandable Medical Details Accordion -->
+       <div class="accordion-section">
+         <button
+           type="button"
+           class="accordion-header ${this.medDetailsAccordionExpanded ? 'open' : ''}"
+           id="accordion-toggle-btn"
+           aria-expanded="${this.medDetailsAccordionExpanded ? 'true' : 'false'}"
+         >
+           <span class="acc-title">Medical Details</span>
+           <span class="acc-chevron">${this.medDetailsAccordionExpanded ? '▾' : '▸'}</span>
+         </button>
+         <div class="accordion-content ${this.medDetailsAccordionExpanded ? 'open' : ''}" id="accordion-content">
+           <div class="detail-row">
+             <span class="detail-label">Latin Term:</span>
+             <span class="detail-val"><em>${item.latinName}</em></span>
+           </div>
+           <div class="detail-row">
+             <span class="detail-label">Innervation:</span>
+             <span class="detail-val">${item.innervation}</span>
+           </div>
+           <div class="detail-row">
+             <span class="detail-label">Fluid Compartment:</span>
+             <span class="detail-val">${item.fluidCompartment}</span>
+           </div>
+           <div class="detail-row">
+             <span class="detail-label">Dimensions / Shape:</span>
+             <span class="detail-val">${item.morphometry}</span>
+           </div>
+           <div class="detail-row clinical-row">
+             <span class="detail-label">Clinical Pearl:</span>
+             <span class="detail-val">${item.clinicalPearl}</span>
+           </div>
+         </div>
+       </div>
+     `;
 
-    // Attach inspector button handlers
-    const minimizeBtn = this.inspectorCard.querySelector('#inspector-minimize-btn') as HTMLButtonElement;
-    minimizeBtn?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this.inspectorCard.classList.toggle('minimized');
-      minimizeBtn.textContent = this.inspectorCard.classList.contains('minimized') ? '▢' : '─';
-    });
+     this.inspectorCard.classList.add('visible');
 
-    const closeBtn = this.inspectorCard.querySelector('#inspector-close-btn') as HTMLButtonElement;
-    closeBtn?.addEventListener('click', () => {
-      this.searchInput.value = '';
-      this.searchClearBtn.style.display = 'none';
-      this.scene.selectStructure(null);
-    });
+     // Attach inspector button handlers
+     const minimizeBtn = this.inspectorCard.querySelector('#inspector-minimize-btn') as HTMLButtonElement;
+     minimizeBtn?.addEventListener('click', (ev) => {
+       ev.stopPropagation();
+       this.inspectorCard.classList.toggle('minimized');
+       minimizeBtn.textContent = this.inspectorCard.classList.contains('minimized') ? '▢' : '─';
+     });
 
-    const isolateBtn = this.inspectorCard.querySelector('#btn-isolate') as HTMLButtonElement;
-    isolateBtn?.addEventListener('click', () => {
-      if (snap.isIsolated) {
-        this.scene.restoreAllVisibility();
-      } else {
-        this.scene.isolateSelected();
-      }
-    });
+     const closeBtn = this.inspectorCard.querySelector('#inspector-close-btn') as HTMLButtonElement;
+     closeBtn?.addEventListener('click', () => {
+       this.searchInput.value = '';
+       this.searchClearBtn.style.display = 'none';
+       this.scene.selectStructure(null);
+     });
 
-    const resetBtn = this.inspectorCard.querySelector('#btn-reset-view') as HTMLButtonElement;
-    resetBtn?.addEventListener('click', () => {
-      this.searchInput.value = '';
-      this.searchClearBtn.style.display = 'none';
-      this.scene.resetView();
-    });
+     const isolateBtn = this.inspectorCard.querySelector('#btn-isolate') as HTMLButtonElement;
+     isolateBtn?.addEventListener('click', () => {
+       if (snap.isIsolated) {
+         this.scene.restoreAllVisibility();
+       } else {
+         this.scene.isolateSelected();
+       }
+     });
 
-    const scdsAudiogramBtn = this.inspectorCard.querySelector('#scds-view-audiogram-btn') as HTMLButtonElement;
-    scdsAudiogramBtn?.addEventListener('click', () => {
-      this.switchLabMode('hearing');
-      this.openAudiogramDrawer();
-      this.audiogramDrawer.setActivePreset('scds');
-    });
+     const resetBtn = this.inspectorCard.querySelector('#btn-reset-view') as HTMLButtonElement;
+     resetBtn?.addEventListener('click', () => {
+       this.searchInput.value = '';
+       this.searchClearBtn.style.display = 'none';
+       this.scene.resetView();
+     });
+
+     const scdsAudiogramBtn = this.inspectorCard.querySelector('#scds-view-audiogram-btn') as HTMLButtonElement;
+     scdsAudiogramBtn?.addEventListener('click', () => {
+       this.switchLabMode('hearing');
+       this.openAudiogramDrawer();
+       this.audiogramDrawer.setActivePreset('scds');
+     });
+
+     const vestViewVorBtn = this.inspectorCard.querySelector('#vest-view-vor-btn') as HTMLButtonElement;
+     vestViewVorBtn?.addEventListener('click', () => {
+       if (this.scene.getSnapshot().labMode !== 'vestibular') {
+         this.switchLabMode('vestibular');
+       }
+       this.openVORDrawer();
+     });
 
     const accordionBtn = this.inspectorCard.querySelector('#accordion-toggle-btn') as HTMLButtonElement;
     accordionBtn?.addEventListener('click', () => {

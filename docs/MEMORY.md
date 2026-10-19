@@ -95,6 +95,25 @@
   - Root `package.json`: Added `test:eye-avatar` and integrated into root `npm test`.
   - Verification: `npm test` (all 4 suites: hearing, radiology, vestibular, eye-avatar passing 100%) and `npm run build` (clean 0 errors).
 
+### 2026-10-19: Stage 3 — Step 4: Contextual Vestibular Workbench & VORDrawer (Completed & Verified)
+- **Objective:** Construct the contextual vestibular bottom dock, interactive 3-axis head gyro flyout, docked clinical VNG & 3D VOR drawer (`VORDrawer.ts`), and floating inspector card vestibular telemetry, unified by strict 4-drawer mutual exclusivity and zero-allocation 60fps render loops.
+- **Key Deliverables Achieved:**
+  - `web/src/ui/VORDrawer.ts`: Docked clinical VNG card ($360\text{ px}$ width) mounting 3D Eye Avatar canvas ($360\times 220$ logical, $720\times 440$ physical) and rolling 3-channel Nystagmogram strip chart canvas ($360\times 110$ logical, $720\times 220$ physical) with 2x Retina scaling. Connects to `EyeAvatarEngine` with Listing's law kinematics and cyclotorsion, 2D gaze tracking HUD overlay (pupil crosshairs $\oplus$, corneal Purkinje glints $\ast$), live degree telemetry readouts (H, V, T, SPV, fast-phase beat direction token), near-infrared VNG toggle, and zero-allocation strip chart (Cyan H, Lime V, Amber T) reading from `NystagmogramRingBuffer` with red vertical saccade tick indicators.
+  - `web/src/ui/AppHUD.ts`:
+    - Mode 4 button `[ 🌀 Vestibular & VOR ]` (`#mode-vestibular-btn`).
+    - Contextual bottom dock `#vestibular-dock-content`: 6 maneuver protocol chips (`epley`, `semont`, `gufoni_geotropic`, `gufoni_apogeotropic`, `barbecue_roll`, `yacovino`), step progress scrubber ($0\dots N-1$), clinical hold timer countdown badge, clearance % badge, bump navigation buttons, play sequencer engine (`isSequencerPlaying`), 3-axis gyro flyout (`#gyro-flyout`, Yaw $\pm 180^\circ$, Pitch $-30^\circ\dots 120^\circ$, Roll $\pm 90^\circ$), crystal reset button, and VOR Eyes drawer toggle button.
+    - Floating Inspector Card Vestibular Telemetry: Authoritative clinical vestibular box rendering active canal/plane badge, CN VIII primary afferent firing rate bar gauge ($10\dots 310\text{ sp/s}$ with $90\text{ sp/s}$ resting baseline marker and dynamic color coding), Ewald's law banner, patient sensation badge, clearance %, clinical pearls, and button `#vest-view-vor-btn` opening `VORDrawer`.
+    - Strict 4-Drawer Mutual Exclusivity: Opening any of `VORDrawer`, `CTSliceDrawer`, `AudiogramDrawer`, or `PartsDrawer` immediately closes all other three drawers.
+  - `web/src/render/DualStageScene.ts`:
+    - Concurrently pre-loads all 3 canal splines via `loadAllCanalPaths()`.
+    - Instantiates 5-particle amber otoconial cloud mesh group (`SphereGeometry(0.135, 12, 12)` with `0.22` halo glow).
+    - Camera fly-to to vestibular perspective ($[21.5, -11.5, 7.2] \to [4.5, 1.5, 0.2]$) upon mode switch.
+    - Selective anatomical ghosting: Cochlea (`mesh_david_cochlea`) and Bony Capsule (`segT2_th1.07_Otsu`) ghosted to $15\%$ opacity with `depthWrite: false`, while semicircular ducts and vestibule remain at full visibility ($95\%$).
+    - 60fps render loop stepping: advances `vestibularEngine.stepPhysics()`, updates otoconia mesh coordinates, and forwards telemetry to `vorDrawer.updateTelemetry()`.
+  - `web/src/style.css`: Responsive CSS styling for `#vestibular-dock-content`, `.protocol-chip`, `#gyro-flyout`, `.vor-drawer`, and `.cn8-gauge-wrap`, guaranteeing $\ge 85\%$ canvas stage command across desktop, tablet, and mobile.
+  - `scripts/test_vor_workbench.js`: Standalone Node.js ESM test suite with 51 assertions across 7 test suites passing 100% (DOM structure, 6 maneuvers, scrubber/timer, gyro SO(3) math, VORDrawer layout/mutual exclusivity, strip chart projection/clamping, and build integrity).
+  - Root `package.json`: Added `test:workbench` and integrated into root `npm test` passing all 5 test suites (hearing, radiology, vestibular, eye-avatar, workbench).
+
 ---
 
 ## 2. Key Architecture & Engineering Decisions (ADRs)
@@ -165,9 +184,12 @@
 │   ├── test_hearing_engine.js   # Stage 1 unit test suite (7 suites)
 │   ├── test_radiology_engine.js # Stage 2 mathematical & clinical verification (52 tests)
 │   ├── test_canal_paths.py      # Stage 3 Step 1 multi-canal spline & eye avatar verifier
+│   ├── test_vestibular_engine.js# Stage 3 Step 2 physics & Ewald verification (72 tests)
+│   ├── test_eye_avatar_vor.js   # Stage 3 Step 3 3D eye avatar & Listing VOR verifier (50 tests)
+│   ├── test_vor_workbench.js    # Stage 3 Step 4 vestibular workbench & VORDrawer verifier (51 tests)
 │   ├── generate_multicanal_splines.py # Continuous 3D spline generator for Horizontal & Anterior canals
 │   ├── export_eye_avatar_glb.py # CC0 sculpted eye extractor & cyclotorsion texture generator
-│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test
+│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test (Modes 1-4)
 │
 ├── assets/
 │   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, canal splines, eye avatar, and metadata
@@ -193,13 +215,16 @@
         │   ├── greenwoodEngine.ts # Stage 1 tonotopy math engine
         │   └── radiologyEngine.ts # Stage 2 MPR planes & SCDS math
         ├── physics/
-        │   └── epleyPhysics.ts # TypeScript BPPV kinematics & steps
+        │   ├── epleyPhysics.ts     # TypeScript BPPV kinematics & steps (legacy wrapper)
+        │   └── vestibularEngine.ts # Multi-canal BPPV Stokes & Steinhausen engine
         ├── render/
         │   ├── DualStageScene.ts # Core Three.js render loop & camera controller
+        │   ├── eyeAvatar.ts      # 3D Eye Avatar & Listing's Law kinematic engine
         │   └── gate3Materials.ts # Custom GLSL shaders & analytic clipping
         └── ui/
-            ├── AppHUD.ts        # DOM manager, search, floating inspector, bottom dock
-            ├── AudiogramDrawer.ts # Interactive clinical audiogram drawer
-            └── CTSliceDrawer.ts # Interactive 2D CT MPR canvas slice viewer
+            ├── AppHUD.ts         # DOM manager, search, floating inspector, bottom dock
+            ├── AudiogramDrawer.ts# Interactive clinical audiogram drawer
+            ├── CTSliceDrawer.ts  # Interactive 2D CT MPR canvas slice viewer
+            └── VORDrawer.ts      # Interactive 3D VOR eye avatar & VNG strip chart drawer
 ```
 

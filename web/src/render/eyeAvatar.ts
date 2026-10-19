@@ -222,6 +222,8 @@ export class EyeAvatarEngine {
   private visualMode: VisualMode;
   private gazeMode: GazeMode;
   private readonly glbPath: string;
+  private contextLostHandler: ((ev: Event) => void) | null = null;
+  private contextRestoredHandler: (() => void) | null = null;
 
   // Kinematic state
   private readonly eyeAngle = { h: 0, v: 0, t: 0 };
@@ -860,14 +862,40 @@ export class EyeAvatarEngine {
   }
 
   public attachCanvas(canvas: HTMLCanvasElement): void {
+    if (this.canvas && this.contextLostHandler) {
+      this.canvas.removeEventListener('webglcontextlost', this.contextLostHandler);
+      this.contextLostHandler = null;
+    }
+    if (this.canvas && this.contextRestoredHandler) {
+      this.canvas.removeEventListener('webglcontextrestored', this.contextRestoredHandler);
+      this.contextRestoredHandler = null;
+    }
+
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      powerPreference: 'high-performance',
-    });
-    this.renderer.setPixelRatio(this.pixelRatio);
-    this.renderer.setSize(this.logicalWidth, this.logicalHeight, false);
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      this.renderer.setPixelRatio(this.pixelRatio);
+      this.renderer.setSize(this.logicalWidth, this.logicalHeight, false);
+
+      this.contextLostHandler = (ev: Event) => {
+        ev.preventDefault();
+        console.warn('EyeAvatarEngine: WebGL context lost.');
+      };
+      this.contextRestoredHandler = () => {
+        console.info('EyeAvatarEngine: WebGL context restored.');
+        if (this.renderer) {
+          this.renderer.setSize(this.logicalWidth, this.logicalHeight, false);
+        }
+      };
+      this.canvas.addEventListener('webglcontextlost', this.contextLostHandler, false);
+      this.canvas.addEventListener('webglcontextrestored', this.contextRestoredHandler, false);
+    } catch {
+      this.renderer = null;
+    }
   }
 
   public resize(logicalWidth: number, logicalHeight: number): void {
@@ -890,6 +918,16 @@ export class EyeAvatarEngine {
   }
 
   public dispose(): void {
+    if (this.canvas) {
+      if (this.contextLostHandler) {
+        this.canvas.removeEventListener('webglcontextlost', this.contextLostHandler);
+        this.contextLostHandler = null;
+      }
+      if (this.contextRestoredHandler) {
+        this.canvas.removeEventListener('webglcontextrestored', this.contextRestoredHandler);
+        this.contextRestoredHandler = null;
+      }
+    }
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer = null;
