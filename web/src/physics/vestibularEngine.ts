@@ -153,6 +153,14 @@ export interface PhysicsTelemetryState {
   particlesRAS: Array<[number, number, number]>;
 }
 
+export interface SplineSampleRAS {
+  arc: number;
+  pos: [number, number, number];
+  tan: [number, number, number];
+  nrm: [number, number, number];
+  binorm: [number, number, number];
+}
+
 export interface StepPhysicsOptions {
   allowBackwardSlide?: boolean;
   phiCapMax?: number;
@@ -914,6 +922,31 @@ export class VestibularDynamicsEngine {
   protected readonly pRadialAngle = [0.2, 1.4, 2.7, 4.1, 5.3];
   protected readonly utricleRadExtra = [0.14, 0.22, 0.02, 0.22, 0.16];
 
+  // Static scratch buffers for zero-allocation spline calculations
+  public static readonly scratchSample: SplineSampleRAS = {
+    arc: 0,
+    pos: [0, 0, 0],
+    tan: [0, 0, 0],
+    nrm: [0, 0, 0],
+    binorm: [0, 0, 0],
+  };
+
+  public static readonly particleScratchSample: SplineSampleRAS = {
+    arc: 0,
+    pos: [0, 0, 0],
+    tan: [0, 0, 0],
+    nrm: [0, 0, 0],
+    binorm: [0, 0, 0],
+  };
+
+  protected readonly cachedParticles: Array<[number, number, number]> = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+
   constructor(
     paths: Partial<Record<CanalId, CanalPathData>> | CanalPathData,
     initialCanalId: CanalId = 'posterior',
@@ -1022,7 +1055,8 @@ export class VestibularDynamicsEngine {
   }
 
   public getParticles(): Array<[number, number, number]> {
-    return this.computeParticlesRAS(this.phiDeg, this.canalId);
+    this.computeParticlesRAS(this.phiDeg, this.canalId, this.cachedParticles);
+    return this.cachedParticles;
   }
 
   public getTelemetry(
@@ -1109,14 +1143,9 @@ export class VestibularDynamicsEngine {
 
   public interpolateAtPhi(
     phi: number,
-    canalId: CanalId = this.canalId
-  ): {
-    arc: number;
-    pos: [number, number, number];
-    tan: [number, number, number];
-    nrm: [number, number, number];
-    binorm: [number, number, number];
-  } {
+    canalId: CanalId = this.canalId,
+    target?: SplineSampleRAS
+  ): SplineSampleRAS {
     const path = this.canalPaths[canalId];
     if (!path) {
       throw new Error(`Canal path data for ${canalId} not loaded`);
@@ -1144,62 +1173,117 @@ export class VestibularDynamicsEngine {
     const span = Math.max(1e-6, Math.abs(s1.phi_deg - s0.phi_deg));
     const t = Math.max(0.0, Math.min(1.0, Math.abs(clamped - s0.phi_deg) / span));
 
-    const lerp3 = (
-      a: [number, number, number],
-      b: [number, number, number]
-    ): [number, number, number] => [
-      a[0] + (b[0] - a[0]) * t,
-      a[1] + (b[1] - a[1]) * t,
-      a[2] + (b[2] - a[2]) * t,
-    ];
-
     const arc = s0.arc_length_mm + (s1.arc_length_mm - s0.arc_length_mm) * t;
-    const pos = lerp3(s0.position_ras, s1.position_ras);
-    const rawTan = lerp3(s0.tangent_ras, s1.tangent_ras);
 
-    let tanZ = rawTan[2];
+    // Linear interpolation using scalar arithmetic without heap vector allocations
+    const p0 = s0.position_ras;
+    const p1 = s1.position_ras;
+    const posX = p0[0] + (p1[0] - p0[0]) * t;
+    const posY = p0[1] + (p1[1] - p0[1]) * t;
+    const posZ = p0[2] + (p1[2] - p0[2]) * t;
+
+    const t0 = s0.tangent_ras;
+    const t1 = s1.tangent_ras;
+    const rawTanX = t0[0] + (t1[0] - t0[0]) * t;
+    const rawTanY = t0[1] + (t1[1] - t0[1]) * t;
+    let rawTanZ = t0[2] + (t1[2] - t0[2]) * t;
+
     if (canalId === 'posterior') {
       const floorRamp = smoothstep(-84.0, -70.0, clamped);
-      tanZ = tanZ > 0 ? tanZ * floorRamp : tanZ;
+      rawTanZ = rawTanZ > 0 ? rawTanZ * floorRamp : rawTanZ;
     }
-    const tan = normalize3([rawTan[0], rawTan[1], tanZ]);
 
-    const rawNrm = lerp3(s0.normal_ras, s1.normal_ras);
-    const dotTN = rawNrm[0] * tan[0] + rawNrm[1] * tan[1] + rawNrm[2] * tan[2];
-    const nrm = normalize3([
-      rawNrm[0] - dotTN * tan[0],
-      rawNrm[1] - dotTN * tan[1],
-      rawNrm[2] - dotTN * tan[2],
-    ]);
-    const binorm = normalize3(cross3(tan, nrm));
+    const tanLen = Math.hypot(rawTanX, rawTanY, rawTanZ);
+    const invTan = tanLen < 1e-8 ? 0.0 : 1.0 / tanLen;
+    const tanX = tanLen < 1e-8 ? 1.0 : rawTanX * invTan;
+    const tanY = tanLen < 1e-8 ? 0.0 : rawTanY * invTan;
+    const tanZ = tanLen < 1e-8 ? 0.0 : rawTanZ * invTan;
 
-    return { arc, pos, tan, nrm, binorm };
+    const n0 = s0.normal_ras;
+    const n1 = s1.normal_ras;
+    const rawNrmX = n0[0] + (n1[0] - n0[0]) * t;
+    const rawNrmY = n0[1] + (n1[1] - n0[1]) * t;
+    const rawNrmZ = n0[2] + (n1[2] - n0[2]) * t;
+
+    const dotTN = rawNrmX * tanX + rawNrmY * tanY + rawNrmZ * tanZ;
+    const orthoNrmX = rawNrmX - dotTN * tanX;
+    const orthoNrmY = rawNrmY - dotTN * tanY;
+    const orthoNrmZ = rawNrmZ - dotTN * tanZ;
+
+    const nrmLen = Math.hypot(orthoNrmX, orthoNrmY, orthoNrmZ);
+    const invNrm = nrmLen < 1e-8 ? 0.0 : 1.0 / nrmLen;
+    const nrmX = nrmLen < 1e-8 ? 0.0 : orthoNrmX * invNrm;
+    const nrmY = nrmLen < 1e-8 ? 1.0 : orthoNrmY * invNrm;
+    const nrmZ = nrmLen < 1e-8 ? 0.0 : orthoNrmZ * invNrm;
+
+    // Cross product tan x nrm
+    const crossX = tanY * nrmZ - tanZ * nrmY;
+    const crossY = tanZ * nrmX - tanX * nrmZ;
+    const crossZ = tanX * nrmY - tanY * nrmX;
+
+    const binormLen = Math.hypot(crossX, crossY, crossZ);
+    const invBinorm = binormLen < 1e-8 ? 0.0 : 1.0 / binormLen;
+    const binormX = binormLen < 1e-8 ? 0.0 : crossX * invBinorm;
+    const binormY = binormLen < 1e-8 ? 0.0 : crossY * invBinorm;
+    const binormZ = binormLen < 1e-8 ? 1.0 : crossZ * invBinorm;
+
+    if (target) {
+      target.arc = arc;
+      target.pos[0] = posX;
+      target.pos[1] = posY;
+      target.pos[2] = posZ;
+      target.tan[0] = tanX;
+      target.tan[1] = tanY;
+      target.tan[2] = tanZ;
+      target.nrm[0] = nrmX;
+      target.nrm[1] = nrmY;
+      target.nrm[2] = nrmZ;
+      target.binorm[0] = binormX;
+      target.binorm[1] = binormY;
+      target.binorm[2] = binormZ;
+      return target;
+    }
+
+    return {
+      arc,
+      pos: [posX, posY, posZ],
+      tan: [tanX, tanY, tanZ],
+      nrm: [nrmX, nrmY, nrmZ],
+      binorm: [binormX, binormY, binormZ],
+    };
   }
 
   public computeParticlesRAS(
     centerPhiDeg: number,
-    canalId: CanalId = this.canalId
+    canalId: CanalId = this.canalId,
+    out?: Array<[number, number, number]>
   ): Array<[number, number, number]> {
     const cfg = CANAL_BOUNDARIES[canalId];
     const utricleFan = smoothstep(cfg.utricleFanStart, cfg.phiMax, centerPhiDeg);
     const spreadScale = 1.0 + 0.25 * utricleFan;
-    const pts: Array<[number, number, number]> = [];
+    const pts = out ?? [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
 
     for (let i = 0; i < 5; i++) {
       const phiI = Math.max(
         cfg.phiMin,
         Math.min(cfg.phiMax + 10.0, centerPhiDeg + this.pPhiOffsets[i] * spreadScale)
       );
-      const { pos, nrm, binorm } = this.interpolateAtPhi(phiI, canalId);
+      this.interpolateAtPhi(phiI, canalId, VestibularDynamicsEngine.particleScratchSample);
+      const { pos, nrm, binorm } = VestibularDynamicsEngine.particleScratchSample;
       const r = this.pRadial[i] + this.utricleRadExtra[i] * utricleFan;
       const ang = this.pRadialAngle[i];
       const c = Math.cos(ang);
       const s = Math.sin(ang);
-      pts.push([
-        pos[0] + r * (c * nrm[0] + s * binorm[0]),
-        pos[1] + r * (c * nrm[1] + s * binorm[1]),
-        pos[2] + r * (c * nrm[2] + s * binorm[2]),
-      ]);
+      const p = pts[i];
+      p[0] = pos[0] + r * (c * nrm[0] + s * binorm[0]);
+      p[1] = pos[1] + r * (c * nrm[1] + s * binorm[1]);
+      p[2] = pos[2] + r * (c * nrm[2] + s * binorm[2]);
     }
     return pts;
   }
@@ -1210,7 +1294,11 @@ export class VestibularDynamicsEngine {
     gammaRollDeg: number = 0.0
   ): VestibularTelemetryState {
     const R = computeHeadRotationMatrix(psiYawDeg, thetaPitchDeg, gammaRollDeg);
-    const sample = this.interpolateAtPhi(this.phiDeg, this.canalId);
+    const sample = this.interpolateAtPhi(
+      this.phiDeg,
+      this.canalId,
+      VestibularDynamicsEngine.scratchSample
+    );
     const tanWorld = matVecMul(R, sample.tan);
     const particlesRAS = this.computeParticlesRAS(this.phiDeg, this.canalId);
 
@@ -1299,8 +1387,8 @@ export class VestibularDynamicsEngine {
         this.cupulaDeflection
       ),
       patientLocation: VestibularDynamicsEngine.classifyPatientLocation(this.phiDeg, this.canalId),
-      centerRAS: sample.pos,
-      tangentRAS: sample.tan,
+      centerRAS: [sample.pos[0], sample.pos[1], sample.pos[2]],
+      tangentRAS: [sample.tan[0], sample.tan[1], sample.tan[2]],
       tangentWorld: tanWorld,
       particlesRAS,
     };
@@ -1340,8 +1428,12 @@ export class VestibularDynamicsEngine {
 
     const clampedDt = Math.min(0.05, Math.max(0.0, dt));
     const R = computeHeadRotationMatrix(psiYawDeg, thetaPitchDeg, gammaRollDeg);
-    const { tan } = this.interpolateAtPhi(this.phiDeg, this.canalId);
-    const tanWorld = matVecMul(R, tan);
+    const splineSample = this.interpolateAtPhi(
+      this.phiDeg,
+      this.canalId,
+      VestibularDynamicsEngine.scratchSample
+    );
+    const tanWorld = matVecMul(R, splineSample.tan);
 
     // Gravity projection along canal tangent: g_proj = -tanWorld[2]
     const gProj = -tanWorld[2];

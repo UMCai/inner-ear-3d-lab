@@ -582,7 +582,7 @@ export class AppHUD {
               >
                 <span class="rad-btn-icon">🩻</span>
                 <span class="rad-btn-text">2D CT Card</span>
-                <span class="ct-card-arrow" id="ct-card-arrow">▾</span>
+                <span class="ct-card-arrow" id="ct-card-arrow">▸</span>
               </button>
             </div>
           </div>
@@ -678,7 +678,7 @@ export class AppHUD {
               >
                 <span class="vest-btn-icon">👁️</span>
                 <span class="vest-btn-text">VOR Eyes</span>
-                <span class="vor-arrow" id="vor-arrow">▾</span>
+                <span class="vor-arrow" id="vor-arrow">▸</span>
               </button>
             </div>
           </div>
@@ -877,7 +877,7 @@ export class AppHUD {
     this.ctSliceDrawer.onClose(() => {
       this.radiologyCtToggleBtn.classList.remove('open');
       this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
-      this.ctCardArrowEl.textContent = '▾';
+      this.ctCardArrowEl.textContent = '▸';
       this.updateMobileDrawerExclusivity();
     });
 
@@ -885,7 +885,7 @@ export class AppHUD {
       this.vestVorToggleBtn.classList.remove('open');
       this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
       if (this.vorArrowEl) {
-        this.vorArrowEl.textContent = '▾';
+        this.vorArrowEl.textContent = '▸';
       }
       this.updateMobileDrawerExclusivity();
     });
@@ -1394,6 +1394,7 @@ export class AppHUD {
       if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
         this.closeVORDrawer();
       }
+      this.closeGyroFlyout();
     }
     this.partsDrawerOpen = !this.partsDrawerOpen;
     this.partsDrawer.classList.toggle('open', this.partsDrawerOpen);
@@ -1434,7 +1435,8 @@ export class AppHUD {
         this.partsDrawerOpen ||
         (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) ||
         (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) ||
-        (this.vorDrawer && this.vorDrawer.getIsOpen());
+        (this.vorDrawer && this.vorDrawer.getIsOpen()) ||
+        this.isGyroFlyoutOpen();
       this.inspectorCard.classList.toggle('drawer-active', anyDrawerOpen);
     } else {
       this.inspectorCard.classList.remove('drawer-active');
@@ -1454,6 +1456,7 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    this.closeGyroFlyout();
     const isOpen = this.audiogramDrawer.toggle();
     this.audiogramToggleBtn.classList.toggle('open', isOpen);
     this.audiogramToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -1471,6 +1474,7 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    this.closeGyroFlyout();
     this.audiogramDrawer.open();
     this.audiogramToggleBtn.classList.add('open');
     this.audiogramToggleBtn.setAttribute('aria-expanded', 'true');
@@ -1499,11 +1503,30 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    this.closeGyroFlyout();
     this.ctSliceDrawer.toggle();
     const isOpen = this.ctSliceDrawer.getIsOpen();
     this.radiologyCtToggleBtn.classList.toggle('open', isOpen);
     this.radiologyCtToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     this.ctCardArrowEl.textContent = isOpen ? '▾' : '▸';
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private openCTDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
+    this.closeGyroFlyout();
+    this.ctSliceDrawer.open();
+    this.radiologyCtToggleBtn.classList.add('open');
+    this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'true');
+    this.ctCardArrowEl.textContent = '▾';
     this.updateMobileDrawerExclusivity();
   }
 
@@ -1530,6 +1553,7 @@ export class AppHUD {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
     }
+    this.closeGyroFlyout();
     this.vorDrawer.toggle();
     const isOpen = this.vorDrawer.getIsOpen();
     this.vestVorToggleBtn.classList.toggle('open', isOpen);
@@ -1550,6 +1574,7 @@ export class AppHUD {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
     }
+    this.closeGyroFlyout();
     this.vorDrawer.open();
     this.vestVorToggleBtn.classList.add('open');
     this.vestVorToggleBtn.setAttribute('aria-expanded', 'true');
@@ -1565,7 +1590,7 @@ export class AppHUD {
       this.vestVorToggleBtn.classList.remove('open');
       this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
       if (this.vorArrowEl) {
-        this.vorArrowEl.textContent = '▾';
+        this.vorArrowEl.textContent = '▸';
       }
       this.updateMobileDrawerExclusivity();
     }
@@ -1618,6 +1643,7 @@ export class AppHUD {
       if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
         this.closeCTDrawer();
       }
+      this.closeGyroFlyout();
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.pause();
         this.scene.setHearingPlayback(false);
@@ -1860,9 +1886,14 @@ export class AppHUD {
     this.goToStep(0);
   }
 
+  private isGyroFlyoutOpen(): boolean {
+    return this.gyroFlyout
+      ? this.gyroFlyout.classList.contains('open') || this.gyroFlyout.style.display !== 'none'
+      : false;
+  }
+
   private toggleGyroFlyout(): void {
-    const isVisible = this.gyroFlyout.style.display !== 'none';
-    if (isVisible) {
+    if (this.isGyroFlyoutOpen()) {
       this.closeGyroFlyout();
     } else {
       this.openGyroFlyout();
@@ -1870,15 +1901,35 @@ export class AppHUD {
   }
 
   private openGyroFlyout(): void {
-    this.gyroFlyout.style.display = 'block';
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
+    this.gyroFlyout.classList.add('open');
+    this.gyroFlyout.style.display = 'flex';
     this.vestGyroToggleBtn.classList.add('active');
     this.vestGyroToggleBtn.setAttribute('aria-expanded', 'true');
+    this.updateMobileDrawerExclusivity();
   }
 
   private closeGyroFlyout(): void {
-    this.gyroFlyout.style.display = 'none';
-    this.vestGyroToggleBtn.classList.remove('active');
-    this.vestGyroToggleBtn.setAttribute('aria-expanded', 'false');
+    if (this.gyroFlyout) {
+      this.gyroFlyout.classList.remove('open');
+      this.gyroFlyout.style.display = 'none';
+    }
+    if (this.vestGyroToggleBtn) {
+      this.vestGyroToggleBtn.classList.remove('active');
+      this.vestGyroToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+    this.updateMobileDrawerExclusivity();
   }
 
   private setHeadOrientationUI(yaw: number, pitch: number, roll: number): void {

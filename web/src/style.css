@@ -3253,6 +3253,8 @@ input[type='range']::-webkit-slider-thumb:hover {
     right: 8px;
     bottom: 110px;
     width: auto;
+    max-height: 56vh;
+    overflow-y: auto;
   }
 }
 

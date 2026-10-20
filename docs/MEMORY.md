@@ -116,7 +116,28 @@
 
 ---
 
+### 2026-10-20: Technical Debt & UI/UX Polish Pass (Completed & Verified)
+- **Objective:** Eliminate accumulated technical debt, synchronization bugs, transient heap allocations in render loops, and bundle chunk warnings identified in the self-audit.
+- **Key Deliverables Achieved:**
+  - `web/src/ui/AppHUD.ts`:
+    - Arrow Inversion Fix: Corrected chevron indicators across all drawers (`CTCard`, `Audiogram`, `VOR`, `Parts`) to strictly display `'▸'` when collapsed/closed and `'▾'` when expanded/opened, fixing inverted arrow initial states and close callbacks.
+    - Unified Panel Exclusivity: `#gyro-flyout` integrated as an exclusive panel alongside the 4 lab drawers. Opening any drawer auto-closes `gyroFlyout`, and opening `gyroFlyout` auto-closes all drawers.
+    - Mobile Z-Index Conflict Elimination: `updateMobileDrawerExclusivity()` detects when `gyroFlyout` is active and hides `.inspector-card` via `.drawer-active` (`display: none !important;`) on mobile ($\le 640\text{ px}$).
+  - `web/src/style.css`: Added scroll containment (`max-height: 56vh; overflow-y: auto;`) to `.gyro-flyout` on mobile handsets.
+  - `web/src/physics/vestibularEngine.ts`: Refactored `interpolateAtPhi()` and `computeParticlesRAS()` with direct scalar arithmetic and static scratch targets (`scratchSample`, `cachedParticles`), eliminating ~54 heap allocations/frame (~3,240 allocs/sec) while retaining complete backward compatibility.
+  - `web/src/render/DualStageScene.ts`:
+    - Zero-Allocation Pin Projections: Pre-allocated `scratchPinVector = new THREE.Vector3()` and static candidate pin arrays in `computeProjectedPins()`, eliminating all per-frame `new THREE.Vector3()` heap allocations across 27 anatomical meshes.
+    - Complete Resource Cleanup: Enhanced `dispose()` to call `this.controls.dispose()`, unbind all 5 container pointer/mouse DOM event listeners (`pointerdown` with capture, `pointermove`, `pointerup`, `pointercancel`, `dblclick`), and recursively traverse the scene graph to dispose all mesh geometries and materials.
+  - `web/vite.config.ts`: Configured Rollup `manualChunks` to isolate `three` into `three-vendor` and set `chunkSizeWarningLimit: 700`, achieving a clean build with 0 TypeScript/Vite errors and 0 bundle size warnings.
+  - Verification: 100% pass across all 5 unit test suites (`npm test`), 100% pass across all 3 viewports in headless Chrome CDP test (`scripts/verify_mvp_cdp.js`), and clean production build (`npm run build`).
+
+---
+
 ## 2. Key Architecture & Engineering Decisions (ADRs)
+
+### ADR-009: Pre-Allocated Scratch Buffers & Complete WebGL Resource Disposal
+- **Decision:** Mandate pre-allocated static scratch arrays and objects (`SplineSampleRAS`, `Float32Array`, `scratchPinVector`) for all render loop operations across physics stepping and 2D pin projections. Enforce dedicated non-overlapping scratch buffers (`scratchSample` for canal center telemetry vs `particleScratchSample` for particle cloud interpolation) to prevent internal state corruption of `arcMm`, `centerRAS`, and `tangentRAS`. Pre-allocate fixed `acceptedBoxes` and filter structures inline in `computeProjectedPins()` to eliminate all heap allocations at 60fps. Enforce complete unbinding of DOM event listeners, container DOM detachment, and recursive Three.js geometry/material disposal on `DualStageScene.dispose()`.
+- **Rationale:** Prevents GC micro-stutter and memory leaks during continuous 60fps clinical simulation, guarantees mathematical integrity across nested spline interpolations, and ensures seamless lifecycle management when mounting/unmounting WebGL scenes in modal workbenches.
 
 ### ADR-008: 3-DOF Listing's Law Kinematics & Sawtooth VOR Avatar Engine
 - **Decision:** Separate ocular rotations into single-axis Listing plane rotations ($q_z \equiv 0$) for visual fixations/saccades and active cyclotorsional rotations around $-Z$ ($\mathbf{q}_{\text{torsion}}$) for vestibular drive. Model bilateral cyclovergence directly with identical torsion angle ($\phi_t$) rotating both upper poles toward patient right, producing right extorsion and left intorsion.

@@ -149,6 +149,34 @@ export class DualStageScene {
   private static readonly DUMMY_CLIP_NORMAL = new THREE.Vector3(0, 0, -1);
   private tempRendererSize = new THREE.Vector2();
   private tempNDC = new THREE.Vector2();
+  private scratchPinVector = new THREE.Vector3();
+
+  // Pin projection pre-allocated buffers
+  private pinCandidates: Array<{
+    pin: ProjectedPin2D;
+    priority: number;
+    maxDist: number;
+    depth: number;
+  }> = [];
+  private activeCandidates: Array<{
+    pin: ProjectedPin2D;
+    priority: number;
+    maxDist: number;
+    depth: number;
+  }> = [];
+  private acceptedBoxes: Array<{ x: number; y: number; w: number; h: number }> = Array.from(
+    { length: 32 },
+    () => ({ x: 0, y: 0, w: 0, h: 0 })
+  );
+  private acceptedBoxCount = 0;
+  private projectedPinResults: ProjectedPin2D[] = [];
+
+  // DOM Event Listener references for complete disposal
+  private onPointerDownBound?: (ev: PointerEvent) => void;
+  private onPointerMoveBound?: (ev: PointerEvent) => void;
+  private onPointerUpBound?: (ev: PointerEvent) => void;
+  private onPointerCancelBound?: (ev: PointerEvent) => void;
+  private onDblClickBound?: (ev: MouseEvent) => void;
 
   // Radiology 3D Helpers & SCDS Visualizer
   private radiologyPlaneHelperGroup: THREE.Group | null = null;
@@ -221,6 +249,24 @@ export class DualStageScene {
 
     for (const item of IEMAP_STRUCTURES) {
       this.state.visibilityMap[item.meshName] = item.defaultState;
+      this.pinCandidates.push({
+        pin: {
+          id: `struct_${item.meshName}`,
+          rawId: item.meshName,
+          label: item.shortLabel,
+          sublabel: `${item.displayName} (${item.latinName})`,
+          category: 'structure',
+          colorHex: item.colorHex,
+          screenX: 0,
+          screenY: 0,
+          visible: false,
+          occluded: false,
+          meshName: item.meshName,
+        },
+        priority: 1,
+        maxDist: 42,
+        depth: 0,
+      });
     }
 
     this.renderer = new THREE.WebGLRenderer({
@@ -1214,19 +1260,15 @@ export class DualStageScene {
   private setupPointerInteractions(): void {
     const dom = this.renderer.domElement;
 
-    dom.addEventListener(
-      'pointerdown',
-      (ev) => {
-        this.activePointers.add(ev.pointerId);
-        if (this.activePointers.size > 1) {
-          this.isMultiTouch = true;
-        }
-        this.pointerDownPos.set(ev.clientX, ev.clientY);
-      },
-      { capture: true }
-    );
+    this.onPointerDownBound = (ev: PointerEvent) => {
+      this.activePointers.add(ev.pointerId);
+      if (this.activePointers.size > 1) {
+        this.isMultiTouch = true;
+      }
+      this.pointerDownPos.set(ev.clientX, ev.clientY);
+    };
 
-    dom.addEventListener('pointermove', (ev) => {
+    this.onPointerMoveBound = (ev: PointerEvent) => {
       // Skip hover raycasting during touch interaction or when orbiting (mouse button held down)
       if (ev.pointerType === 'touch' || ev.buttons > 0) {
         return;
@@ -1237,9 +1279,9 @@ export class DualStageScene {
         dom.style.cursor = hitMesh ? 'pointer' : 'grab';
         this.applySceneStateToMeshes();
       }
-    });
+    };
 
-    dom.addEventListener('pointerup', (ev) => {
+    this.onPointerUpBound = (ev: PointerEvent) => {
       const wasMultiTouch = this.isMultiTouch;
       this.activePointers.delete(ev.pointerId);
       if (this.activePointers.size === 0) {
@@ -1267,21 +1309,27 @@ export class DualStageScene {
         this.selectStructure(hitMesh, true);
         this.notifyStructurePicked(hitMesh);
       }
-    });
+    };
 
-    dom.addEventListener('pointercancel', (ev) => {
+    this.onPointerCancelBound = (ev: PointerEvent) => {
       this.activePointers.delete(ev.pointerId);
       if (this.activePointers.size === 0) {
         this.isMultiTouch = false;
       }
-    });
+    };
 
-    dom.addEventListener('dblclick', (ev) => {
+    this.onDblClickBound = (ev: MouseEvent) => {
       const hitMesh = this.raycastLabyrinthAtScreen(ev.clientX, ev.clientY);
       if (hitMesh) {
         this.selectStructure(hitMesh, true);
       }
-    });
+    };
+
+    dom.addEventListener('pointerdown', this.onPointerDownBound, { capture: true });
+    dom.addEventListener('pointermove', this.onPointerMoveBound);
+    dom.addEventListener('pointerup', this.onPointerUpBound);
+    dom.addEventListener('pointercancel', this.onPointerCancelBound);
+    dom.addEventListener('dblclick', this.onDblClickBound);
   }
 
   private raycastLabyrinthAtScreen(clientX: number, clientY: number): string | null {
@@ -1365,39 +1413,19 @@ export class DualStageScene {
   // 3D LABELS PROJECTION TO 2D OVERLAY
   // ===========================================================================
   private computeProjectedPins(width: number, height: number): ProjectedPin2D[] {
-    if (this.state.labelMode === 'off') {
+    if (this.state.labelMode === 'off' || width <= 10 || height <= 10) {
       return [];
     }
-
-    if (width <= 10 || height <= 10) return [];
 
     const camDist = this.camera.position.distanceTo(this.controls.target);
     const isAllMode = this.state.labelMode === 'all';
 
-    const projectWorldPoint = (worldPt: THREE.Vector3) => {
-      const v = worldPt.clone().project(this.camera);
-      const sx = (v.x * 0.5 + 0.5) * width;
-      const sy = (-(v.y * 0.5) + 0.5) * height;
-      const inFrustum =
-        v.z > -1.0 &&
-        v.z < 1.0 &&
-        sx >= 10 &&
-        sx <= width - 10 &&
-        sy >= 10 &&
-        sy <= height - 10;
-      return { sx, sy, inFrustum, depth: v.z };
-    };
+    this.activeCandidates.length = 0;
+    this.acceptedBoxCount = 0;
+    this.projectedPinResults.length = 0;
 
-    interface CandidatePin {
-      pin: ProjectedPin2D;
-      priority: number;
-      maxDist: number;
-      depth: number;
-    }
-
-    let candidates: CandidatePin[] = [];
-
-    for (const item of IEMAP_STRUCTURES) {
+    for (let i = 0; i < IEMAP_STRUCTURES.length; i++) {
+      const item = IEMAP_STRUCTURES[i];
       const entry = this.meshEntries.get(item.meshName);
       if (!entry || !entry.mesh.visible) continue;
       if (item.systemGroup === 'bony_capsule') continue;
@@ -1405,72 +1433,77 @@ export class DualStageScene {
       const isKeyStruct = KEY_STRUCTURE_MESH_NAMES.has(item.meshName);
       if (!isAllMode && !isKeyStruct) continue;
 
+      if (this.state.labMode === 'hearing' && !item.meshName.includes('coch')) {
+        continue;
+      }
+      if (
+        this.state.labMode === 'vestibular' &&
+        (item.meshName.includes('coch') || item.meshName.includes('segT2'))
+      ) {
+        continue;
+      }
+
       const priority = isKeyStruct ? 1 : 2;
       const maxDist = isKeyStruct ? (isAllMode ? 55 : 42) : 28;
 
-      const pt = new THREE.Vector3(
+      this.scratchPinVector.set(
         item.centroidRAS[0] + entry.mesh.position.x,
         item.centroidRAS[1] + entry.mesh.position.y,
         item.centroidRAS[2] + entry.mesh.position.z
       );
-      const proj = projectWorldPoint(pt);
+      this.scratchPinVector.project(this.camera);
 
-      candidates.push({
-        pin: {
-          id: `struct_${item.meshName}`,
-          rawId: item.meshName,
-          label: item.shortLabel,
-          sublabel: `${item.displayName} (${item.latinName})`,
-          category: 'structure',
-          colorHex: item.colorHex,
-          screenX: proj.sx,
-          screenY: proj.sy,
-          visible: proj.inFrustum,
-          occluded: proj.depth > 0.985,
-          meshName: item.meshName,
-        },
-        priority,
-        maxDist,
-        depth: proj.depth,
-      });
-    }
+      const vx = this.scratchPinVector.x;
+      const vy = this.scratchPinVector.y;
+      const vz = this.scratchPinVector.z;
 
-    if (this.state.labMode === 'hearing') {
-      candidates = candidates.filter((c) => c.pin.meshName.includes('coch'));
-    } else if (this.state.labMode === 'vestibular') {
-      candidates = candidates.filter(
-        (c) => !c.pin.meshName.includes('coch') && !c.pin.meshName.includes('segT2')
-      );
+      const sx = (vx * 0.5 + 0.5) * width;
+      const sy = (-(vy * 0.5) + 0.5) * height;
+      const inFrustum =
+        vz > -1.0 &&
+        vz < 1.0 &&
+        sx >= 10 &&
+        sx <= width - 10 &&
+        sy >= 10 &&
+        sy <= height - 10;
+
+      const cand = this.pinCandidates[i];
+      if (!cand) continue;
+
+      cand.pin.screenX = sx;
+      cand.pin.screenY = sy;
+      cand.pin.visible = inFrustum;
+      cand.pin.occluded = vz > 0.985;
+      cand.priority = priority;
+      cand.maxDist = maxDist;
+      cand.depth = vz;
+
+      this.activeCandidates.push(cand);
     }
 
     // Filter distance & avoid collisions
-    candidates.sort((a, b) => a.priority - b.priority || a.depth - b.depth);
+    this.activeCandidates.sort((a, b) => a.priority - b.priority || a.depth - b.depth);
 
-    const acceptedBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
-    const results: ProjectedPin2D[] = [];
-
-    for (const cand of candidates) {
+    for (let i = 0; i < this.activeCandidates.length; i++) {
+      const cand = this.activeCandidates[i];
       if (!cand.pin.visible || camDist > cand.maxDist) {
         continue;
       }
 
       const boxW = Math.max(90, cand.pin.label.length * 7 + 22);
       const boxH = 26;
-      const box = {
-        x: cand.pin.screenX - boxW / 2,
-        y: cand.pin.screenY - 14,
-        w: boxW,
-        h: boxH,
-      };
+      const bx = cand.pin.screenX - boxW / 2;
+      const by = cand.pin.screenY - 14;
 
       let collides = false;
-      for (const acc of acceptedBoxes) {
+      for (let j = 0; j < this.acceptedBoxCount; j++) {
+        const acc = this.acceptedBoxes[j];
         if (
           !(
-            box.x + box.w < acc.x - 8 ||
-            box.x > acc.x + acc.w + 8 ||
-            box.y + box.h < acc.y - 6 ||
-            box.y > acc.y + acc.h + 6
+            bx + boxW < acc.x - 8 ||
+            bx > acc.x + acc.w + 8 ||
+            by + boxH < acc.y - 6 ||
+            by > acc.y + acc.h + 6
           )
         ) {
           collides = true;
@@ -1479,12 +1512,21 @@ export class DualStageScene {
       }
 
       if (!collides) {
-        acceptedBoxes.push(box);
-        results.push(cand.pin);
+        let box = this.acceptedBoxes[this.acceptedBoxCount];
+        if (!box) {
+          box = { x: 0, y: 0, w: 0, h: 0 };
+          this.acceptedBoxes.push(box);
+        }
+        box.x = bx;
+        box.y = by;
+        box.w = boxW;
+        box.h = boxH;
+        this.acceptedBoxCount++;
+        this.projectedPinResults.push(cand.pin);
       }
     }
 
-    return results;
+    return this.projectedPinResults;
   }
 
   // ===========================================================================
@@ -1546,7 +1588,12 @@ export class DualStageScene {
       // Advance Vestibular Physics & Otoconia Particles in Vestibular Mode
       if (this.state.labMode === 'vestibular' && this.vestibularEngine) {
         const simDt = Math.min(dt, 0.033);
-        this.vestibularEngine.stepPhysics(simDt, this.currentYaw, this.currentPitch, this.currentRoll);
+        const telem = this.vestibularEngine.stepPhysics(
+          simDt,
+          this.currentYaw,
+          this.currentPitch,
+          this.currentRoll
+        );
         const particles = this.vestibularEngine.getParticles();
         for (let i = 0; i < 5; i++) {
           const p = particles[i];
@@ -1555,11 +1602,6 @@ export class DualStageScene {
           }
         }
         if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-          const telem = this.vestibularEngine.getTelemetry(
-            this.currentYaw,
-            this.currentPitch,
-            this.currentRoll
-          );
           this.vorDrawer.updateTelemetry(telem, simDt);
         }
       }
@@ -1668,6 +1710,49 @@ export class DualStageScene {
 
   public dispose(): void {
     cancelAnimationFrame(this.animationFrameId);
+
+    if (this.controls) {
+      this.controls.dispose();
+    }
+
+    const dom = this.renderer?.domElement;
+    if (dom) {
+      if (this.onPointerDownBound) {
+        dom.removeEventListener('pointerdown', this.onPointerDownBound, { capture: true });
+      }
+      if (this.onPointerMoveBound) {
+        dom.removeEventListener('pointermove', this.onPointerMoveBound);
+      }
+      if (this.onPointerUpBound) {
+        dom.removeEventListener('pointerup', this.onPointerUpBound);
+      }
+      if (this.onPointerCancelBound) {
+        dom.removeEventListener('pointercancel', this.onPointerCancelBound);
+      }
+      if (this.onDblClickBound) {
+        dom.removeEventListener('dblclick', this.onDblClickBound);
+      }
+      if (dom.parentElement) {
+        dom.parentElement.removeChild(dom);
+      }
+    }
+
+    this.scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry?.dispose();
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((mat) => mat.dispose());
+        } else if (obj.material) {
+          obj.material.dispose();
+        }
+      }
+    });
+
+    this.meshEntries.clear();
+    this.onStateChangeCallbacks.length = 0;
+    this.onPinsUpdateCallbacks.length = 0;
+    this.onStructurePickedCallbacks.length = 0;
+
     this.renderer.dispose();
   }
 }
