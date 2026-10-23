@@ -609,7 +609,7 @@ async function run() {
         `,
         returnByValue: true,
       });
-      if (!audiogramTest.result.value.drawerOpen || audiogramTest.result.value.presetCount !== 5 || !audiogramTest.result.value.notchActive) {
+      if (!audiogramTest.result.value.drawerOpen || audiogramTest.result.value.presetCount !== 7 || !audiogramTest.result.value.notchActive) {
         throw new Error(`Audiogram drawer test failed: ${JSON.stringify(audiogramTest.result.value)}`);
       }
       console.log(`✓ Clinical Audiogram Drawer verified (${audiogramTest.result.value.presetCount} presets, active: "${audiogramTest.result.value.title}")`);
@@ -1012,16 +1012,364 @@ async function run() {
       console.log(`✓ 3D VOR Eye Avatar & Clinical VNG Drawer verified (Retina Avatars, Strip Chart, NIR Goggles, 4-Way Exclusivity)`);
       await new Promise((r) => setTimeout(r, 650));
 
-      // 28. Capture Stage 3 Vestibular & VOR Visual Screenshot
+      // 28. Capture Stage 3 BPPV Visual Screenshot
       const vestSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const vestSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_vestibular_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
       writeFileSync(vestSsPath, Buffer.from(vestSs.data, 'base64'));
-      console.log(`✓ Captured Stage 3 Vestibular & VOR visual screenshot to ${vestSsPath}`);
+      console.log(`✓ Captured Stage 3 BPPV visual screenshot to ${vestSsPath}`);
+
+      // =========================================================================
+      // 28A. Stage 3 Phase 3B: Caloric Testing Suite (COWS & Alexander's Law)
+      const caloricTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            // 1. Switch to Caloric submode via subnav tab
+            const caloricTab = document.querySelector('.vest-subnav-tab[data-submode="caloric"]');
+            caloricTab?.click();
+            const caloricSubview = document.querySelector('#vest-caloric-subview');
+            const caloricVisible = caloricSubview && getComputedStyle(caloricSubview).display !== 'none';
+            const bppvHidden = document.querySelector('#vest-bppv-subview')?.style.display === 'none';
+
+            // 2. Laterality Switching: Left ear (L44) mirrors labyrinth
+            const l44Chip = document.querySelector('.caloric-chip[data-caloric-temp="L44"]');
+            l44Chip?.click();
+            const latBadgeLeft = document.querySelector('#caloric-laterality-badge')?.textContent;
+
+            // Switch back to Right ear (R44)
+            const r44Chip = document.querySelector('.caloric-chip[data-caloric-temp="R44"]');
+            r44Chip?.click();
+            const latBadgeRight = document.querySelector('#caloric-laterality-badge')?.textContent;
+
+            // 3. Align Supine +30° Posture
+            const postureBtn = document.querySelector('#caloric-posture-btn');
+            postureBtn?.click();
+
+            // 4. Start Caloric Irrigation
+            const playBtn = document.querySelector('#caloric-play-btn');
+            playBtn?.click();
+            const isIrrigating = playBtn?.classList.contains('playing');
+
+            return {
+              caloricVisible,
+              bppvHidden,
+              latBadgeLeft,
+              latBadgeRight,
+              isIrrigating,
+            };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !caloricTest.result.value.caloricVisible ||
+        !caloricTest.result.value.bppvHidden ||
+        !caloricTest.result.value.latBadgeLeft?.includes('Left Ear') ||
+        !caloricTest.result.value.latBadgeRight?.includes('Right Ear') ||
+        !caloricTest.result.value.isIrrigating
+      ) {
+        throw new Error(`Caloric test failed: ${JSON.stringify(caloricTest.result.value)}`);
+      }
+      console.log(`✓ Caloric Testing Suite verified (Subnav switch, L44/R44 laterality, Supine +30°, Irrigation active)`);
+
+      // Allow irrigation to run for ~1.5s to generate thermal convection and nystagmus
+      await new Promise((r) => setTimeout(r, 1600));
+
+      // Test Alexander Gaze modulation and pause irrigation
+      const alexGazeTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const timerText = document.querySelector('#caloric-timer-badge')?.textContent;
+            const spvText = document.querySelector('#caloric-spv-badge')?.textContent;
+
+            // Click Alexander Gaze +30° chip
+            const gazePlus = document.querySelector('.alex-gaze-chip[data-alex-gaze="30"]');
+            gazePlus?.click();
+            const alexBadge = document.querySelector('#caloric-alex-degree-badge')?.textContent;
+
+            // Stop irrigation
+            const playBtn = document.querySelector('#caloric-play-btn');
+            playBtn?.click();
+            const isPaused = !playBtn?.classList.contains('playing');
+
+            // Reset gaze to 0°
+            document.querySelector('.alex-gaze-chip[data-alex-gaze="0"]')?.click();
+
+            return { timerText, spvText, alexBadge, isPaused };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !alexGazeTest.result.value.timerText ||
+        alexGazeTest.result.value.timerText === '⏱️ 0s / 40s' ||
+        !alexGazeTest.result.value.isPaused
+      ) {
+        throw new Error(`Alexander gaze / irrigation timer test failed: ${JSON.stringify(alexGazeTest.result.value)}`);
+      }
+      console.log(`✓ Caloric Convection ODE & Alexander's Law verified (Timer: ${alexGazeTest.result.value.timerText}, SPV: ${alexGazeTest.result.value.spvText}, Gaze: ${alexGazeTest.result.value.alexBadge})`);
+
+      // Test Jongkees Calculator Modal
+      const jongkeesTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            // Open modal
+            const openBtn = document.querySelector('#caloric-jongkees-open-btn');
+            openBtn?.click();
+            const modal = document.querySelector('#caloric-jongkees-modal');
+            const modalOpen = modal && getComputedStyle(modal).display !== 'none';
+
+            // Select Acute Right Neuritis preset
+            const rightPreset = document.querySelector('.jongkees-preset-btn[data-preset="right_uw"]');
+            rightPreset?.click();
+            const uwVal = document.querySelector('#jongkees-uw-val')?.textContent;
+            const dpVal = document.querySelector('#jongkees-dp-val')?.textContent;
+            const interp = document.querySelector('#caloric-interp-card')?.textContent;
+
+            // Close modal via Apply
+            const applyBtn = document.querySelector('#caloric-modal-apply-btn');
+            applyBtn?.click();
+            const modalClosed = modal && modal.style.display === 'none';
+
+            return { modalOpen, uwVal, dpVal, interp, modalClosed };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !jongkeesTest.result.value.modalOpen ||
+        !jongkeesTest.result.value.uwVal ||
+        parseFloat(jongkeesTest.result.value.uwVal) < 25.0 ||
+        !/right/i.test(jongkeesTest.result.value.interp || '') ||
+        !jongkeesTest.result.value.modalClosed
+      ) {
+        throw new Error(`Jongkees modal test failed: ${JSON.stringify(jongkeesTest.result.value)}`);
+      }
+      console.log(`✓ Jongkees Matrix Calculator verified (UW: ${jongkeesTest.result.value.uwVal}, DP: ${jongkeesTest.result.value.dpVal}, Pathologic Right Paresis flagged)`);
+
+      // Capture Stage 3 Caloric Screenshot
+      const caloricSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const caloricSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_caloric_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(caloricSsPath, Buffer.from(caloricSs.data, 'base64'));
+      console.log(`✓ Captured Stage 3 Caloric visual screenshot to ${caloricSsPath}`);
+
+      // =========================================================================
+      // 28B. Stage 3 Phase 3B: Video Head Impulse Test (vHIT) Suite
+      const vhitTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            // Switch to vHIT submode via subnav tab
+            const vhitTab = document.querySelector('.vest-subnav-tab[data-submode="vhit"]');
+            vhitTab?.click();
+            const vhitSubview = document.querySelector('#vest-vhit-subview');
+            const vhitVisible = vhitSubview && getComputedStyle(vhitSubview).display !== 'none';
+
+            // Test canal pair selector
+            const ralpChip = document.querySelector('.vhit-pair-chip[data-vhit-pair="ralp"]');
+            ralpChip?.click();
+            const ralpActive = ralpChip?.classList.contains('active');
+
+            const horizChip = document.querySelector('.vhit-pair-chip[data-vhit-pair="horizontal"]');
+            horizChip?.click();
+            const horizActive = horizChip?.classList.contains('active');
+
+            // Test direction selector
+            const dirLeft = document.querySelector('#vhit-dir-left-btn');
+            dirLeft?.click();
+            const leftActive = dirLeft?.classList.contains('active');
+            const dirRight = document.querySelector('#vhit-dir-right-btn');
+            dirRight?.click();
+            const rightActive = dirRight?.classList.contains('active');
+
+            // Test pathology preset selection (Schwannoma with covert saccades)
+            const schwannomaChip = document.querySelector('.vhit-preset-chip[data-vhit-preset="chronic_schwannoma"]');
+            schwannomaChip?.click();
+            const schwannomaActive = schwannomaChip?.classList.contains('active');
+            const previewGain = document.querySelector('#vhit-gain-badge')?.textContent;
+
+            // Toggle SHIMP paradigm
+            const paradigmBtn = document.querySelector('#vhit-paradigm-toggle-btn');
+            paradigmBtn?.click();
+            const isShimp = paradigmBtn?.textContent?.includes('SHIMP');
+            paradigmBtn?.click();
+            const isHimp = paradigmBtn?.textContent?.includes('HIMP');
+
+            return {
+              vhitVisible,
+              ralpActive,
+              horizActive,
+              leftActive,
+              rightActive,
+              schwannomaActive,
+              previewGain,
+              isShimp,
+              isHimp,
+            };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !vhitTest.result.value.vhitVisible ||
+        !vhitTest.result.value.ralpActive ||
+        !vhitTest.result.value.horizActive ||
+        !vhitTest.result.value.rightActive ||
+        !vhitTest.result.value.schwannomaActive ||
+        !vhitTest.result.value.previewGain?.includes('0.38') ||
+        !vhitTest.result.value.isHimp
+      ) {
+        throw new Error(`vHIT setup test failed: ${JSON.stringify(vhitTest.result.value)}`);
+      }
+      console.log(`✓ vHIT Workbench Controls verified (Canal pairs, Direction, Schwannoma preset, HIMP/SHIMP)`);
+
+      // Deliver High-Acceleration Head Impulse Thrust
+      const thrustTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const thrustBtn = document.querySelector('#vhit-deliver-thrust-btn');
+            thrustBtn?.click();
+            const isImpulsing = thrustBtn?.classList.contains('impulsing') || thrustBtn?.disabled;
+            return { isImpulsing };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (!thrustTest.result.value.isImpulsing) {
+        throw new Error('vHIT Deliver Thrust button failed to initiate impulse animation');
+      }
+
+      // Wait for head thrust animation (600ms) to complete and button to reset
+      await new Promise((r) => setTimeout(r, 750));
+
+      const postThrustTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const thrustBtn = document.querySelector('#vhit-deliver-thrust-btn');
+            const isReset = !thrustBtn?.classList.contains('impulsing') && !thrustBtn?.disabled;
+            const vorDrawer = document.querySelector('#vor-drawer');
+            const drawerOpen = vorDrawer?.classList.contains('open');
+            const gainBadge = document.querySelector('#vhit-gain-badge')?.textContent;
+            const saccadeBadge = document.querySelector('#vhit-saccade-badge')?.textContent;
+            const stripTitle = document.querySelector('#vor-strip-title')?.textContent;
+
+            return { isReset, drawerOpen, gainBadge, saccadeBadge, stripTitle };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !postThrustTest.result.value.isReset ||
+        !postThrustTest.result.value.drawerOpen ||
+        !postThrustTest.result.value.gainBadge?.includes('Gain:') ||
+        !postThrustTest.result.value.stripTitle?.includes('vHIT')
+      ) {
+        throw new Error(`vHIT post-thrust execution failed: ${JSON.stringify(postThrustTest.result.value)}`);
+      }
+      console.log(`✓ vHIT High-Acceleration Head Thrust executed & verified (Gain: ${postThrustTest.result.value.gainBadge}, Saccades: ${postThrustTest.result.value.saccadeBadge}, Dual-Trace plot active)`);
+
+      // Capture Stage 3 vHIT Screenshot
+      const vhitSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const vhitSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_vhit_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(vhitSsPath, Buffer.from(vhitSs.data, 'base64'));
+      console.log(`✓ Captured Stage 3 vHIT visual screenshot to ${vhitSsPath}`);
+
+      // Return to BPPV submode before Stage 4
+      await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            document.querySelector('.vest-subnav-tab[data-submode="bppv"]')?.click();
+          })()
+        `,
+      });
+      await new Promise((r) => setTimeout(r, 400));
+
+      // =========================================================================
+      // 28C. Stage 4: Surgical Suites & Implant Simulations Verification
+      await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const surgBtn = document.querySelector('#mode-surgical-btn');
+            surgBtn?.click();
+          })()
+        `,
+      });
+      await new Promise((r) => setTimeout(r, 600));
+
+      const surgModeTest = await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const dock = document.querySelector('#surgical-dock-content');
+            const dockVisible = dock && getComputedStyle(dock).display !== 'none';
+            const ciSubview = document.querySelector('#surg-ci-subview');
+            const ciVisible = ciSubview && getComputedStyle(ciSubview).display !== 'none';
+
+            // Open Surgical Drawer via toggle button
+            const surgDrawerBtn = document.querySelector('#ci-drawer-toggle-btn');
+            surgDrawerBtn?.click();
+            const surgDrawer = document.querySelector('#surgical-drawer');
+            const drawerOpen = surgDrawer?.classList.contains('open');
+            const hasMonitorCanvas = !!surgDrawer?.querySelector('#surg-monitor-canvas');
+            const hasPlotCanvas = !!surgDrawer?.querySelector('#surg-plot-canvas');
+
+            // Test 5-way mutual exclusivity: Opening CT drawer closes surgical drawer
+            const ctBtn = document.querySelector('#rad-ct-toggle-btn');
+            ctBtn?.click();
+            const surgClosedByCt = !surgDrawer?.classList.contains('open');
+
+            // Reopen surgical drawer closes CT drawer
+            surgDrawerBtn?.click();
+            const surgReopened = surgDrawer?.classList.contains('open');
+            const ctClosedBySurg = !document.querySelector('#ct-slice-drawer')?.classList.contains('open');
+
+            return {
+              dockVisible,
+              ciVisible,
+              drawerOpen,
+              hasMonitorCanvas,
+              hasPlotCanvas,
+              surgClosedByCt,
+              surgReopened,
+              ctClosedBySurg,
+            };
+          })()
+        `,
+        returnByValue: true,
+      });
+
+      if (
+        !surgModeTest.result.value.dockVisible ||
+        !surgModeTest.result.value.ciVisible ||
+        !surgModeTest.result.value.drawerOpen ||
+        !surgModeTest.result.value.hasMonitorCanvas ||
+        !surgModeTest.result.value.hasPlotCanvas ||
+        !surgModeTest.result.value.surgClosedByCt ||
+        !surgModeTest.result.value.surgReopened ||
+        !surgModeTest.result.value.ctClosedBySurg
+      ) {
+        throw new Error(`Surgical Drawer test failed: ${JSON.stringify(surgModeTest.result.value)}`);
+      }
+      console.log(`✓ Stage 4 Surgical Suites verified (Dock Workbench, CI Navigation, 2D Endoscopy & Plot, 5-Way Exclusivity)`);
+      await new Promise((r) => setTimeout(r, 650));
+
+      // Capture Stage 4 Surgical Visual Screenshot
+      const surgSs = await client.send('Page.captureScreenshot', { format: 'png' });
+      const surgSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage4_surgical_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      writeFileSync(surgSsPath, Buffer.from(surgSs.data, 'base64'));
+      console.log(`✓ Captured Stage 4 Surgical visual screenshot to ${surgSsPath}`);
 
       // 29. Return to Anatomy Mode and close drawers for clean state
       await client.send('Runtime.evaluate', {
         expression: `
           (() => {
+            const surgDrawer = document.querySelector('#surgical-drawer');
+            if (surgDrawer?.classList.contains('open')) {
+              document.querySelector('#ci-drawer-toggle-btn')?.click();
+            }
             const vorDrawer = document.querySelector('#vor-drawer');
             if (vorDrawer?.classList.contains('open')) {
               document.querySelector('#vest-vor-toggle-btn')?.click();

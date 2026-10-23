@@ -13,7 +13,9 @@
     "test:vestibular": "node scripts/test_vestibular_engine.js",
     "test:eye-avatar": "node scripts/test_eye_avatar_vor.js",
     "test:workbench": "node scripts/test_vor_workbench.js",
-    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular && npm run test:eye-avatar && npm run test:workbench"
+    "test:diagnostic": "node scripts/test_diagnostic_vestibular.js",
+    "test:surgical": "node scripts/test_surgical_engine.js",
+    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular && npm run test:eye-avatar && npm run test:workbench && npm run test:diagnostic && npm run test:surgical"
   }
 }
 

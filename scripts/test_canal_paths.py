@@ -13,7 +13,12 @@ import json
 import math
 import sys
 from pathlib import Path
-import numpy as np
+
+try:
+    import numpy as np
+    HAVE_NUMPY = True
+except ImportError:
+    HAVE_NUMPY = False
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 IEMAP_DIR = REPO_ROOT / "assets" / "iemap"
@@ -26,7 +31,7 @@ def load_obj(path):
         for line in f:
             if line.startswith("v "):
                 verts.append([float(x) for x in line.split()[1:4]])
-    return np.array(verts)
+    return verts
 
 def test_canal_file(json_path, expected_len_range, mesh_files):
     print(f"\n[TEST SUITE] Verifying {json_path.name}...")
@@ -65,13 +70,13 @@ def test_canal_file(json_path, expected_len_range, mesh_files):
     pts = []
     for i, s in enumerate(samples):
         pos = s["position_ras"]
-        tan = np.array(s["tangent_ras"])
-        nrm = np.array(s["normal_ras"])
+        tan = s["tangent_ras"]
+        nrm = s["normal_ras"]
 
         pts.append(pos)
-        t_len = np.linalg.norm(tan)
-        n_len = np.linalg.norm(nrm)
-        dot_tn = abs(np.dot(tan, nrm))
+        t_len = math.sqrt(tan[0] ** 2 + tan[1] ** 2 + tan[2] ** 2)
+        n_len = math.sqrt(nrm[0] ** 2 + nrm[1] ** 2 + nrm[2] ** 2)
+        dot_tn = abs(tan[0] * nrm[0] + tan[1] * nrm[1] + tan[2] * nrm[2])
 
         max_tan_norm_err = max(max_tan_norm_err, abs(t_len - 1.0))
         max_nrm_norm_err = max(max_nrm_norm_err, abs(n_len - 1.0))
@@ -86,13 +91,28 @@ def test_canal_file(json_path, expected_len_range, mesh_files):
     assert max_dot_tn_err < 1e-3, f"Tangent-Normal orthogonality error too high: {max_dot_tn_err}"
 
     # Check clearance inside authentic OBJ meshes
-    mesh_verts = np.vstack([load_obj(OBJ_DIR / m) for m in mesh_files])
-    pts = np.array(pts)
-    clearances = np.array([np.min(np.linalg.norm(mesh_verts - p, axis=1)) for p in pts])
+    mesh_verts = []
+    for m in mesh_files:
+        mesh_verts.extend(load_obj(OBJ_DIR / m))
 
-    print(f"  Mesh Lumen Clearance: min={clearances.min():.3f} mm, mean={clearances.mean():.3f} mm, max={clearances.max():.3f} mm")
-    assert clearances.min() > 0.015, f"Clearance min {clearances.min():.3f} mm indicates wall penetration"
-    assert clearances.mean() > 0.18, f"Clearance mean {clearances.mean():.3f} mm indicates off-center spline"
+    if HAVE_NUMPY:
+        np_mesh_verts = np.array(mesh_verts)
+        np_pts = np.array(pts)
+        clearances = [float(np.min(np.linalg.norm(np_mesh_verts - p, axis=1))) for p in np_pts]
+    else:
+        clearances = []
+        for p in pts:
+            px, py, pz = p
+            min_d_sq = min((v[0] - px) ** 2 + (v[1] - py) ** 2 + (v[2] - pz) ** 2 for v in mesh_verts)
+            clearances.append(math.sqrt(min_d_sq))
+
+    min_clearance = min(clearances)
+    mean_clearance = sum(clearances) / len(clearances)
+    max_clearance = max(clearances)
+
+    print(f"  Mesh Lumen Clearance: min={min_clearance:.3f} mm, mean={mean_clearance:.3f} mm, max={max_clearance:.3f} mm")
+    assert min_clearance > 0.015, f"Clearance min {min_clearance:.3f} mm indicates wall penetration"
+    assert mean_clearance > 0.18, f"Clearance mean {mean_clearance:.3f} mm indicates off-center spline"
 
     print(f"  [PASS] {json_path.name} is 100% verified!")
 

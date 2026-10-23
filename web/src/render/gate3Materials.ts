@@ -21,6 +21,18 @@ export interface Gate3ShaderUniforms {
   uLossMaskActive: { value: number };
   uLossRange: { value: THREE.Vector2 };
   uLossSeverity: { value: number };
+  // Caloric Thermal Convection Uniforms
+  uCaloricActive: { value: number };
+  uCaloricTempDiff: { value: number };
+  uCaloricDiffusion: { value: number };
+  uCaloricTime: { value: number };
+  // Contralateral Mirrored Mode Normal Correction
+  uMirrored: { value: number };
+  // Surgical Simulation Uniforms
+  uSurgicalDrillActive: { value: number };
+  uCanalUnroofed: { value: THREE.Vector3 };
+  uTranslocationBreach: { value: number };
+  uSurgicalTime: { value: number };
 }
 
 const VERTEX_SHADER = /* glsl */ `
@@ -68,6 +80,19 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform vec2 uLossRange;
   uniform float uLossSeverity;
 
+  // Caloric Thermal Convection Uniforms
+  uniform float uCaloricActive;
+  uniform float uCaloricTempDiff;
+  uniform float uCaloricDiffusion;
+  uniform float uCaloricTime;
+  uniform float uMirrored;
+
+  // Surgical Simulation Uniforms
+  uniform float uSurgicalDrillActive;
+  uniform vec3 uCanalUnroofed;
+  uniform float uTranslocationBreach;
+  uniform float uSurgicalTime;
+
   varying vec3 vNormalView;
   varying vec3 vViewPosition;
   varying vec3 vWorldPosition;
@@ -111,9 +136,26 @@ const FRAGMENT_SHADER = /* glsl */ `
       }
     }
 
+    // Discrete Surgical Canal Arch Unroofing Masks
+    // uCanalUnroofed.x = Horizontal/Lateral Canal (ls_Hsapiens_Sl)
+    // uCanalUnroofed.y = Superior Canal (ls_Hsapiens_Sa)
+    // uCanalUnroofed.z = Posterior Canal (ls_Hsapiens_Sp)
+    if (uCanalUnroofed.x > 0.5 && vNormalWorld.z > 0.38 && vWorldPosition.x > 4.5) {
+      discard;
+    }
+    if (uCanalUnroofed.y > 0.5 && vNormalWorld.z > 0.40 && vWorldPosition.z > 2.5) {
+      discard;
+    }
+    if (uCanalUnroofed.z > 0.5 && (vNormalWorld.z > 0.38 || vNormalWorld.y < -0.35) && vWorldPosition.y < -1.0) {
+      discard;
+    }
+
     vec3 viewDir = normalize(vViewPosition);
     vec3 normal = normalize(vNormalView);
-    bool isBackface = !gl_FrontFacing;
+    // Under contralateral mirrored mode (scale.x = -1.0), triangle winding order inverts,
+    // so gl_FrontFacing is false for external surfaces.
+    bool isFacingOut = (uMirrored > 0.5) ? (!gl_FrontFacing) : gl_FrontFacing;
+    bool isBackface = !isFacingOut;
     if (isBackface) {
       normal = -normal;
     }
@@ -131,7 +173,7 @@ const FRAGMENT_SHADER = /* glsl */ `
     vec3 fillDir = normalize(vec3(-0.62, 0.42, 0.35));
     vec3 topDir = normalize(vec3(0.0, 0.15, 0.98));
 
-    vec3 nWorld = normalize(gl_FrontFacing ? vNormalWorld : -vNormalWorld);
+    vec3 nWorld = normalize(isFacingOut ? vNormalWorld : -vNormalWorld);
     float keyTerm = max(dot(nWorld, keyDir), -0.25) * 0.48 + 0.52;
     float fillTerm = max(dot(nWorld, fillDir), 0.0) * 0.24;
     float topTerm = max(dot(nWorld, topDir), 0.0) * 0.16;
@@ -192,6 +234,40 @@ const FRAGMENT_SHADER = /* glsl */ `
       litColor = mix(litColor, tonotopyLit, uTonotopyMode);
     }
 
+    // Caloric Thermal Convection Shader on Lateral Duct
+    if (uCaloricActive > 0.01 && uCaloricDiffusion > 0.001) {
+      // Coordinate along lateral arch in RAS space:
+      // X ranges ~4.2 mm (medial ampulla) to ~10.7 mm (lateral arch peak)
+      float xCoord = abs(vWorldPosition.x);
+      float uThermal = clamp((xCoord - 4.2) / (10.7 - 4.2), 0.0, 1.0);
+
+      // Convective flow ripple: animated waves along canal lumen
+      float flowDir = (uCaloricTempDiff > 0.0) ? 1.0 : -1.0;
+      float flowRipple = sin(uThermal * 18.0 + uCaloricTime * 4.0 * flowDir) * 0.15 + 0.85;
+
+      vec3 thermalColor;
+      if (uCaloricTempDiff < -20.0) {
+        // Ice water (4°C, ΔT = -33°C): intense frosty white-cyan with sparkle
+        vec3 iceBase = vec3(0.01, 0.52, 0.78);
+        vec3 frostPeak = vec3(0.88, 0.95, 1.0);
+        float sparkle = pow(max(0.0, sin(uThermal * 40.0 + uCaloricTime * 6.0)), 4.0) * 0.4;
+        thermalColor = mix(iceBase, frostPeak, uThermal) * (flowRipple + sparkle);
+      } else if (uCaloricTempDiff < 0.0) {
+        // Cold (30°C, ΔT = -7°C): Crystalline cyan-blue
+        vec3 coldDeep = vec3(0.11, 0.31, 0.85); // #1d4ed8
+        vec3 coldLight = vec3(0.22, 0.74, 0.97); // #38bdf8
+        thermalColor = mix(coldDeep, coldLight, uThermal) * flowRipple;
+      } else {
+        // Warm (44°C, ΔT = +7°C): Fiery amber-orange to crimson
+        vec3 warmAmpulla = vec3(0.88, 0.11, 0.28); // #e11d48
+        vec3 warmArch = vec3(1.0, 0.42, 0.0); // #ff6b00
+        thermalColor = mix(warmAmpulla, warmArch, uThermal) * flowRipple;
+      }
+
+      float thermalIntensity = clamp(abs(uCaloricTempDiff) / 7.0, 0.5, 2.0) * uCaloricDiffusion * uCaloricActive;
+      litColor = mix(litColor, thermalColor * (1.3 + fresnel * 0.5), min(0.92, thermalIntensity * 0.85));
+    }
+
     // Cross-section cut edge highlight glow (within 0.18 mm of clipping plane)
     if (uClipActive > 0.5) {
       float clipDist = dot(vWorldPosition, uClipNormal) + uClipConstant;
@@ -202,6 +278,29 @@ const FRAGMENT_SHADER = /* glsl */ `
     // Selection / hover highlight boost
     if (uHighlight > 0.01) {
       litColor = mix(litColor, rimColor * 1.25, uHighlight * (0.25 + 0.55 * fresnel));
+    }
+
+    // Surgical Translocation Crimson Flash Alarm
+    if (uTranslocationBreach > 0.01) {
+      vec3 crimsonBreach = vec3(0.98, 0.04, 0.18);
+      float pulse = 0.7 + 0.3 * sin(uSurgicalTime * 16.0);
+      litColor = mix(litColor, crimsonBreach * (1.3 * pulse), uTranslocationBreach * 0.85);
+    }
+
+    // Surgical Otologic Drill Cutting Visual
+    if (uSurgicalDrillActive > 0.5) {
+      // Localized drill burr friction glow near lateral canal / antrum [8.68, 0.45, 0.82]
+      float drillDist = length(vWorldPosition - vec3(8.68, 0.45, 0.82));
+      if (drillDist < 3.2) {
+        float drillFlicker = 0.85 + 0.15 * sin(uSurgicalTime * 45.0);
+        litColor = mix(litColor, vec3(1.0, 0.92, 0.55) * 1.5 * drillFlicker, (1.0 - drillDist / 3.2) * 0.65);
+      }
+    }
+
+    // Canal unroofing glistening cut edge highlight
+    if (uCanalUnroofed.x > 0.5 || uCanalUnroofed.y > 0.5 || uCanalUnroofed.z > 0.5) {
+      float unroofEdge = smoothstep(0.30, 0.40, vNormalWorld.z);
+      litColor = mix(litColor, vec3(0.85, 0.95, 1.0) * 1.35, unroofEdge * 0.4);
     }
 
     float finalAlpha = uOpacity;
@@ -255,6 +354,15 @@ export function createGate3StructureMaterial(options: {
     uLossMaskActive: { value: 0.0 },
     uLossRange: { value: new THREE.Vector2(0.0, 0.0) },
     uLossSeverity: { value: 0.0 },
+    uCaloricActive: { value: 0.0 },
+    uCaloricTempDiff: { value: 0.0 },
+    uCaloricDiffusion: { value: 0.0 },
+    uCaloricTime: { value: 0.0 },
+    uMirrored: { value: 0.0 },
+    uSurgicalDrillActive: { value: 0.0 },
+    uCanalUnroofed: { value: new THREE.Vector3(0, 0, 0) },
+    uTranslocationBreach: { value: 0.0 },
+    uSurgicalTime: { value: 0.0 },
   };
 
   const isTranslucent = options.baseAlpha < 0.85 || Boolean(options.singleSurface);
@@ -288,6 +396,14 @@ export function updateGate3MaterialState(
     lossMaskActive?: number;
     lossRange?: THREE.Vector2;
     lossSeverity?: number;
+    caloricActive?: number;
+    caloricTempDiff?: number;
+    caloricDiffusion?: number;
+    caloricTime?: number;
+    surgicalDrillActive?: number;
+    canalUnroofed?: THREE.Vector3;
+    translocationBreach?: number;
+    surgicalTime?: number;
   }
 ): void {
   const u = mat.uniforms as unknown as Gate3ShaderUniforms;
@@ -316,5 +432,34 @@ export function updateGate3MaterialState(
   if (params.lossMaskActive !== undefined) u.uLossMaskActive.value = params.lossMaskActive;
   if (params.lossRange !== undefined) u.uLossRange.value.copy(params.lossRange);
   if (params.lossSeverity !== undefined) u.uLossSeverity.value = params.lossSeverity;
+  if (params.caloricActive !== undefined) u.uCaloricActive.value = params.caloricActive;
+  if (params.caloricTempDiff !== undefined) u.uCaloricTempDiff.value = params.caloricTempDiff;
+  if (params.caloricDiffusion !== undefined) u.uCaloricDiffusion.value = params.caloricDiffusion;
+  if (params.caloricTime !== undefined) u.uCaloricTime.value = params.caloricTime;
+  if (params.surgicalDrillActive !== undefined) u.uSurgicalDrillActive.value = params.surgicalDrillActive;
+  if (params.canalUnroofed !== undefined) u.uCanalUnroofed.value.copy(params.canalUnroofed);
+  if (params.translocationBreach !== undefined) u.uTranslocationBreach.value = params.translocationBreach;
+  if (params.surgicalTime !== undefined) u.uSurgicalTime.value = params.surgicalTime;
+}
+
+/**
+ * Donald D. Greenwood perceptual 7-stop spectral color in TypeScript space.
+ */
+export function getGreenwoodColor(x: number): THREE.Color {
+  const cx = Math.max(0.0, Math.min(1.0, x));
+  const c0 = new THREE.Color(0.38, 0.10, 0.78);
+  const c1 = new THREE.Color(0.12, 0.38, 0.96);
+  const c2 = new THREE.Color(0.10, 0.82, 0.94);
+  const c3 = new THREE.Color(0.20, 0.88, 0.45);
+  const c4 = new THREE.Color(0.98, 0.80, 0.14);
+  const c5 = new THREE.Color(0.98, 0.45, 0.12);
+  const c6 = new THREE.Color(0.95, 0.12, 0.22);
+
+  if (cx < 0.17) return c0.clone().lerp(c1, cx / 0.17);
+  if (cx < 0.33) return c1.clone().lerp(c2, (cx - 0.17) / (0.33 - 0.17));
+  if (cx < 0.50) return c2.clone().lerp(c3, (cx - 0.33) / (0.50 - 0.33));
+  if (cx < 0.68) return c3.clone().lerp(c4, (cx - 0.50) / (0.68 - 0.50));
+  if (cx < 0.84) return c4.clone().lerp(c5, (cx - 0.68) / (0.84 - 0.68));
+  return c5.clone().lerp(c6, (cx - 0.84) / (1.00 - 0.84));
 }
 

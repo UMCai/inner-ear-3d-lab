@@ -40,11 +40,42 @@ import {
   type VestibularTelemetryState,
   type ManeuverId,
 } from '../physics/vestibularEngine';
+import {
+  computeVHITHeadQuaternion,
+  type VHITCanalPair,
+  type CaloricConvectionState,
+} from '../physics/diagnosticVestibularEngine';
+import {
+  type Gate3ShaderUniforms,
+  getGreenwoodColor,
+} from './gate3Materials';
 import type { VORDrawer } from '../ui/VORDrawer';
+import type { SurgicalDrawer } from '../ui/SurgicalDrawer';
+import {
+  type SurgicalProcedure,
+  type CIArrayType,
+  type CIApproach,
+  type KoosStage,
+  type CIInsertionState,
+  type LabyrinthectomyState,
+  type NeurectomyState,
+  SURGICAL_CAMERA_PERSPECTIVES,
+  computeCIInsertionKinematics,
+  computeLabyrinthectomyAblation,
+  computeNeurectomyElectrophysiology,
+  evaluateScalaTympaniSpline,
+} from '../physics/surgicalEngine';
 
 export type LabelDensityMode = 'off' | 'key' | 'all';
 export type ReadingDepth = 'simple' | 'detailed';
-export type LabMode = 'anatomy' | 'hearing' | 'vestibular' | 'radiology';
+export type LabMode = 'anatomy' | 'hearing' | 'vestibular' | 'radiology' | 'surgical';
+
+export interface SurgicalLabState {
+  activeProcedure: SurgicalProcedure;
+  ciState: CIInsertionState;
+  labyState: LabyrinthectomyState;
+  neurectomyState: NeurectomyState;
+}
 
 export interface HearingLabState {
   activeFrequency: number;
@@ -81,6 +112,7 @@ export interface LabSceneSnapshot {
   labMode: LabMode;
   hearingState: HearingLabState;
   radiologyState: RadiologyLabState;
+  surgicalState: SurgicalLabState;
   selectedMesh: string | null;
   hoveredMesh: string | null;
   visibilityMap: Record<string, VisibilityState>;
@@ -194,6 +226,37 @@ export class DualStageScene {
   private currentPitch = 0;
   private currentRoll = 0;
 
+  // Diagnostic Vestibular Testing State: Laterality & vHIT Kinematic Animation
+  private currentLaterality: 'right' | 'left' = 'right';
+  private vhitAnim: {
+    active: boolean;
+    startTime: number;
+    pair: VHITCanalPair;
+    direction: 1 | -1;
+    onComplete?: () => void;
+  } | null = null;
+  private readonly qVHITTmp = new THREE.Quaternion();
+  private readonly qIdentity = new THREE.Quaternion(0, 0, 0, 1);
+  private readonly vhitQuatArray = new Float64Array(4);
+  private activeCaloricState: {
+    active: boolean;
+    cupulaDeflection: number;
+    afferentFiringRate: number;
+    slowPhaseHorizDegPerSec: number;
+    fastPhaseBeatDirection: string;
+    flowDirection: string;
+    isAmpullopetal: boolean;
+  } | null = null;
+
+  // Surgical Simulation Suite
+  private surgicalDrawer: SurgicalDrawer | null = null;
+  private ciElectrodeGroup: THREE.Group | null = null;
+  private ciCarrierMesh: THREE.Line | null = null;
+  private ciCarrierTubeMesh: THREE.Mesh | null = null;
+  private ciContactMeshes: THREE.Mesh[] = [];
+  private ciCenterPointsTmp: [number, number, number][] = Array.from({ length: 65 }, () => [0, 0, 0]);
+  private surgicalSimTime = 0.0;
+
   // Reactive State
   private state: LabSceneSnapshot = {
     labMode: 'anatomy',
@@ -211,6 +274,12 @@ export class DualStageScene {
       showPlaneHelper: true,
       scdsActive: false,
       windowMode: 'bone',
+    },
+    surgicalState: {
+      activeProcedure: 'cochlear_implant',
+      ciState: computeCIInsertionKinematics(0),
+      labyState: computeLabyrinthectomyAblation(0),
+      neurectomyState: computeNeurectomyElectrophysiology(0),
     },
     selectedMesh: 'ls_Hsapiens_Sp',
     hoveredMesh: null,
@@ -332,6 +401,7 @@ export class DualStageScene {
 
     this.initRadiology3DHelpers();
     this.initOtoconiaVisualizer();
+    this.initSurgicalArray();
     this.setupPointerInteractions();
   }
 
@@ -361,6 +431,91 @@ export class DualStageScene {
     }
     this.otoconiaGroup.visible = false;
     this.labyrinthRoot.add(this.otoconiaGroup);
+  }
+
+  private initSurgicalArray(): void {
+    this.ciElectrodeGroup = new THREE.Group();
+    this.ciElectrodeGroup.name = 'surgical_ci_electrode_group';
+
+    // 1. Procedural 3D Silicone Carrier Tube Geometry (64 longitudinal segments, 8 radial slices)
+    const SEGMENTS = 64;
+    const RADIAL = 8;
+    const vertexCount = (SEGMENTS + 1) * (RADIAL + 1);
+    const indexCount = SEGMENTS * RADIAL * 6;
+
+    const tubePositions = new Float32Array(vertexCount * 3);
+    const tubeNormals = new Float32Array(vertexCount * 3);
+    const tubeIndices = new Uint16Array(indexCount);
+
+    let idx = 0;
+    for (let j = 0; j < SEGMENTS; j++) {
+      for (let i = 0; i < RADIAL; i++) {
+        const a = j * (RADIAL + 1) + i;
+        const b = (j + 1) * (RADIAL + 1) + i;
+        const c = (j + 1) * (RADIAL + 1) + (i + 1);
+        const d = j * (RADIAL + 1) + (i + 1);
+
+        tubeIndices[idx++] = a;
+        tubeIndices[idx++] = b;
+        tubeIndices[idx++] = d;
+
+        tubeIndices[idx++] = b;
+        tubeIndices[idx++] = c;
+        tubeIndices[idx++] = d;
+      }
+    }
+
+    const tubeGeo = new THREE.BufferGeometry();
+    tubeGeo.setAttribute('position', new THREE.BufferAttribute(tubePositions, 3));
+    tubeGeo.setAttribute('normal', new THREE.BufferAttribute(tubeNormals, 3));
+    tubeGeo.setIndex(new THREE.BufferAttribute(tubeIndices, 1));
+
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: 0xcfd8dc,
+      roughness: 0.32,
+      metalness: 0.18,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+    });
+    this.ciCarrierTubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+    this.ciElectrodeGroup.add(this.ciCarrierTubeMesh);
+
+    // Also keep center line for surgical tracking
+    const linePositions = new Float32Array((SEGMENTS + 1) * 3);
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x64748b,
+      transparent: true,
+      opacity: 0.6,
+    });
+    this.ciCarrierMesh = new THREE.Line(lineGeo, lineMat);
+    this.ciElectrodeGroup.add(this.ciCarrierMesh);
+
+    // 2. 22 Platinum electrode contact rings with Greenwood spectral colors (pre-allocated)
+    // Contact 0 = E1 (apical lead, lowest frequency, normX = 0, violet)
+    // Contact 21 = E22 (basal lead, highest frequency, normX = 1, scarlet red)
+    const contactGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.38, 12);
+    this.ciContactMeshes = [];
+    for (let i = 0; i < 22; i++) {
+      const normX = Math.max(0.0, Math.min(1.0, i / 21));
+      const color = getGreenwoodColor(normX);
+      const contactMat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.4,
+        metalness: 0.92,
+        roughness: 0.12,
+      });
+      const mesh = new THREE.Mesh(contactGeo, contactMat);
+      mesh.visible = false;
+      this.ciElectrodeGroup.add(mesh);
+      this.ciContactMeshes.push(mesh);
+    }
+
+    this.ciElectrodeGroup.visible = false;
+    this.labyrinthRoot.add(this.ciElectrodeGroup);
   }
 
   // ===========================================================================
@@ -703,6 +858,16 @@ export class DualStageScene {
   public setLabMode(mode: LabMode): void {
     if (this.state.labMode === mode) return;
 
+    this.cancelVHITThrust();
+
+    if (mode !== 'vestibular') {
+      this.setCaloricUniforms(false, 0, 0, 0);
+      this.setCaloricSimulationState(false, null);
+      if (this.currentLaterality !== 'right') {
+        this.setLabyrinthLaterality('right');
+      }
+    }
+
     if (mode === 'radiology') {
       // Save current anatomy state for lossless restoration
       if (!this.savedAnatomyState) {
@@ -766,6 +931,19 @@ export class DualStageScene {
       const camPos = new THREE.Vector3(21.5, -11.5, 7.2);
       const targetRAS = new THREE.Vector3(4.5, 1.5, 0.2);
       this.startCameraFly(camPos, targetRAS, 550, new THREE.Vector3(0, 0, 1));
+    } else if (mode === 'surgical') {
+      if (!this.savedAnatomyState) {
+        this.savedAnatomyState = {
+          visibilityMap: { ...this.state.visibilityMap },
+          bonyPeelPercent: this.state.bonyPeelPercent,
+          cameraPos: this.camera.position.clone(),
+          controlsTarget: this.controls.target.clone(),
+          cameraUp: this.camera.up.clone(),
+        };
+      }
+
+      this.state.labMode = 'surgical';
+      this.flyToSurgicalProcedure(this.state.surgicalState.activeProcedure);
     } else if (mode === 'anatomy') {
       this.state.labMode = 'anatomy';
       if (this.savedAnatomyState) {
@@ -785,6 +963,47 @@ export class DualStageScene {
     }
     if (this.tonotopyCursorMesh) {
       this.tonotopyCursorMesh.visible = this.state.labMode === 'hearing';
+    }
+    if (this.ciElectrodeGroup) {
+      this.ciElectrodeGroup.visible =
+        this.state.labMode === 'surgical' &&
+        this.state.surgicalState.activeProcedure === 'cochlear_implant';
+    }
+
+    if (this.state.labMode !== 'surgical') {
+      const entrySV = this.meshEntries.get('seg_coch_inner_scala_vestibuli');
+      if (entrySV && entrySV.material) {
+        entrySV.material.uniforms.uTranslocationBreach.value = 0.0;
+      }
+      const entrySl = this.meshEntries.get('ls_Hsapiens_Sl');
+      if (entrySl && entrySl.material) {
+        entrySl.material.uniforms.uSurgicalDrillActive.value = 0.0;
+        entrySl.material.uniforms.uCanalUnroofed.value.set(0, 0, 0);
+      }
+      const entrySa = this.meshEntries.get('ls_Hsapiens_Sa');
+      if (entrySa && entrySa.material) {
+        entrySa.material.uniforms.uCanalUnroofed.value.set(0, 0, 0);
+      }
+      const entrySp = this.meshEntries.get('ls_Hsapiens_Sp');
+      if (entrySp && entrySp.material) {
+        entrySp.material.uniforms.uCanalUnroofed.value.set(0, 0, 0);
+      }
+      const entryOtsu = this.meshEntries.get('segT2_th1.07_Otsu');
+      if (entryOtsu && entryOtsu.material) {
+        entryOtsu.material.uniforms.uSurgicalDrillActive.value = 0.0;
+      }
+    }
+
+    if (this.state.labMode !== 'vestibular') {
+      const entrySl = this.meshEntries.get('ls_Hsapiens_Sl');
+      if (entrySl && entrySl.material) {
+        const u = entrySl.material.uniforms as unknown as Gate3ShaderUniforms;
+        if (u.uCaloricActive) u.uCaloricActive.value = 0.0;
+        if (u.uCaloricTempDiff) u.uCaloricTempDiff.value = 0.0;
+        if (u.uCaloricDiffusion) u.uCaloricDiffusion.value = 0.0;
+        if (u.uCaloricTime) u.uCaloricTime.value = 0.0;
+      }
+      this.activeCaloricState = null;
     }
 
     this.applySceneStateToMeshes();
@@ -1546,6 +1765,31 @@ export class DualStageScene {
         }
       }
 
+      // Update Surgical Simulation Time on Shaders
+      if (this.state.labMode === 'surgical') {
+        this.surgicalSimTime += dt;
+        const entrySV = this.meshEntries.get('seg_coch_inner_scala_vestibuli');
+        if (entrySV && entrySV.material) {
+          entrySV.material.uniforms.uSurgicalTime.value = this.surgicalSimTime;
+        }
+        const entrySl = this.meshEntries.get('ls_Hsapiens_Sl');
+        if (entrySl && entrySl.material) {
+          entrySl.material.uniforms.uSurgicalTime.value = this.surgicalSimTime;
+        }
+        const entrySa = this.meshEntries.get('ls_Hsapiens_Sa');
+        if (entrySa && entrySa.material) {
+          entrySa.material.uniforms.uSurgicalTime.value = this.surgicalSimTime;
+        }
+        const entrySp = this.meshEntries.get('ls_Hsapiens_Sp');
+        if (entrySp && entrySp.material) {
+          entrySp.material.uniforms.uSurgicalTime.value = this.surgicalSimTime;
+        }
+        const entryOtsu = this.meshEntries.get('segT2_th1.07_Otsu');
+        if (entryOtsu && entryOtsu.material) {
+          entryOtsu.material.uniforms.uSurgicalTime.value = this.surgicalSimTime;
+        }
+      }
+
       // Update Camera Fly-To interpolation
       if (this.flyAnim && this.flyAnim.active) {
         const elapsed = now - this.flyAnim.startTime;
@@ -1586,23 +1830,71 @@ export class DualStageScene {
       }
 
       // Advance Vestibular Physics & Otoconia Particles in Vestibular Mode
-      if (this.state.labMode === 'vestibular' && this.vestibularEngine) {
+      if (this.state.labMode === 'vestibular') {
         const simDt = Math.min(dt, 0.033);
-        const telem = this.vestibularEngine.stepPhysics(
-          simDt,
-          this.currentYaw,
-          this.currentPitch,
-          this.currentRoll
-        );
-        const particles = this.vestibularEngine.getParticles();
-        for (let i = 0; i < 5; i++) {
-          const p = particles[i];
-          if (p && this.otoconiaMeshes[i]) {
-            this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+        let telem: VestibularTelemetryState;
+        if (this.vestibularEngine) {
+          telem = this.vestibularEngine.stepPhysics(
+            simDt,
+            this.currentYaw,
+            this.currentPitch,
+            this.currentRoll
+          );
+          const particles = this.vestibularEngine.getParticles();
+          for (let i = 0; i < 5; i++) {
+            const p = particles[i];
+            if (p && this.otoconiaMeshes[i]) {
+              this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+            }
           }
+        } else {
+          telem = {} as VestibularTelemetryState;
         }
+
+        // Overlay active Caloric Convection if irrigating
+        if (this.activeCaloricState && this.activeCaloricState.active) {
+          telem.cupulaDeflectionNormalized = this.activeCaloricState.cupulaDeflection;
+          telem.afferentSpikesPerSec = this.activeCaloricState.afferentFiringRate;
+          telem.slowPhaseVelocityDegPerSec = {
+            horizontal: this.activeCaloricState.slowPhaseHorizDegPerSec,
+            vertical: 0,
+            torsional: 0,
+          };
+          telem.fastPhaseBeatDirection = this.activeCaloricState.fastPhaseBeatDirection;
+          telem.ewaldLawActive = this.activeCaloricState.isAmpullopetal
+            ? "Ewald's 2nd Law: Ampullopetal excitation (horizontal canal)"
+            : "Ewald's 2nd Law: Ampullofugal inhibition (horizontal canal)";
+          telem.nystagmusState = `Caloric Convection: ${this.activeCaloricState.fastPhaseBeatDirection}`;
+        }
+
         if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
           this.vorDrawer.updateTelemetry(telem, simDt);
+        }
+      }
+
+      // vHIT Head Impulse Passive Rotation Animation
+      if (this.vhitAnim && this.vhitAnim.active) {
+        const elapsed = (now - this.vhitAnim.startTime) / 1000.0;
+        if (elapsed <= 0.120) {
+          computeVHITHeadQuaternion(elapsed, this.vhitAnim.pair, this.vhitAnim.direction, this.vhitQuatArray);
+          this.qVHITTmp.set(this.vhitQuatArray[0], this.vhitQuatArray[1], this.vhitQuatArray[2], this.vhitQuatArray[3]);
+          this.labyrinthRoot.quaternion.copy(this.qVHITTmp);
+        } else if (elapsed <= 0.300) {
+          computeVHITHeadQuaternion(0.120, this.vhitAnim.pair, this.vhitAnim.direction, this.vhitQuatArray);
+          this.qVHITTmp.set(this.vhitQuatArray[0], this.vhitQuatArray[1], this.vhitQuatArray[2], this.vhitQuatArray[3]);
+          this.labyrinthRoot.quaternion.copy(this.qVHITTmp);
+        } else if (elapsed <= 0.600) {
+          const returnFrac = (elapsed - 0.300) / 0.300;
+          const s = returnFrac * returnFrac * (3.0 - 2.0 * returnFrac);
+          computeVHITHeadQuaternion(0.120, this.vhitAnim.pair, this.vhitAnim.direction, this.vhitQuatArray);
+          this.qVHITTmp.set(this.vhitQuatArray[0], this.vhitQuatArray[1], this.vhitQuatArray[2], this.vhitQuatArray[3]);
+          this.labyrinthRoot.quaternion.slerpQuaternions(this.qVHITTmp, this.qIdentity, s);
+        } else {
+          this.labyrinthRoot.quaternion.identity();
+          this.controls.enabled = true;
+          const cb = this.vhitAnim.onComplete;
+          this.vhitAnim = null;
+          if (cb) cb();
         }
       }
 
@@ -1611,6 +1903,14 @@ export class DualStageScene {
       const canvasW = this.container.clientWidth;
       const canvasH = this.container.clientHeight;
       if (canvasW === 0 || canvasH === 0) return;
+
+      const targetPR = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
+      if (this.renderer.getPixelRatio() !== targetPR) {
+        this.renderer.setPixelRatio(targetPR);
+        this.renderer.setSize(canvasW, canvasH, false);
+        this.camera.aspect = canvasW / canvasH;
+        this.camera.updateProjectionMatrix();
+      }
 
       const rendererSize = this.renderer.getSize(this.tempRendererSize);
       if (rendererSize.x !== canvasW || rendererSize.y !== canvasH) {
@@ -1708,8 +2008,454 @@ export class DualStageScene {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Diagnostic Vestibular Testing API (Caloric & vHIT)
+  // ---------------------------------------------------------------------------
+
+  public setCaloricUniforms(
+    active: boolean,
+    tempDiff: number,
+    diffusion: number,
+    timeSec: number
+  ): void {
+    const entry = this.meshEntries.get('ls_Hsapiens_Sl');
+    if (entry && entry.material) {
+      const u = entry.material.uniforms as unknown as Gate3ShaderUniforms;
+      const shouldBeActive = active && this.state.labMode === 'vestibular';
+      u.uCaloricActive.value = shouldBeActive ? 1.0 : 0.0;
+      u.uCaloricTempDiff.value = shouldBeActive ? tempDiff : 0.0;
+      u.uCaloricDiffusion.value = shouldBeActive ? diffusion : 0.0;
+      u.uCaloricTime.value = shouldBeActive ? timeSec : 0.0;
+    }
+  }
+
+  public setLabyrinthLaterality(ear: 'right' | 'left'): void {
+    this.currentLaterality = ear;
+    const isLeft = ear === 'left';
+    this.labyrinthRoot.scale.x = isLeft ? -1.0 : 1.0;
+    this.labyrinthRoot.updateMatrixWorld(true);
+
+    const mirroredVal = isLeft ? 1.0 : 0.0;
+    for (const entry of this.meshEntries.values()) {
+      if (entry.material && entry.material.uniforms) {
+        const u = entry.material.uniforms as unknown as Gate3ShaderUniforms;
+        if (u.uMirrored) {
+          u.uMirrored.value = mirroredVal;
+        }
+      }
+    }
+  }
+
+  public getLabyrinthLaterality(): 'right' | 'left' {
+    return this.currentLaterality;
+  }
+
+  public setCaloricSimulationState(
+    active: boolean,
+    conv: CaloricConvectionState | null,
+    alexSPV = 0
+  ): void {
+    if (!active || !conv) {
+      this.activeCaloricState = null;
+      return;
+    }
+    const slowPhaseHoriz =
+      conv.fastPhaseBeatDirection === 'Right-Beating'
+        ? -alexSPV
+        : conv.fastPhaseBeatDirection === 'Left-Beating'
+        ? +alexSPV
+        : 0;
+
+    this.activeCaloricState = {
+      active: true,
+      cupulaDeflection: Math.abs(conv.cupulaDeflection),
+      afferentFiringRate: conv.afferentFiringRate,
+      slowPhaseHorizDegPerSec: slowPhaseHoriz,
+      fastPhaseBeatDirection: conv.fastPhaseBeatDirection,
+      flowDirection: conv.flowDirection,
+      isAmpullopetal: conv.isAmpullopetal,
+    };
+  }
+
+  public getCaloricSimulationState(): {
+    active: boolean;
+    cupulaDeflection: number;
+    afferentFiringRate: number;
+    slowPhaseHorizDegPerSec: number;
+    fastPhaseBeatDirection: string;
+    flowDirection: string;
+    isAmpullopetal: boolean;
+  } | null {
+    return this.activeCaloricState;
+  }
+
+  public flyToCaloricPosture(): void {
+    // Supine +30° head-up posture (θ_pitch = +60°)
+    this.currentYaw = 0.0;
+    this.currentPitch = 60.0;
+    this.currentRoll = 0.0;
+
+    const fromPos = this.camera.position.clone();
+    const toPos = new THREE.Vector3(18.0, -14.0, 16.0);
+    const fromTarget = this.controls.target.clone();
+    const toTarget = new THREE.Vector3(6.0, 2.0, 2.0);
+
+    this.flyAnim = {
+      active: true,
+      startTime: performance.now(),
+      durationMs: 900,
+      fromPos,
+      toPos,
+      fromTarget,
+      toTarget,
+      fromUp: this.camera.up.clone(),
+      toUp: new THREE.Vector3(0, 0, 1),
+    };
+  }
+
+  public triggerVHITThrust(
+    pair: VHITCanalPair,
+    direction: 1 | -1 = 1,
+    onComplete?: () => void
+  ): void {
+    if (this.vhitAnim && this.vhitAnim.active) return;
+    this.controls.enabled = false;
+    this.vhitAnim = {
+      active: true,
+      startTime: performance.now(),
+      pair,
+      direction,
+      onComplete,
+    };
+  }
+
+  public cancelVHITThrust(): void {
+    if (this.vhitAnim) {
+      const cb = this.vhitAnim.onComplete;
+      this.vhitAnim.active = false;
+      this.vhitAnim = null;
+      if (cb) {
+        try {
+          cb();
+        } catch {
+          // swallow any callback errors on cancel
+        }
+      }
+    }
+    if (this.controls) {
+      this.controls.enabled = true;
+    }
+    if (this.labyrinthRoot) {
+      this.labyrinthRoot.quaternion.identity();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Stage 4: Surgical Simulation API (CI, Labyrinthectomy, Neurectomy)
+  // ---------------------------------------------------------------------------
+
+  public setSurgicalDrawer(drawer: SurgicalDrawer | null): void {
+    this.surgicalDrawer = drawer;
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+  }
+
+  public getSurgicalDrawer(): SurgicalDrawer | null {
+    return this.surgicalDrawer;
+  }
+
+  public getSurgicalState(): SurgicalLabState {
+    return this.state.surgicalState;
+  }
+
+  public setSurgicalProcedure(procedure: SurgicalProcedure): void {
+    this.state.surgicalState.activeProcedure = procedure;
+    if (this.state.labMode === 'surgical') {
+      this.flyToSurgicalProcedure(procedure);
+    }
+    if (this.ciElectrodeGroup) {
+      this.ciElectrodeGroup.visible =
+        this.state.labMode === 'surgical' && procedure === 'cochlear_implant';
+    }
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+    this.emitState();
+  }
+
+  public flyToSurgicalProcedure(procedure: SurgicalProcedure): void {
+    let camInfo = SURGICAL_CAMERA_PERSPECTIVES.cochlearImplant;
+    if (procedure === 'labyrinthectomy') {
+      camInfo = SURGICAL_CAMERA_PERSPECTIVES.labyrinthectomy;
+    } else if (procedure === 'neurectomy') {
+      camInfo = SURGICAL_CAMERA_PERSPECTIVES.neurectomy;
+    }
+
+    this.startCameraFly(
+      new THREE.Vector3(...camInfo.cameraPosRAS),
+      new THREE.Vector3(...camInfo.targetRAS),
+      550,
+      new THREE.Vector3(...camInfo.cameraUpRAS)
+    );
+  }
+
+  public updateCIArray(
+    depthMm: number,
+    arrayType: CIArrayType = 'lateral_wall',
+    approach: CIApproach = 'round_window',
+    pitchDev = 0,
+    yawDev = 0
+  ): CIInsertionState {
+    const ciState = computeCIInsertionKinematics(depthMm, arrayType, approach, pitchDev, yawDev);
+    this.state.surgicalState.ciState = ciState;
+
+    if (this.ciCarrierMesh && this.ciContactMeshes.length > 0) {
+      const posAttr = this.ciCarrierMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      const positions = posAttr.array as Float32Array;
+      const SEGMENTS = 64;
+      const RADIAL = 8;
+
+      const sMax = ciState.insertionDepthMm;
+      const visibleCount = sMax > 0.05 ? SEGMENTS + 1 : 0;
+
+      for (let i = 0; i <= SEGMENTS; i++) {
+        const frac = i / SEGMENTS;
+        const s = frac * sMax;
+        const pt = evaluateScalaTympaniSpline(s, approach, arrayType, pitchDev, yawDev);
+        this.ciCenterPointsTmp[i] = pt;
+        positions[i * 3] = pt[0];
+        positions[i * 3 + 1] = pt[1];
+        positions[i * 3 + 2] = pt[2];
+      }
+      posAttr.needsUpdate = true;
+      this.ciCarrierMesh.geometry.setDrawRange(0, visibleCount);
+      this.ciCarrierMesh.visible = visibleCount > 0;
+
+      // Update Procedural 3D Silicone Carrier Tube Mesh vertices
+      if (this.ciCarrierTubeMesh) {
+        const tubePosAttr = this.ciCarrierTubeMesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+        const tubePositions = tubePosAttr.array as Float32Array;
+        const radius = 0.20;
+
+        for (let j = 0; j <= SEGMENTS; j++) {
+          const pt = this.ciCenterPointsTmp[j];
+          const nextPt = j < SEGMENTS ? this.ciCenterPointsTmp[j + 1] : this.ciCenterPointsTmp[j];
+          const prevPt = j > 0 ? this.ciCenterPointsTmp[j - 1] : this.ciCenterPointsTmp[j];
+
+          let tx = nextPt[0] - prevPt[0];
+          let ty = nextPt[1] - prevPt[1];
+          let tz = nextPt[2] - prevPt[2];
+          const tLen = Math.hypot(tx, ty, tz) || 1e-4;
+          tx /= tLen;
+          ty /= tLen;
+          tz /= tLen;
+
+          let nx = -ty;
+          let ny = tx;
+          let nz = 0;
+          let nLen = Math.hypot(nx, ny, nz);
+          if (nLen < 1e-3) {
+            nx = 1;
+            ny = 0;
+            nz = 0;
+          } else {
+            nx /= nLen;
+            ny /= nLen;
+            nz /= nLen;
+          }
+
+          const bx = ty * nz - tz * ny;
+          const by = tz * nx - tx * nz;
+          const bz = tx * ny - ty * nx;
+
+          for (let i = 0; i <= RADIAL; i++) {
+            const angle = (i / RADIAL) * Math.PI * 2;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            const vx = pt[0] + radius * (cosA * nx + sinA * bx);
+            const vy = pt[1] + radius * (cosA * ny + sinA * by);
+            const vz = pt[2] + radius * (cosA * nz + sinA * bz);
+
+            const vIdx = (j * (RADIAL + 1) + i) * 3;
+            tubePositions[vIdx] = vx;
+            tubePositions[vIdx + 1] = vy;
+            tubePositions[vIdx + 2] = vz;
+          }
+        }
+        tubePosAttr.needsUpdate = true;
+        this.ciCarrierTubeMesh.geometry.setDrawRange(0, visibleCount > 0 ? SEGMENTS * RADIAL * 6 : 0);
+        this.ciCarrierTubeMesh.visible = visibleCount > 0;
+      }
+
+      // Position the 22 platinum contacts
+      // Contact 0 = E1 (apical lead at array tip)
+      // Contact 21 = E22 (basal lead near round window)
+      for (let i = 0; i < 22; i++) {
+        const offset = i * 1.10;
+        const contactDepth = sMax - offset;
+        const mesh = this.ciContactMeshes[i];
+        if (mesh) {
+          if (contactDepth > 0.0 && contactDepth <= sMax) {
+            const pt = evaluateScalaTympaniSpline(contactDepth, approach, arrayType, pitchDev, yawDev);
+            mesh.position.set(pt[0], pt[1], pt[2]);
+            mesh.visible = true;
+          } else {
+            mesh.visible = false;
+          }
+        }
+      }
+    }
+
+    // Flashing crimson breach alarm uniform on scala vestibuli upon rupture
+    const entrySV = this.meshEntries.get('seg_coch_inner_scala_vestibuli');
+    if (entrySV && entrySV.material) {
+      entrySV.material.uniforms.uTranslocationBreach.value = ciState.isRuptured ? 1.0 : 0.0;
+    }
+
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+
+    this.emitState();
+    return ciState;
+  }
+
+  public updateLabyrinthectomy(
+    step: 0 | 1 | 2 | 3,
+    compensationHours = 0,
+    drillActive = false
+  ): LabyrinthectomyState {
+    const labyState = computeLabyrinthectomyAblation(step, compensationHours, drillActive);
+    this.state.surgicalState.labyState = labyState;
+
+    // Otologic drill cutaway and canal milling uniforms across all 3 canals and otic capsule
+    const lateralCanal = this.meshEntries.get('ls_Hsapiens_Sl');
+    if (lateralCanal && lateralCanal.material) {
+      lateralCanal.material.uniforms.uSurgicalDrillActive.value = drillActive ? 1.0 : 0.0;
+      lateralCanal.material.uniforms.uCanalUnroofed.value.set(
+        labyState.canalsMilled.horizontal ? 1.0 : 0.0,
+        0.0,
+        0.0
+      );
+    }
+
+    const superiorCanal = this.meshEntries.get('ls_Hsapiens_Sa');
+    if (superiorCanal && superiorCanal.material) {
+      superiorCanal.material.uniforms.uCanalUnroofed.value.set(
+        0.0,
+        labyState.canalsMilled.superior ? 1.0 : 0.0,
+        0.0
+      );
+    }
+
+    const posteriorCanal = this.meshEntries.get('ls_Hsapiens_Sp');
+    if (posteriorCanal && posteriorCanal.material) {
+      posteriorCanal.material.uniforms.uCanalUnroofed.value.set(
+        0.0,
+        0.0,
+        labyState.canalsMilled.posterior ? 1.0 : 0.0
+      );
+    }
+
+    const oticCapsule = this.meshEntries.get('segT2_th1.07_Otsu');
+    if (oticCapsule && oticCapsule.material) {
+      oticCapsule.material.uniforms.uSurgicalDrillActive.value = drillActive ? 1.0 : 0.0;
+      // Step 1+ unroofs mastoid cortical bone over antrum to reveal canals
+      oticCapsule.material.uniforms.uOpacity.value = step >= 1 ? 0.32 : 0.88;
+    }
+
+    // Step 4 (Curettage): Neuroepithelial evacuation & ghosting
+    const neuroepithelialMeshes = [
+      'ls_Hsapiens_utricle',
+      'ls_Hsapiens_UCp',
+      'mesh_david_sacculus',
+      'ls_Hsapiens_Al',
+      'ls_Hsapiens_Aa',
+      'ls_Hsapiens_Ap',
+      'ls_Hsapiens_Lat_Cup_Duct',
+      'ls_Hsapiens_Ant_Cup_Duct',
+      'ls_Hsapiens_Post_Cup_Duct',
+    ];
+
+    for (const meshName of neuroepithelialMeshes) {
+      const entry = this.meshEntries.get(meshName);
+      if (entry && entry.material) {
+        if (labyState.neuroepitheliumAblated) {
+          entry.material.uniforms.uGhostMode.value = 1.0;
+          entry.material.uniforms.uOpacity.value = 0.1;
+        } else {
+          entry.material.uniforms.uGhostMode.value = 0.0;
+          entry.material.uniforms.uOpacity.value = entry.ontology.baseAlpha;
+        }
+      }
+    }
+
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+
+    this.emitState();
+    return labyState;
+  }
+
+  public updateNeurectomy(
+    step: 0 | 1 | 2 | 3,
+    koosStage: KoosStage = 0,
+    toolProximity = 5.0,
+    tractionGrams = 0.0,
+    tool: 'scissors' | 'hook' | 'bipolar' = 'scissors',
+    cleavage = true
+  ): NeurectomyState {
+    const neurectomyState = computeNeurectomyElectrophysiology(
+      step,
+      koosStage,
+      toolProximity,
+      tractionGrams,
+      tool,
+      cleavage
+    );
+    this.state.surgicalState.neurectomyState = neurectomyState;
+
+    // Step 2 & 3: Cleavage plane and selective vestibular transection preserving cochlear nerve
+    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
+    if (cochleaEntry && cochleaEntry.material) {
+      // Cochlear nerve hearing division preserved with prominence
+      cochleaEntry.material.uniforms.uHighlight.value = step >= 2 ? 0.65 : 0.0;
+    }
+
+    const vestibularMeshes = [
+      'ls_Hsapiens_utricle',
+      'ls_Hsapiens_UCp',
+      'mesh_david_sacculus',
+    ];
+    for (const meshName of vestibularMeshes) {
+      const entry = this.meshEntries.get(meshName);
+      if (entry && entry.material) {
+        if (neurectomyState.vestibularNerveTransected) {
+          // Vestibular division divided: ghosted
+          entry.material.uniforms.uGhostMode.value = 1.0;
+          entry.material.uniforms.uOpacity.value = 0.22;
+        } else {
+          entry.material.uniforms.uGhostMode.value = 0.0;
+          entry.material.uniforms.uOpacity.value = entry.ontology.baseAlpha;
+        }
+      }
+    }
+
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+
+    this.emitState();
+    return neurectomyState;
+  }
+
   public dispose(): void {
     cancelAnimationFrame(this.animationFrameId);
+    this.cancelVHITThrust();
+    this.setCaloricUniforms(false, 0, 0, 0);
+    this.setCaloricSimulationState(false, null);
 
     if (this.controls) {
       this.controls.dispose();

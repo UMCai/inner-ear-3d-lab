@@ -20,12 +20,32 @@ import { ToneSynthesizer } from '../audio/ToneSynthesizer';
 import { AudiogramDrawer } from './AudiogramDrawer';
 import { CTSliceDrawer } from './CTSliceDrawer';
 import { VORDrawer } from './VORDrawer';
+import { SurgicalDrawer } from './SurgicalDrawer';
+import {
+  type SurgicalProcedure,
+  type CIArrayType,
+  type CIApproach,
+  type KoosStage,
+  type CIInsertionState,
+  type LabyrinthectomyState,
+  type NeurectomyState,
+} from '../physics/surgicalEngine';
 import {
   MANEUVER_PRESETS,
   type ManeuverId,
   type VestibularStepPreset,
   type VestibularTelemetryState,
 } from '../physics/vestibularEngine';
+import {
+  calculateJongkees,
+  computeCaloricConvection,
+  computeAlexanderModulation,
+  CALORIC_CLINICAL_PRESETS,
+  type CaloricIrrigationType,
+  type VHITCanalPair,
+  type VHITPathologyPreset,
+  type VHITParadigm,
+} from '../physics/diagnosticVestibularEngine';
 import { getAcousticLandmark, getDistanceApexMm, greenwoodPosition } from '../data/greenwoodEngine';
 import {
   RadiologyPlaneId,
@@ -67,6 +87,50 @@ export class AppHUD {
   private hearingDockContent!: HTMLElement;
   private radiologyDockContent!: HTMLElement;
   private vestibularDockContent!: HTMLElement;
+  private surgicalDockContent!: HTMLElement;
+  private modeSurgicalBtn!: HTMLButtonElement;
+  private surgicalDrawer!: SurgicalDrawer;
+
+  // Surgical Workbench Controls
+  private surgSubnavTabs: HTMLButtonElement[] = [];
+  private surgSubviews = new Map<string, HTMLElement>();
+  private activeSurgProcedure: SurgicalProcedure = 'cochlear_implant';
+
+  // CI Controls
+  private ciApproachChips: HTMLButtonElement[] = [];
+  private ciArrayChips: HTMLButtonElement[] = [];
+  private ciDepthSlider!: HTMLInputElement;
+  private ciPitchSlider!: HTMLInputElement;
+  private ciYawSlider!: HTMLInputElement;
+  private ciDepthTitleEl!: HTMLElement;
+  private ciForceBadgeEl!: HTMLElement;
+  private ciRiskBadgeEl!: HTMLElement;
+  private ciPitchValEl!: HTMLElement;
+  private ciYawValEl!: HTMLElement;
+  private ciAutoInsertBtn!: HTMLButtonElement;
+  private ciRetractBtn!: HTMLButtonElement;
+  private ciAutoInsertTimer: number | null = null;
+
+  // Labyrinthectomy Controls
+  private labyStepChips: HTMLButtonElement[] = [];
+  private labyStepTitleEl!: HTMLElement;
+  private labyDrillBadgeEl!: HTMLElement;
+  private labySpvBadgeEl!: HTMLElement;
+  private labyDrillToggleBtn!: HTMLButtonElement;
+  private labyDrillTextEl!: HTMLElement;
+  private labyCompSlider!: HTMLInputElement;
+  private labyCompValEl!: HTMLElement;
+  private labyAblateAllBtn!: HTMLButtonElement;
+
+  // Neurectomy Controls
+  private neurectomyStepChips: HTMLButtonElement[] = [];
+  private neurectomyToolBtns: HTMLButtonElement[] = [];
+  private neurectomyStepTitleEl!: HTMLElement;
+  private neurectomyAbrBadgeEl!: HTMLElement;
+  private neurectomyEmgBadgeEl!: HTMLElement;
+  private neurectomyKoosSlider!: HTMLInputElement;
+  private neurectomyKoosValEl!: HTMLElement;
+  private neurectomyCleavageBtn!: HTMLButtonElement;
 
   // Anatomy Dock Controls
   private boneSlider!: HTMLInputElement;
@@ -103,6 +167,13 @@ export class AppHUD {
   private ctCardArrowEl!: HTMLElement;
 
   // Vestibular Workbench Dock Controls
+  private vestSubmode: 'bppv' | 'caloric' | 'vhit' = 'bppv';
+  private vestSubnavTabs: HTMLButtonElement[] = [];
+  private vestSubviews: HTMLElement[] = [];
+  private vestBppvSubview!: HTMLElement;
+  private vestCaloricSubview!: HTMLElement;
+  private vestVhitSubview!: HTMLElement;
+
   private vestProtocolChips: HTMLButtonElement[] = [];
   private vestStepTitleEl!: HTMLElement;
   private vestHoldTimerBadgeEl!: HTMLElement;
@@ -116,6 +187,60 @@ export class AppHUD {
   private vestResetBtn!: HTMLButtonElement;
   private vestVorToggleBtn!: HTMLButtonElement;
   private vorArrowEl!: HTMLElement;
+
+  // Diagnostic Vestibular Submodes & Controls
+  private activeCaloricTemp: CaloricIrrigationType = 'R44';
+  private caloricAlexanderGaze = 0;
+  private isCaloricIrrigating = false;
+  private caloricElapsedSec = 0;
+  private caloricTimerInterval: ReturnType<typeof setInterval> | null = null;
+  private caloricLastTickTime = 0;
+  private caloricModalApplyBtn!: HTMLButtonElement;
+
+  private caloricTempChips: HTMLButtonElement[] = [];
+  private caloricPlayBtn!: HTMLButtonElement;
+  private caloricPlayIconEl!: HTMLElement;
+  private caloricTimerBadgeEl!: HTMLElement;
+  private caloricSpvBadgeEl!: HTMLElement;
+  private caloricStatusTitleEl!: HTMLElement;
+  private caloricLateralityBadgeEl!: HTMLElement;
+  private caloricPostureBtn!: HTMLButtonElement;
+  private caloricGazeChips: HTMLButtonElement[] = [];
+  private caloricAlexBadgeEl!: HTMLElement;
+  private caloricJongkeesOpenBtn!: HTMLButtonElement;
+  private caloricJongkeesModal!: HTMLElement;
+  private caloricJongkeesCloseBtn!: HTMLButtonElement;
+  private caloricPresetChips: HTMLButtonElement[] = [];
+  private jongkeesR44Input!: HTMLInputElement;
+  private jongkeesR30Input!: HTMLInputElement;
+  private jongkeesL44Input!: HTMLInputElement;
+  private jongkeesL30Input!: HTMLInputElement;
+  private resultUwValEl!: HTMLElement;
+  private resultDpValEl!: HTMLElement;
+  private resultTotalValEl!: HTMLElement;
+  private caloricInterpCardEl!: HTMLElement;
+  private caloricVorToggleBtn!: HTMLButtonElement;
+  private caloricVorArrowEl!: HTMLElement;
+
+  // vHIT Controls & State
+  private vhitPair: VHITCanalPair = 'horizontal';
+  private vhitDirection: 1 | -1 = 1;
+  private vhitPreset: VHITPathologyPreset = 'normal';
+  private vhitParadigm: VHITParadigm = 'himp';
+  private vhitSlippage = false;
+
+  private vhitPairChips: HTMLButtonElement[] = [];
+  private vhitDirLeftBtn!: HTMLButtonElement;
+  private vhitDirRightBtn!: HTMLButtonElement;
+  private vhitPresetChips: HTMLButtonElement[] = [];
+  private vhitParadigmBtn!: HTMLButtonElement;
+  private vhitSlippageBtn!: HTMLButtonElement;
+  private vhitThrustBtn!: HTMLButtonElement;
+  private vhitGainBadgeEl!: HTMLElement;
+  private vhitSaccadeBadgeEl!: HTMLElement;
+  private vhitStatusTitleEl!: HTMLElement;
+  private vhitVorToggleBtn!: HTMLButtonElement;
+  private vhitVorArrowEl!: HTMLElement;
 
   // Gyro Flyout Controls
   private gyroFlyout!: HTMLElement;
@@ -169,6 +294,7 @@ export class AppHUD {
     this.buildDOM();
     this.scene = new DualStageScene(this.canvasHost);
     this.scene.setVORDrawer(this.vorDrawer);
+    this.scene.setSurgicalDrawer(this.surgicalDrawer);
     this.renderPartsTree();
 
     this.scene.onStateChange((snap) => this.renderState(snap));
@@ -284,6 +410,19 @@ export class AppHUD {
             >
               <span class="mode-icon">🌀</span>
               <span class="mode-label">Vestibular &amp; VOR</span>
+            </button>
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-surgical-btn"
+              data-mode="surgical"
+              role="tab"
+              aria-selected="false"
+              aria-controls="surgical-dock-content"
+              title="Surgical Approaches &amp; Implant Simulations"
+            >
+              <span class="mode-icon">🔬</span>
+              <span class="mode-label">Surgical Suites</span>
             </button>
           </nav>
 
@@ -589,97 +728,430 @@ export class AppHUD {
 
           <!-- 4D. Vestibular & VOR Workbench Dock Content -->
           <div class="vestibular-dock-content" id="vestibular-dock-content" style="display: none;">
-            <!-- 1. Protocol Selector Chips (Grouped by Canal) -->
-            <div class="vestibular-protocol-group" id="vest-protocol-chips" role="group" aria-label="BPPV Clinical Protocols">
-              <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal Canalithiasis - 5 Steps)">
-                <span class="chip-badge">Post</span>
-                <span class="chip-label">Epley (5s)</span>
-              </button>
-              <button type="button" class="protocol-chip" data-maneuver="semont" title="Semont Liberatory Maneuver (Posterior Canal - 3 Steps)">
-                <span class="chip-badge">Post</span>
-                <span class="chip-label">Semont (3s)</span>
-              </button>
-              <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Canal Geotropic - 4 Steps)">
-                <span class="chip-badge">Horiz</span>
-                <span class="chip-label">Gufoni Geo</span>
-              </button>
-              <button type="button" class="protocol-chip" data-maneuver="gufoni_apogeotropic" title="Gufoni Maneuver (Horizontal Canal Apogeotropic - 4 Steps)">
-                <span class="chip-badge">Horiz</span>
-                <span class="chip-label">Gufoni Apo</span>
-              </button>
-              <button type="button" class="protocol-chip" data-maneuver="barbecue_roll" title="Lempert 360° Barbecue Roll (Horizontal Canal - 5 Steps)">
-                <span class="chip-badge">Horiz</span>
-                <span class="chip-label">Barbecue 360°</span>
-              </button>
-              <button type="button" class="protocol-chip" data-maneuver="yacovino" title="Yacovino Maneuver (Anterior Canal - 4 Steps)">
-                <span class="chip-badge">Ant</span>
-                <span class="chip-label">Yacovino (4s)</span>
-              </button>
+            <!-- Subnav Bar: Switch between BPPV Maneuvers, Caloric (COWS), and vHIT -->
+            <div class="vest-subnav-bar" id="vest-subnav-bar" role="tablist" aria-label="Diagnostic Vestibular Modalities">
+              <button type="button" class="vest-subnav-tab active" data-submode="bppv" id="vest-subnav-bppv">🌀 BPPV Maneuvers</button>
+              <button type="button" class="vest-subnav-tab" data-submode="caloric" id="vest-subnav-caloric">🌡️ Caloric (COWS)</button>
+              <button type="button" class="vest-subnav-tab" data-submode="vhit" id="vest-subnav-vhit">⚡ vHIT Test</button>
             </div>
 
-            <!-- 2. Timeline Step Scrubber & Sequence Controls -->
-            <div class="vestibular-timeline-wrap">
-              <div class="timeline-header">
-                <span class="timeline-title" id="vest-step-title">Step 1 of 5: Start Sitting Upright</span>
-                <div class="timeline-meta-cluster">
-                  <span class="hold-timer-badge" id="vest-hold-timer-badge" title="Recommended Clinical Position Hold Timer">⏱️ 30s</span>
-                  <span class="clearance-badge" id="vest-clearance-badge">0% Cleared</span>
+            <!-- Subview 1: BPPV Maneuvers (Existing BPPV Controls) -->
+            <div class="vest-subview vest-bppv-subview" id="vest-bppv-subview" style="display: flex;">
+              <!-- 1. Protocol Selector Chips (Grouped by Canal) -->
+              <div class="vestibular-protocol-group" id="vest-protocol-chips" role="group" aria-label="BPPV Clinical Protocols">
+                <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal Canalithiasis - 5 Steps)">
+                  <span class="chip-badge">Post</span>
+                  <span class="chip-label">Epley (5s)</span>
+                </button>
+                <button type="button" class="protocol-chip" data-maneuver="semont" title="Semont Liberatory Maneuver (Posterior Canal - 3 Steps)">
+                  <span class="chip-badge">Post</span>
+                  <span class="chip-label">Semont (3s)</span>
+                </button>
+                <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Canal Geotropic - 4 Steps)">
+                  <span class="chip-badge">Horiz</span>
+                  <span class="chip-label">Gufoni Geo</span>
+                </button>
+                <button type="button" class="protocol-chip" data-maneuver="gufoni_apogeotropic" title="Gufoni Maneuver (Horizontal Canal Apogeotropic - 4 Steps)">
+                  <span class="chip-badge">Horiz</span>
+                  <span class="chip-label">Gufoni Apo</span>
+                </button>
+                <button type="button" class="protocol-chip" data-maneuver="barbecue_roll" title="Lempert 360° Barbecue Roll (Horizontal Canal - 5 Steps)">
+                  <span class="chip-badge">Horiz</span>
+                  <span class="chip-label">Barbecue 360°</span>
+                </button>
+                <button type="button" class="protocol-chip" data-maneuver="yacovino" title="Yacovino Maneuver (Anterior Canal - 4 Steps)">
+                  <span class="chip-badge">Ant</span>
+                  <span class="chip-label">Yacovino (4s)</span>
+                </button>
+              </div>
+
+              <!-- 2. Timeline Step Scrubber & Sequence Controls -->
+              <div class="vestibular-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="vest-step-title">Step 1 of 5: Start Sitting Upright</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="vest-hold-timer-badge" title="Recommended Clinical Position Hold Timer">⏱️ 30s</span>
+                    <span class="clearance-badge" id="vest-clearance-badge">0% Cleared</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row">
+                  <button type="button" class="timeline-btn" id="vest-step-prev-btn" title="Previous Step">◀</button>
+                  <button type="button" class="timeline-btn play-btn" id="vest-play-btn" title="Auto-advance Maneuver with Timed Holds">
+                    <span class="play-icon" id="vest-play-icon">▶</span>
+                  </button>
+                  <input
+                    type="range"
+                    class="vestibular-step-slider"
+                    id="vest-step-slider"
+                    min="0"
+                    max="4"
+                    value="0"
+                    step="1"
+                    aria-label="Clinical Maneuver Step Progress"
+                  />
+                  <button type="button" class="timeline-btn" id="vest-step-next-btn" title="Next Step">▶</button>
                 </div>
               </div>
-              <div class="timeline-slider-row">
-                <button type="button" class="timeline-btn" id="vest-step-prev-btn" title="Previous Step">◀</button>
-                <button type="button" class="timeline-btn play-btn" id="vest-play-btn" title="Auto-advance Maneuver with Timed Holds">
-                  <span class="play-icon" id="vest-play-icon">▶</span>
+
+              <!-- 3. Actions & Modals: 3-Axis Gyro, Reset, VOR Eyes Toggle -->
+              <div class="vestibular-actions-group">
+                <button
+                  type="button"
+                  class="vest-action-btn gyro-toggle-btn"
+                  id="vest-gyro-toggle-btn"
+                  title="Toggle Interactive 3-Axis Head Gyro Sliders"
+                  aria-expanded="false"
+                >
+                  <span class="vest-btn-icon">🕹️</span>
+                  <span class="vest-btn-text">Head Gyro</span>
                 </button>
-                <input
-                  type="range"
-                  class="vestibular-step-slider"
-                  id="vest-step-slider"
-                  min="0"
-                  max="4"
-                  value="0"
-                  step="1"
-                  aria-label="Clinical Maneuver Step Progress"
-                />
-                <button type="button" class="timeline-btn" id="vest-step-next-btn" title="Next Step">▶</button>
+
+                <button
+                  type="button"
+                  class="vest-action-btn reset-crystals-btn"
+                  id="vest-reset-btn"
+                  title="Reset Otoconia to Initial Cupular Resting Position"
+                >
+                  <span class="vest-btn-icon">⚡</span>
+                  <span class="vest-btn-text">Reset</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="vest-action-btn vor-toggle-btn"
+                  id="vest-vor-toggle-btn"
+                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
+                  aria-expanded="false"
+                  aria-controls="vor-drawer"
+                >
+                  <span class="vest-btn-icon">👁️</span>
+                  <span class="vest-btn-text">VOR Eyes</span>
+                  <span class="vor-arrow" id="vor-arrow">▸</span>
+                </button>
               </div>
             </div>
 
-            <!-- 3. Actions & Modals: 3-Axis Gyro, Reset, VOR Eyes Toggle -->
-            <div class="vestibular-actions-group">
-              <button
-                type="button"
-                class="vest-action-btn gyro-toggle-btn"
-                id="vest-gyro-toggle-btn"
-                title="Toggle Interactive 3-Axis Head Gyro Sliders"
-                aria-expanded="false"
-              >
-                <span class="vest-btn-icon">🕹️</span>
-                <span class="vest-btn-text">Head Gyro</span>
-              </button>
+            <!-- Subview 2: Caloric Testing Suite (COWS & Alexander's Law) -->
+            <div class="vest-subview vest-caloric-subview" id="vest-caloric-subview" style="display: none;">
+              <!-- 1. Irrigation Ear & Temperature Selector -->
+              <div class="vestibular-protocol-group" id="caloric-temp-chips" role="group" aria-label="Caloric Irrigations">
+                <button type="button" class="caloric-chip active" data-caloric-temp="R44" title="Right Warm 44°C (Ampullopetal excitation -> Fast phase Right/Same)">
+                  <span class="chip-badge warm">🔴 Warm</span>
+                  <span class="chip-label">R 44°C</span>
+                </button>
+                <button type="button" class="caloric-chip" data-caloric-temp="R30" title="Right Cold 30°C (Ampullofugal inhibition -> Fast phase Left/Opposite)">
+                  <span class="chip-badge cold">🔵 Cold</span>
+                  <span class="chip-label">R 30°C</span>
+                </button>
+                <button type="button" class="caloric-chip" data-caloric-temp="L44" title="Left Warm 44°C (Ampullopetal excitation -> Fast phase Left/Same)">
+                  <span class="chip-badge warm">🔴 Warm</span>
+                  <span class="chip-label">L 44°C</span>
+                </button>
+                <button type="button" class="caloric-chip" data-caloric-temp="L30" title="Left Cold 30°C (Ampullofugal inhibition -> Fast phase Right/Opposite)">
+                  <span class="chip-badge cold">🔵 Cold</span>
+                  <span class="chip-label">L 30°C</span>
+                </button>
+                <button type="button" class="caloric-chip" data-caloric-temp="Ice4" title="Ice Water 4°C (Severe hypofunction / areflexia confirmation)">
+                  <span class="chip-badge ice">🧊 Ice</span>
+                  <span class="chip-label">Ice 4°C</span>
+                </button>
+              </div>
 
-              <button
-                type="button"
-                class="vest-action-btn reset-crystals-btn"
-                id="vest-reset-btn"
-                title="Reset Otoconia to Initial Cupular Resting Position"
-              >
-                <span class="vest-btn-icon">⚡</span>
-                <span class="vest-btn-text">Reset</span>
-              </button>
+              <!-- 2. Caloric Posture, Irrigation Controls & Timeline -->
+              <div class="vestibular-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="caloric-status-title">COWS: Warm Same, Cold Opposite</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="caloric-timer-badge">⏱️ 0s / 40s</span>
+                    <span class="clearance-badge" id="caloric-spv-badge">SPV: 0.0°/s</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row caloric-row">
+                  <button type="button" class="timeline-btn play-btn" id="caloric-play-btn" title="Start / Pause Caloric Irrigation (40s)">
+                    <span class="play-icon" id="caloric-play-icon">▶</span>
+                  </button>
+                  <button type="button" class="vest-action-btn posture-btn" id="caloric-posture-btn" title="Align to Supine +30° Head Up Posture (θ=60°)">
+                    <span class="vest-btn-icon">🛏️</span>
+                    <span class="vest-btn-text">Supine +30°</span>
+                  </button>
+                  <div class="alexander-hud-group" role="group" aria-label="Alexander's Law Gaze Modulation">
+                    <span class="alex-hud-lbl">Gaze:</span>
+                    <button type="button" class="alex-gaze-chip" data-alex-gaze="-30">◀ -30°</button>
+                    <button type="button" class="alex-gaze-chip active" data-alex-gaze="0">0°</button>
+                    <button type="button" class="alex-gaze-chip" data-alex-gaze="30">+30° ▶</button>
+                    <span class="alex-badge" id="caloric-alex-degree-badge">2nd Deg</span>
+                  </div>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                class="vest-action-btn vor-toggle-btn"
-                id="vest-vor-toggle-btn"
-                title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
-                aria-expanded="false"
-                aria-controls="vor-drawer"
-              >
-                <span class="vest-btn-icon">👁️</span>
-                <span class="vest-btn-text">VOR Eyes</span>
-                <span class="vor-arrow" id="vor-arrow">▸</span>
-              </button>
+              <!-- 3. Actions: Jongkees Matrix, Laterality Badge, VOR Toggle -->
+              <div class="vestibular-actions-group">
+                <span class="caloric-laterality-tag" id="caloric-laterality-badge">Right Ear (Ipsilateral)</span>
+                <button
+                  type="button"
+                  class="vest-action-btn"
+                  id="caloric-jongkees-open-btn"
+                  title="Open Interactive Jongkees Bithermal Matrix Calculator"
+                >
+                  <span class="vest-btn-icon">📊</span>
+                  <span class="vest-btn-text">Jongkees</span>
+                </button>
+                <button
+                  type="button"
+                  class="vest-action-btn vor-toggle-btn"
+                  id="caloric-vor-toggle-btn"
+                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
+                  aria-expanded="false"
+                  aria-controls="vor-drawer"
+                >
+                  <span class="vest-btn-icon">👁️</span>
+                  <span class="vest-btn-text">VOR Eyes</span>
+                  <span class="vor-arrow" id="caloric-vor-arrow">▸</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Subview 3: Video Head Impulse Test (vHIT) -->
+            <div class="vest-subview vest-vhit-subview" id="vest-vhit-subview" style="display: none;">
+              <!-- 1. Canal Pair Selector Chips & Thrust Direction -->
+              <div class="vestibular-protocol-group" id="vhit-pair-chips" role="group" aria-label="vHIT Canal Pairs">
+                <button type="button" class="vhit-pair-chip active" data-vhit-pair="horizontal" title="Horizontal Semicircular Canals (Yaw Impulse)">
+                  <span class="chip-badge">Yaw</span>
+                  <span class="chip-label">Horizontal</span>
+                </button>
+                <button type="button" class="vhit-pair-chip" data-vhit-pair="ralp" title="Right Anterior / Left Posterior (Pitch/Roll +45°)">
+                  <span class="chip-badge">Ant/Post</span>
+                  <span class="chip-label">RALP (+45°)</span>
+                </button>
+                <button type="button" class="vhit-pair-chip" data-vhit-pair="larp" title="Left Anterior / Right Posterior (Pitch/Roll -45°)">
+                  <span class="chip-badge">Ant/Post</span>
+                  <span class="chip-label">LARP (-45°)</span>
+                </button>
+                <button type="button" class="timeline-btn vhit-dir-btn" id="vhit-dir-left-btn" data-vhit-dir="-1" title="Thrust Head Left">◀ Thrust L</button>
+                <button type="button" class="timeline-btn vhit-dir-btn active" id="vhit-dir-right-btn" data-vhit-dir="1" title="Thrust Head Right">Thrust R ▶</button>
+              </div>
+
+              <!-- 2. Pathology Presets & Paradigm -->
+              <div class="vestibular-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="vhit-status-title">High-Acceleration Head Impulse (15°, 120ms)</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="vhit-gain-badge">Gain: 1.00</span>
+                    <span class="clearance-badge" id="vhit-saccade-badge">Normal (No Saccades)</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row vhit-presets-row">
+                  <button type="button" class="vhit-preset-chip active" data-vhit-preset="normal">Normal</button>
+                  <button type="button" class="vhit-preset-chip" data-vhit-preset="acute_neuritis">Acute Neuritis</button>
+                  <button type="button" class="vhit-preset-chip" data-vhit-preset="chronic_schwannoma">Schwannoma</button>
+                  <button type="button" class="vhit-preset-chip" data-vhit-preset="bilateral_loss">Bilateral Loss</button>
+                  <button type="button" class="vhit-toggle-btn" id="vhit-paradigm-toggle-btn" title="Toggle HIMP (Earth-Fixed) vs SHIMP (Head-Fixed)">HIMP</button>
+                  <button type="button" class="vhit-toggle-btn" id="vhit-slippage-toggle-btn" title="Toggle Goggle Slippage Artifact">Slippage: Off</button>
+                </div>
+              </div>
+
+              <!-- 3. Actions: Deliver Thrust & VOR Drawer -->
+              <div class="vestibular-actions-group">
+                <button
+                  type="button"
+                  class="vest-action-btn vhit-deliver-thrust-btn"
+                  id="vhit-deliver-thrust-btn"
+                  title="Deliver 15° 120ms High-Acceleration Passive Head Impulse Thrust"
+                >
+                  <span class="vest-btn-icon">⚡</span>
+                  <span class="vest-btn-text">Deliver Thrust</span>
+                </button>
+                <button
+                  type="button"
+                  class="vest-action-btn vor-toggle-btn"
+                  id="vhit-vor-toggle-btn"
+                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
+                  aria-expanded="false"
+                  aria-controls="vor-drawer"
+                >
+                  <span class="vest-btn-icon">👁️</span>
+                  <span class="vest-btn-text">VOR Eyes</span>
+                  <span class="vor-arrow" id="vhit-vor-arrow">▸</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4E. Surgical Suites Workbench Dock Content -->
+          <div class="surgical-dock-content" id="surgical-dock-content" style="display: none;">
+            <!-- Subnav: CI vs Labyrinthectomy vs Neurectomy -->
+            <div class="surg-subnav-bar" id="surg-subnav-bar" role="tablist" aria-label="Surgical Procedures">
+              <button type="button" class="surg-subnav-tab active" data-submode="ci" id="surg-subnav-ci">🦻 Cochlear Implant</button>
+              <button type="button" class="surg-subnav-tab" data-submode="labyrinthectomy" id="surg-subnav-laby">🪚 Transmastoid Labyrinthectomy</button>
+              <button type="button" class="surg-subnav-tab" data-submode="neurectomy" id="surg-subnav-neurectomy">🧠 Retrosigmoid Neurectomy &amp; CPA</button>
+            </div>
+
+            <!-- Subview 1: Cochlear Implant (CI) -->
+            <div class="surg-subview surg-ci-subview" id="surg-ci-subview" style="display: flex;">
+              <div class="surg-chip-group" role="group" aria-label="CI Hardware &amp; Approach">
+                <button type="button" class="surg-chip active" id="ci-approach-rw" data-approach="round_window" title="Atraumatic Round Window Membrane Approach">
+                  <span class="chip-badge">Approach</span>
+                  <span class="chip-label">🎯 Round Window</span>
+                </button>
+                <button type="button" class="surg-chip" id="ci-approach-coch" data-approach="cochleostomy" title="Anteroinferior Cochleostomy Approach (1mm to RW)">
+                  <span class="chip-badge">Approach</span>
+                  <span class="chip-label">⚙️ Cochleostomy</span>
+                </button>
+                <button type="button" class="surg-chip active" id="ci-array-lateral" data-array="lateral_wall" title="Flexible Straight Lateral Wall Array (28mm)">
+                  <span class="chip-badge">Array</span>
+                  <span class="chip-label">〰️ Lateral Wall</span>
+                </button>
+                <button type="button" class="surg-chip" id="ci-array-peri" data-array="perimodiolar" title="Pre-Curved Perimodiolar AOS Array (21mm)">
+                  <span class="chip-badge">Array</span>
+                  <span class="chip-label">🌀 Perimodiolar</span>
+                </button>
+              </div>
+
+              <div class="surg-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="ci-depth-title">Insertion Depth: 0.0 mm (0.0°)</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="ci-force-badge">F: 0.0 mN</span>
+                    <span class="clearance-badge" id="ci-risk-badge">OPTIMAL</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row">
+                  <button type="button" class="timeline-btn play-btn" id="ci-auto-insert-btn" title="Motorized Auto-Insert (0.5 mm/s)">
+                    <span class="play-icon" id="ci-auto-icon">▶</span>
+                  </button>
+                  <button type="button" class="timeline-btn" id="ci-retract-btn" title="Full Retraction">↺</button>
+                  <input
+                    type="range"
+                    class="surgical-slider"
+                    id="ci-depth-slider"
+                    min="0"
+                    max="280"
+                    value="0"
+                    step="1"
+                    aria-label="Electrode Insertion Depth in tenths of a mm"
+                  />
+                  <div class="ci-trajectory-sliders" title="Trajectory Deviation Angles">
+                    <label class="ci-mini-lbl">Pitch: <span id="ci-pitch-val">0°</span></label>
+                    <input type="range" class="mini-slider" id="ci-pitch-slider" min="-15" max="15" value="0" step="1" title="Pitch Angle Deviation (-15° to +15°)" />
+                    <label class="ci-mini-lbl">Yaw: <span id="ci-yaw-val">0°</span></label>
+                    <input type="range" class="mini-slider" id="ci-yaw-slider" min="-15" max="15" value="0" step="1" title="Yaw Angle Deviation (-15° to +15°)" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="surg-actions-group">
+                <button
+                  type="button"
+                  class="vest-action-btn surg-drawer-toggle-btn"
+                  id="ci-drawer-toggle-btn"
+                  title="Toggle Docked Surgical Endoscopy &amp; Biotelemetry Drawer"
+                  aria-expanded="false"
+                  aria-controls="surgical-drawer"
+                >
+                  <span class="vest-btn-icon">🔬</span>
+                  <span class="vest-btn-text">Monitor</span>
+                  <span class="surg-arrow" id="ci-surg-arrow">▸</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Subview 2: Transmastoid Labyrinthectomy -->
+            <div class="surg-subview surg-laby-subview" id="surg-laby-subview" style="display: none;">
+              <div class="surg-chip-group" role="group" aria-label="Labyrinthectomy Steps">
+                <button type="button" class="surg-chip active" data-laby-step="0">Step 1: Mastoidectomy</button>
+                <button type="button" class="surg-chip" data-laby-step="1">Step 2: Canal Milling</button>
+                <button type="button" class="surg-chip" data-laby-step="2">Step 3: Vestibulotomy</button>
+                <button type="button" class="surg-chip" data-laby-step="3">Step 4: Curettage</button>
+              </div>
+
+              <div class="surg-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="laby-step-title">Step 1: Cortical Mastoidectomy</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="laby-drill-badge">70,000 RPM</span>
+                    <span class="clearance-badge" id="laby-spv-badge">SPV: 0.0°/s</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row">
+                  <button type="button" class="vest-action-btn drill-btn" id="laby-drill-toggle-btn" title="Toggle Otologic Drill (70,000 RPM &amp; Audio Whine)">
+                    <span class="vest-btn-icon">🪚</span>
+                    <span class="vest-btn-text" id="laby-drill-text">Drill: On</span>
+                  </button>
+                  <div class="compensation-row">
+                    <label class="ci-mini-lbl">Comp Time: <span id="laby-comp-val">0h (Acute)</span></label>
+                    <input type="range" class="surgical-slider" id="laby-comp-slider" min="0" max="720" value="0" step="6" title="Central Vestibular Compensation Hours (0 to 720h)" />
+                  </div>
+                  <button type="button" class="vest-action-btn ablate-btn" id="laby-ablate-all-btn" title="Complete Acute Deafferentation of all 5 Balance End-Organs">
+                    <span class="vest-btn-icon">⚡</span>
+                    <span class="vest-btn-text">Ablate All</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="surg-actions-group">
+                <button
+                  type="button"
+                  class="vest-action-btn surg-drawer-toggle-btn"
+                  id="laby-drawer-toggle-btn"
+                  title="Toggle Docked Surgical Drawer"
+                  aria-expanded="false"
+                  aria-controls="surgical-drawer"
+                >
+                  <span class="vest-btn-icon">🔬</span>
+                  <span class="vest-btn-text">Monitor</span>
+                  <span class="surg-arrow" id="laby-surg-arrow">▸</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Subview 3: Retrosigmoid Neurectomy & CPA -->
+            <div class="surg-subview surg-neurectomy-subview" id="surg-neurectomy-subview" style="display: none;">
+              <div class="surg-chip-group" role="group" aria-label="Neurectomy Steps">
+                <button type="button" class="surg-chip active" data-neurectomy-step="0">Step 1: Craniotomy</button>
+                <button type="button" class="surg-chip" data-neurectomy-step="1">Step 2: CPA Exposure</button>
+                <button type="button" class="surg-chip" data-neurectomy-step="2">Step 3: Cleavage Plane</button>
+                <button type="button" class="surg-chip" data-neurectomy-step="3">Step 4: Transection</button>
+              </div>
+
+              <div class="surg-timeline-wrap">
+                <div class="timeline-header">
+                  <span class="timeline-title" id="neurectomy-step-title">Step 1: Retrosigmoid Craniotomy</span>
+                  <div class="timeline-meta-cluster">
+                    <span class="hold-timer-badge" id="neurectomy-abr-badge">ABR V: 5.70 ms</span>
+                    <span class="clearance-badge" id="neurectomy-emg-badge">EMG: 8 μV</span>
+                  </div>
+                </div>
+                <div class="timeline-slider-row">
+                  <div class="tool-btn-group" role="group" aria-label="Microsurgical Tools">
+                    <button type="button" class="surg-tool-btn active" data-tool="scissors" title="Micro-Scissors">✂️ Scissors</button>
+                    <button type="button" class="surg-tool-btn" data-tool="hook" title="Nerve Hook">🪝 Hook</button>
+                    <button type="button" class="surg-tool-btn" data-tool="bipolar" title="Bipolar Coagulation">⚡ Bipolar</button>
+                  </div>
+                  <div class="koos-row">
+                    <label class="ci-mini-lbl">Koos: <span id="neurectomy-koos-val">Stage 0</span></label>
+                    <input type="range" class="mini-slider" id="neurectomy-koos-slider" min="0" max="4" value="0" step="1" title="Acoustic Neuroma Koos Staging (0 to IV)" />
+                  </div>
+                  <button type="button" class="vest-action-btn" id="neurectomy-cleavage-btn" title="Toggle Cleavage Plane Highlight">
+                    <span class="vest-btn-icon">📐</span>
+                    <span class="vest-btn-text">Cleavage</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="surg-actions-group">
+                <button
+                  type="button"
+                  class="vest-action-btn surg-drawer-toggle-btn"
+                  id="neurectomy-drawer-toggle-btn"
+                  title="Toggle Docked Surgical Drawer"
+                  aria-expanded="false"
+                  aria-controls="surgical-drawer"
+                >
+                  <span class="vest-btn-icon">🔬</span>
+                  <span class="vest-btn-text">Monitor</span>
+                  <span class="surg-arrow" id="neurectomy-surg-arrow">▸</span>
+                </button>
+              </div>
             </div>
           </div>
         </nav>
@@ -754,6 +1226,84 @@ export class AppHUD {
             </div>
             <div class="modal-actions">
               <button type="button" class="modal-confirm-btn" id="about-confirm-btn">Close</button>
+            </div>
+        <!-- 5B. CALORIC JONGKEES BITHERMAL MATRIX MODAL -->
+        <div class="modal-backdrop caloric-modal-backdrop" id="caloric-jongkees-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="jongkees-modal-title">
+          <div class="modal-card caloric-modal-sheet">
+            <div class="modal-header">
+              <div class="modal-title-cluster">
+                <span class="brand-badge">CALORIC LAB</span>
+                <h2 id="jongkees-modal-title">Jongkees Bithermal Caloric Matrix</h2>
+              </div>
+              <button type="button" class="modal-close-btn" id="caloric-jongkees-close-btn" aria-label="Close dialog">✕</button>
+            </div>
+            <div class="modal-body caloric-modal-body">
+              <p class="modal-lead">
+                Bithermal caloric irrigation assesses unilateral weakness (canal paresis) and directional preponderance using peak slow-phase eye velocity (SPV °/s) per Jongkees (1962).
+              </p>
+
+              <!-- Clinical Presets -->
+              <div class="jongkees-presets-row" role="group" aria-label="Clinical Presets">
+                <span class="jongkees-lbl">Presets:</span>
+                <button type="button" class="jongkees-preset-btn active" data-preset="normal">Normal</button>
+                <button type="button" class="jongkees-preset-btn" data-preset="right_uw">Right Paresis (70%)</button>
+                <button type="button" class="jongkees-preset-btn" data-preset="left_uw">Left Paresis (51%)</button>
+                <button type="button" class="jongkees-preset-btn" data-preset="dp_right">DP Right (48%)</button>
+                <button type="button" class="jongkees-preset-btn" data-preset="bilateral">Bilateral Loss</button>
+              </div>
+
+              <!-- 4-Ear SPV Inputs Grid -->
+              <div class="jongkees-grid">
+                <div class="jongkees-ear-col right-ear">
+                  <h4>Right Ear (AD)</h4>
+                  <div class="input-field-group">
+                    <label for="jongkees-r44">Warm 44°C SPV (°/s):</label>
+                    <input type="number" id="jongkees-r44" min="0" max="100" step="0.5" value="22.0" />
+                  </div>
+                  <div class="input-field-group">
+                    <label for="jongkees-r30">Cold 30°C SPV (°/s):</label>
+                    <input type="number" id="jongkees-r30" min="0" max="100" step="0.5" value="20.0" />
+                  </div>
+                </div>
+
+                <div class="jongkees-ear-col left-ear">
+                  <h4>Left Ear (AS)</h4>
+                  <div class="input-field-group">
+                    <label for="jongkees-l44">Warm 44°C SPV (°/s):</label>
+                    <input type="number" id="jongkees-l44" min="0" max="100" step="0.5" value="21.0" />
+                  </div>
+                  <div class="input-field-group">
+                    <label for="jongkees-l30">Cold 30°C SPV (°/s):</label>
+                    <input type="number" id="jongkees-l30" min="0" max="100" step="0.5" value="21.0" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Calculated Results & Interpretation -->
+              <div class="jongkees-results-panel">
+                <div class="jongkees-result-metric">
+                  <span class="metric-title">Unilateral Weakness (UW)</span>
+                  <span class="metric-val" id="jongkees-uw-val">2.4%</span>
+                  <span class="metric-sub">Pathology: &ge; 25%</span>
+                </div>
+                <div class="jongkees-result-metric">
+                  <span class="metric-title">Directional Preponderance (DP)</span>
+                  <span class="metric-val" id="jongkees-dp-val">0.0%</span>
+                  <span class="metric-sub">Pathology: &ge; 30%</span>
+                </div>
+                <div class="jongkees-result-metric">
+                  <span class="metric-title">Total Caloric Response</span>
+                  <span class="metric-val" id="jongkees-total-val">84.0°/s</span>
+                  <span class="metric-sub">Hypofunction: &lt; 12°/s</span>
+                </div>
+              </div>
+
+              <div class="caloric-interp-card" id="caloric-interp-card">
+                <strong>Symmetric Vestibular Function:</strong> Bilateral horizontal canal caloric responses are within normative limits (UW &lt; 25%, DP &lt; 30%, Total &ge; 12°/s).
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="modal-confirm-btn" id="caloric-modal-apply-btn">Apply &amp; Close</button>
             </div>
           </div>
         </div>
@@ -849,6 +1399,51 @@ export class AppHUD {
     this.vestVorToggleBtn = this.root.querySelector('#vest-vor-toggle-btn') as HTMLButtonElement;
     this.vorArrowEl = this.root.querySelector('#vor-arrow') as HTMLElement;
 
+    // Diagnostic Vestibular Submodes
+    this.vestSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.vest-subnav-tab'));
+    this.vestSubviews = Array.from(this.root.querySelectorAll<HTMLElement>('.vest-subview'));
+
+    // Caloric Testing Controls
+    this.caloricTempChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.caloric-chip'));
+    this.caloricPlayBtn = this.root.querySelector('#caloric-play-btn') as HTMLButtonElement;
+    this.caloricPlayIconEl = this.root.querySelector('#caloric-play-icon') as HTMLElement;
+    this.caloricTimerBadgeEl = this.root.querySelector('#caloric-timer-badge') as HTMLElement;
+    this.caloricSpvBadgeEl = this.root.querySelector('#caloric-spv-badge') as HTMLElement;
+    this.caloricStatusTitleEl = this.root.querySelector('#caloric-status-title') as HTMLElement;
+    this.caloricLateralityBadgeEl = this.root.querySelector('#caloric-laterality-badge') as HTMLElement;
+    this.caloricPostureBtn = this.root.querySelector('#caloric-posture-btn') as HTMLButtonElement;
+    this.caloricGazeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.alex-gaze-chip'));
+    this.caloricAlexBadgeEl = this.root.querySelector('#caloric-alex-degree-badge') as HTMLElement;
+    this.caloricJongkeesOpenBtn = this.root.querySelector('#caloric-jongkees-open-btn') as HTMLButtonElement;
+    this.caloricJongkeesModal = this.root.querySelector('#caloric-jongkees-modal') as HTMLElement;
+    this.caloricJongkeesCloseBtn = this.root.querySelector('#caloric-jongkees-close-btn') as HTMLButtonElement;
+    this.caloricModalApplyBtn = this.root.querySelector('#caloric-modal-apply-btn') as HTMLButtonElement;
+    this.caloricPresetChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.jongkees-preset-btn'));
+    this.jongkeesR44Input = this.root.querySelector('#jongkees-r44') as HTMLInputElement;
+    this.jongkeesR30Input = this.root.querySelector('#jongkees-r30') as HTMLInputElement;
+    this.jongkeesL44Input = this.root.querySelector('#jongkees-l44') as HTMLInputElement;
+    this.jongkeesL30Input = this.root.querySelector('#jongkees-l30') as HTMLInputElement;
+    this.resultUwValEl = this.root.querySelector('#jongkees-uw-val') as HTMLElement;
+    this.resultDpValEl = this.root.querySelector('#jongkees-dp-val') as HTMLElement;
+    this.resultTotalValEl = this.root.querySelector('#jongkees-total-val') as HTMLElement;
+    this.caloricInterpCardEl = this.root.querySelector('#caloric-interp-card') as HTMLElement;
+    this.caloricVorToggleBtn = this.root.querySelector('#caloric-vor-toggle-btn') as HTMLButtonElement;
+    this.caloricVorArrowEl = this.root.querySelector('#caloric-vor-arrow') as HTMLElement;
+
+    // vHIT Controls
+    this.vhitPairChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-vhit-pair]'));
+    this.vhitDirLeftBtn = this.root.querySelector('#vhit-dir-left-btn') as HTMLButtonElement;
+    this.vhitDirRightBtn = this.root.querySelector('#vhit-dir-right-btn') as HTMLButtonElement;
+    this.vhitPresetChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-vhit-preset]'));
+    this.vhitParadigmBtn = this.root.querySelector('#vhit-paradigm-toggle-btn') as HTMLButtonElement;
+    this.vhitSlippageBtn = this.root.querySelector('#vhit-slippage-toggle-btn') as HTMLButtonElement;
+    this.vhitThrustBtn = this.root.querySelector('#vhit-deliver-thrust-btn') as HTMLButtonElement;
+    this.vhitGainBadgeEl = this.root.querySelector('#vhit-gain-badge') as HTMLElement;
+    this.vhitSaccadeBadgeEl = this.root.querySelector('#vhit-saccade-badge') as HTMLElement;
+    this.vhitStatusTitleEl = this.root.querySelector('#vhit-status-title') as HTMLElement;
+    this.vhitVorToggleBtn = this.root.querySelector('#vhit-vor-toggle-btn') as HTMLButtonElement;
+    this.vhitVorArrowEl = this.root.querySelector('#vhit-vor-arrow') as HTMLElement;
+
     // Gyro Flyout
     this.gyroFlyout = this.root.querySelector('#gyro-flyout') as HTMLElement;
     this.gyroCloseBtn = this.root.querySelector('#gyro-close-btn') as HTMLButtonElement;
@@ -882,11 +1477,74 @@ export class AppHUD {
     });
 
     this.vorDrawer.onClose(() => {
-      this.vestVorToggleBtn.classList.remove('open');
-      this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
-      if (this.vorArrowEl) {
-        this.vorArrowEl.textContent = '▸';
+      this.syncVORDrawerButtons(false);
+      this.updateMobileDrawerExclusivity();
+    });
+
+    this.vorDrawer.onDiagnosticModeChange((mode) => {
+      if (this.scene.getSnapshot().labMode === 'vestibular') {
+        const submode = mode === 'nystagmogram' ? 'bppv' : mode;
+        if (this.vestSubmode !== submode) {
+          this.switchVestibularSubmode(submode);
+        }
       }
+    });
+
+    this.vorDrawer.onAlexanderGazeChange((gaze) => {
+      this.selectCaloricAlexanderGaze(gaze);
+    });
+    this.vorDrawer.setCaloricData(22, 20, 21, 21);
+
+    // Surgical Workbench Controls
+    this.surgicalDockContent = this.root.querySelector('#surgical-dock-content') as HTMLElement;
+    this.modeSurgicalBtn = this.root.querySelector('#mode-surgical-btn') as HTMLButtonElement;
+    this.surgSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.surg-subnav-tab'));
+    const ciSub = this.root.querySelector('#surg-ci-subview') as HTMLElement;
+    const labySub = this.root.querySelector('#surg-laby-subview') as HTMLElement;
+    const neurectomySub = this.root.querySelector('#surg-neurectomy-subview') as HTMLElement;
+    if (ciSub) this.surgSubviews.set('ci', ciSub);
+    if (labySub) this.surgSubviews.set('labyrinthectomy', labySub);
+    if (neurectomySub) this.surgSubviews.set('neurectomy', neurectomySub);
+
+    // CI Controls
+    this.ciApproachChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-approach]'));
+    this.ciArrayChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-array]'));
+    this.ciDepthSlider = this.root.querySelector('#ci-depth-slider') as HTMLInputElement;
+    this.ciPitchSlider = this.root.querySelector('#ci-pitch-slider') as HTMLInputElement;
+    this.ciYawSlider = this.root.querySelector('#ci-yaw-slider') as HTMLInputElement;
+    this.ciDepthTitleEl = this.root.querySelector('#ci-depth-title') as HTMLElement;
+    this.ciForceBadgeEl = this.root.querySelector('#ci-force-badge') as HTMLElement;
+    this.ciRiskBadgeEl = this.root.querySelector('#ci-risk-badge') as HTMLElement;
+    this.ciPitchValEl = this.root.querySelector('#ci-pitch-val') as HTMLElement;
+    this.ciYawValEl = this.root.querySelector('#ci-yaw-val') as HTMLElement;
+    this.ciAutoInsertBtn = this.root.querySelector('#ci-auto-insert-btn') as HTMLButtonElement;
+    this.ciRetractBtn = this.root.querySelector('#ci-retract-btn') as HTMLButtonElement;
+
+    // Labyrinthectomy Controls
+    this.labyStepChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-laby-step]'));
+    this.labyStepTitleEl = this.root.querySelector('#laby-step-title') as HTMLElement;
+    this.labyDrillBadgeEl = this.root.querySelector('#laby-drill-badge') as HTMLElement;
+    this.labySpvBadgeEl = this.root.querySelector('#laby-spv-badge') as HTMLElement;
+    this.labyDrillToggleBtn = this.root.querySelector('#laby-drill-toggle-btn') as HTMLButtonElement;
+    this.labyDrillTextEl = this.root.querySelector('#laby-drill-text') as HTMLElement;
+    this.labyCompSlider = this.root.querySelector('#laby-comp-slider') as HTMLInputElement;
+    this.labyCompValEl = this.root.querySelector('#laby-comp-val') as HTMLElement;
+    this.labyAblateAllBtn = this.root.querySelector('#laby-ablate-all-btn') as HTMLButtonElement;
+
+    // Neurectomy Controls
+    this.neurectomyStepChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-neurectomy-step]'));
+    this.neurectomyToolBtns = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.surg-tool-btn'));
+    this.neurectomyStepTitleEl = this.root.querySelector('#neurectomy-step-title') as HTMLElement;
+    this.neurectomyAbrBadgeEl = this.root.querySelector('#neurectomy-abr-badge') as HTMLElement;
+    this.neurectomyEmgBadgeEl = this.root.querySelector('#neurectomy-emg-badge') as HTMLElement;
+    this.neurectomyKoosSlider = this.root.querySelector('#neurectomy-koos-slider') as HTMLInputElement;
+    this.neurectomyKoosValEl = this.root.querySelector('#neurectomy-koos-val') as HTMLElement;
+    this.neurectomyCleavageBtn = this.root.querySelector('#neurectomy-cleavage-btn') as HTMLButtonElement;
+
+    // Surgical Drawer Initialization
+    this.surgicalDrawer = new SurgicalDrawer(labShell);
+    this.surgicalDrawer.onClose(() => {
+      this.syncSurgicalDrawerButtonUI(false);
       this.updateMobileDrawerExclusivity();
     });
 
@@ -1284,7 +1942,245 @@ export class AppHUD {
     });
 
     this.vestVorToggleBtn?.addEventListener('click', () => {
-      this.toggleVORDrawer();
+      this.toggleVORDrawer('nystagmogram');
+    });
+
+    // Vestibular Subnav Modality Tabs
+    this.vestSubnavTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const submode = tab.getAttribute('data-submode') as 'bppv' | 'caloric' | 'vhit';
+        if (submode) {
+          this.switchVestibularSubmode(submode);
+        }
+      });
+    });
+
+    // Caloric Testing Listeners
+    this.caloricTempChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const temp = chip.getAttribute('data-caloric-temp') as CaloricIrrigationType;
+        if (temp) {
+          this.selectCaloricTemp(temp);
+        }
+      });
+    });
+
+    this.caloricPlayBtn?.addEventListener('click', () => {
+      this.toggleCaloricIrrigation();
+    });
+
+    this.caloricPostureBtn?.addEventListener('click', () => {
+      this.alignCaloricPosture();
+    });
+
+    this.caloricGazeChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const gaze = parseInt(chip.getAttribute('data-alex-gaze') || '0', 10);
+        this.selectCaloricAlexanderGaze(gaze);
+      });
+    });
+
+    this.caloricJongkeesOpenBtn?.addEventListener('click', () => {
+      this.openJongkeesModal();
+    });
+
+    this.caloricJongkeesCloseBtn?.addEventListener('click', () => {
+      this.closeJongkeesModal();
+    });
+
+    this.caloricModalApplyBtn?.addEventListener('click', () => {
+      this.closeJongkeesModal();
+      this.openVORDrawer('caloric');
+    });
+
+    this.caloricPresetChips.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.getAttribute('data-preset');
+        if (preset) {
+          this.loadJongkeesPreset(preset);
+        }
+      });
+    });
+
+    [this.jongkeesR44Input, this.jongkeesR30Input, this.jongkeesL44Input, this.jongkeesL30Input].forEach((input) => {
+      input?.addEventListener('input', () => {
+        this.recalculateJongkees();
+      });
+    });
+
+    this.caloricVorToggleBtn?.addEventListener('click', () => {
+      this.toggleVORDrawer('caloric');
+    });
+
+    // vHIT Listeners
+    this.vhitPairChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const pair = chip.getAttribute('data-vhit-pair') as VHITCanalPair;
+        if (pair) {
+          this.selectVHITPair(pair);
+        }
+      });
+    });
+
+    this.vhitDirLeftBtn?.addEventListener('click', () => {
+      this.selectVHITDirection(-1);
+    });
+
+    this.vhitDirRightBtn?.addEventListener('click', () => {
+      this.selectVHITDirection(1);
+    });
+
+    this.vhitPresetChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const preset = chip.getAttribute('data-vhit-preset') as VHITPathologyPreset;
+        if (preset) {
+          this.selectVHITPreset(preset);
+        }
+      });
+    });
+
+    this.vhitParadigmBtn?.addEventListener('click', () => {
+      this.toggleVHITParadigm();
+    });
+
+    this.vhitSlippageBtn?.addEventListener('click', () => {
+      this.toggleVHITSlippage();
+    });
+
+    this.vhitThrustBtn?.addEventListener('click', () => {
+      this.deliverVHITThrust();
+    });
+
+    this.vhitVorToggleBtn?.addEventListener('click', () => {
+      this.toggleVORDrawer('vhit');
+    });
+
+    // -------------------------------------------------------------------------
+    // Surgical Suites Workbench Controls
+    // -------------------------------------------------------------------------
+    this.modeSurgicalBtn?.addEventListener('click', () => {
+      this.switchLabMode('surgical');
+    });
+
+    this.surgSubnavTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const submode = tab.getAttribute('data-submode');
+        if (submode === 'ci') {
+          this.switchSurgicalProcedure('cochlear_implant');
+        } else if (submode === 'labyrinthectomy') {
+          this.switchSurgicalProcedure('labyrinthectomy');
+        } else if (submode === 'neurectomy') {
+          this.switchSurgicalProcedure('neurectomy');
+        }
+      });
+    });
+
+    const surgDrawerBtns = this.root.querySelectorAll<HTMLButtonElement>('.surg-drawer-toggle-btn');
+    surgDrawerBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.toggleSurgicalDrawer();
+      });
+    });
+
+    // CI Listeners
+    this.ciApproachChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        this.ciApproachChips.forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.applyCIParameters();
+      });
+    });
+
+    this.ciArrayChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        this.ciArrayChips.forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        const arrayType = chip.getAttribute('data-array') as CIArrayType;
+        if (arrayType === 'perimodiolar') {
+          this.ciDepthSlider.max = '210';
+          if (parseInt(this.ciDepthSlider.value, 10) > 210) {
+            this.ciDepthSlider.value = '210';
+          }
+        } else {
+          this.ciDepthSlider.max = '280';
+        }
+        this.applyCIParameters();
+      });
+    });
+
+    this.ciDepthSlider?.addEventListener('input', () => {
+      this.applyCIParameters();
+    });
+
+    this.ciPitchSlider?.addEventListener('input', () => {
+      this.applyCIParameters();
+    });
+
+    this.ciYawSlider?.addEventListener('input', () => {
+      this.applyCIParameters();
+    });
+
+    this.ciAutoInsertBtn?.addEventListener('click', () => {
+      this.toggleCIAutoInsert();
+    });
+
+    this.ciRetractBtn?.addEventListener('click', () => {
+      this.stopCIAutoInsert();
+      this.ciDepthSlider.value = '0';
+      this.ciPitchSlider.value = '0';
+      this.ciYawSlider.value = '0';
+      this.applyCIParameters();
+    });
+
+    // Labyrinthectomy Listeners
+    this.labyStepChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const step = parseInt(chip.getAttribute('data-laby-step') ?? '0', 10) as 0 | 1 | 2 | 3;
+        this.selectLabyrinthectomyStep(step);
+      });
+    });
+
+    this.labyDrillToggleBtn?.addEventListener('click', () => {
+      this.toggleLabyDrill();
+    });
+
+    this.labyCompSlider?.addEventListener('input', () => {
+      const compHours = parseFloat(this.labyCompSlider.value);
+      this.applyLabyrinthectomyParameters(compHours);
+    });
+
+    this.labyAblateAllBtn?.addEventListener('click', () => {
+      this.selectLabyrinthectomyStep(3);
+      this.labyCompSlider.value = '0';
+      this.applyLabyrinthectomyParameters(0);
+    });
+
+    // Neurectomy Listeners
+    this.neurectomyStepChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const step = parseInt(chip.getAttribute('data-neurectomy-step') ?? '0', 10) as 0 | 1 | 2 | 3;
+        this.selectNeurectomyStep(step);
+      });
+    });
+
+    this.neurectomyToolBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.neurectomyToolBtns.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.applyNeurectomyParameters();
+      });
+    });
+
+    this.neurectomyKoosSlider?.addEventListener('input', () => {
+      const stage = parseInt(this.neurectomyKoosSlider.value, 10);
+      const romanStages = ['0', 'I', 'II', 'III', 'IV'];
+      this.neurectomyKoosValEl.textContent = `Stage ${romanStages[stage] ?? stage}`;
+      this.applyNeurectomyParameters();
+    });
+
+    this.neurectomyCleavageBtn?.addEventListener('click', () => {
+      this.neurectomyCleavageBtn.classList.toggle('active');
+      this.applyNeurectomyParameters();
     });
   }
 
@@ -1394,6 +2290,9 @@ export class AppHUD {
       if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
         this.closeVORDrawer();
       }
+      if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+        this.closeSurgicalDrawer();
+      }
       this.closeGyroFlyout();
     }
     this.partsDrawerOpen = !this.partsDrawerOpen;
@@ -1436,6 +2335,7 @@ export class AppHUD {
         (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) ||
         (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) ||
         (this.vorDrawer && this.vorDrawer.getIsOpen()) ||
+        (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) ||
         this.isGyroFlyoutOpen();
       this.inspectorCard.classList.toggle('drawer-active', anyDrawerOpen);
     } else {
@@ -1456,6 +2356,9 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
+    }
     this.closeGyroFlyout();
     const isOpen = this.audiogramDrawer.toggle();
     this.audiogramToggleBtn.classList.toggle('open', isOpen);
@@ -1473,6 +2376,9 @@ export class AppHUD {
     }
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
+    }
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
     }
     this.closeGyroFlyout();
     this.audiogramDrawer.open();
@@ -1503,6 +2409,9 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
+    }
     this.closeGyroFlyout();
     this.ctSliceDrawer.toggle();
     const isOpen = this.ctSliceDrawer.getIsOpen();
@@ -1521,6 +2430,9 @@ export class AppHUD {
     }
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
+    }
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
     }
     this.closeGyroFlyout();
     this.ctSliceDrawer.open();
@@ -1543,7 +2455,23 @@ export class AppHUD {
   // ===========================================================================
   // 3D VOR & CLINICAL VNG EYE AVATAR DRAWER TOGGLE
   // ===========================================================================
-  private toggleVORDrawer(): void {
+  private syncVORDrawerButtons(isOpen: boolean): void {
+    const btns = [this.vestVorToggleBtn, this.caloricVorToggleBtn, this.vhitVorToggleBtn];
+    for (const b of btns) {
+      if (b) {
+        b.classList.toggle('open', isOpen);
+        b.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      }
+    }
+    const arrows = [this.vorArrowEl, this.caloricVorArrowEl, this.vhitVorArrowEl];
+    for (const a of arrows) {
+      if (a) {
+        a.textContent = isOpen ? '▾' : '▸';
+      }
+    }
+  }
+
+  private toggleVORDrawer(targetMode?: 'nystagmogram' | 'caloric' | 'vhit'): void {
     if (this.partsDrawerOpen) {
       this.closePartsDrawer();
     }
@@ -1553,18 +2481,30 @@ export class AppHUD {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
     }
-    this.closeGyroFlyout();
-    this.vorDrawer.toggle();
-    const isOpen = this.vorDrawer.getIsOpen();
-    this.vestVorToggleBtn.classList.toggle('open', isOpen);
-    this.vestVorToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    if (this.vorArrowEl) {
-      this.vorArrowEl.textContent = isOpen ? '▾' : '▸';
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
     }
+    this.closeGyroFlyout();
+    const mode = targetMode || (this.vestSubmode === 'bppv' ? 'nystagmogram' : this.vestSubmode);
+    const isOpen = this.vorDrawer.getIsOpen();
+
+    if (!isOpen) {
+      this.vorDrawer.setDiagnosticViewMode(mode);
+      this.vorDrawer.open();
+    } else {
+      const currentMode = this.vorDrawer.getDiagnosticViewMode();
+      if (mode !== currentMode) {
+        this.vorDrawer.setDiagnosticViewMode(mode);
+      } else {
+        this.vorDrawer.close();
+      }
+    }
+    const finalIsOpen = this.vorDrawer.getIsOpen();
+    this.syncVORDrawerButtons(finalIsOpen);
     this.updateMobileDrawerExclusivity();
   }
 
-  private openVORDrawer(): void {
+  private openVORDrawer(targetMode?: 'nystagmogram' | 'caloric' | 'vhit'): void {
     if (this.partsDrawerOpen) {
       this.closePartsDrawer();
     }
@@ -1574,26 +2514,87 @@ export class AppHUD {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.closeCTDrawer();
     }
-    this.closeGyroFlyout();
-    this.vorDrawer.open();
-    this.vestVorToggleBtn.classList.add('open');
-    this.vestVorToggleBtn.setAttribute('aria-expanded', 'true');
-    if (this.vorArrowEl) {
-      this.vorArrowEl.textContent = '▾';
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
     }
+    this.closeGyroFlyout();
+    const mode = targetMode || (this.vestSubmode === 'bppv' ? 'nystagmogram' : this.vestSubmode);
+    this.vorDrawer.setDiagnosticViewMode(mode);
+    this.vorDrawer.open();
+    this.syncVORDrawerButtons(true);
     this.updateMobileDrawerExclusivity();
   }
 
   private closeVORDrawer(): void {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.vorDrawer.close();
-      this.vestVorToggleBtn.classList.remove('open');
-      this.vestVorToggleBtn.setAttribute('aria-expanded', 'false');
-      if (this.vorArrowEl) {
-        this.vorArrowEl.textContent = '▸';
-      }
+      this.syncVORDrawerButtons(false);
       this.updateMobileDrawerExclusivity();
     }
+  }
+
+  // ===========================================================================
+  // SURGICAL WORKBENCH & MONITOR DRAWER TOGGLE
+  // ===========================================================================
+  private toggleSurgicalDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
+    this.closeGyroFlyout();
+
+    this.surgicalDrawer.toggle();
+    const isOpen = this.surgicalDrawer.getIsOpen();
+    this.syncSurgicalDrawerButtonUI(isOpen);
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private openSurgicalDrawer(): void {
+    if (this.partsDrawerOpen) {
+      this.closePartsDrawer();
+    }
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.closeAudiogramDrawer();
+    }
+    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+      this.closeCTDrawer();
+    }
+    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+      this.closeVORDrawer();
+    }
+    this.closeGyroFlyout();
+
+    this.surgicalDrawer.open();
+    this.syncSurgicalDrawerButtonUI(true);
+    this.updateMobileDrawerExclusivity();
+  }
+
+  private closeSurgicalDrawer(): void {
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.surgicalDrawer.close();
+      this.syncSurgicalDrawerButtonUI(false);
+      this.updateMobileDrawerExclusivity();
+    }
+  }
+
+  private syncSurgicalDrawerButtonUI(isOpen: boolean): void {
+    const toggleBtns = this.root.querySelectorAll<HTMLButtonElement>('.surg-drawer-toggle-btn');
+    toggleBtns.forEach((btn) => {
+      btn.classList.toggle('open', isOpen);
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      const arrow = btn.querySelector('.surg-arrow');
+      if (arrow) {
+        arrow.textContent = isOpen ? '▾' : '▸';
+      }
+    });
   }
 
   private syncRadiologyDepthUI(depthMm: number): void {
@@ -1633,7 +2634,59 @@ export class AppHUD {
   }
 
   public switchLabMode(mode: LabMode): void {
-    if (mode === 'vestibular') {
+    if (mode !== 'vestibular') {
+      this.scene.setLabyrinthLaterality('right');
+    }
+
+    if (mode === 'surgical') {
+      this.stopCaloricIrrigation();
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      this.closeGyroFlyout();
+      this.pauseSequencer();
+
+      if (this.toneSynth.getIsPlaying()) {
+        this.toneSynth.pause();
+        this.scene.setHearingPlayback(false);
+        this.updateTonePlayButton(false);
+      }
+      this.stopCaloricIrrigation();
+      this.scene.setLabMode('surgical');
+      this.modeAnatomyBtn.classList.remove('active');
+      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
+      this.modeHearingBtn.classList.remove('active');
+      this.modeHearingBtn.setAttribute('aria-selected', 'false');
+      this.modeRadiologyBtn.classList.remove('active');
+      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
+      this.modeVestibularBtn.classList.remove('active');
+      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
+      this.modeSurgicalBtn.classList.add('active');
+      this.modeSurgicalBtn.setAttribute('aria-selected', 'true');
+
+      this.anatomyDockContent.style.display = 'none';
+      this.hearingDockContent.style.display = 'none';
+      this.radiologyDockContent.style.display = 'none';
+      this.vestibularDockContent.style.display = 'none';
+      this.surgicalDockContent.style.display = 'flex';
+
+      this.syncSurgicalUI();
+      this.renderInspectorCard(this.scene.getSelectedMesh());
+    } else if (mode === 'vestibular') {
+      this.closeSurgicalDrawer();
+      this.stopCIAutoInsert();
+      this.toneSynth.stopDrill();
+      this.toneSynth.stopEMGAlarm();
+
       if (this.partsDrawerOpen) {
         this.closePartsDrawer();
       }
@@ -1656,12 +2709,15 @@ export class AppHUD {
       this.modeHearingBtn.setAttribute('aria-selected', 'false');
       this.modeRadiologyBtn.classList.remove('active');
       this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
+      this.modeSurgicalBtn.classList.remove('active');
+      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
       this.modeVestibularBtn.classList.add('active');
       this.modeVestibularBtn.setAttribute('aria-selected', 'true');
 
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
+      this.surgicalDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'flex';
 
       const curr = this.scene.getSelectedMesh();
@@ -1672,6 +2728,12 @@ export class AppHUD {
       this.syncVestibularUI();
       this.renderInspectorCard(this.scene.getSelectedMesh());
     } else if (mode === 'radiology') {
+      this.closeSurgicalDrawer();
+      this.stopCIAutoInsert();
+      this.toneSynth.stopDrill();
+      this.toneSynth.stopEMGAlarm();
+
+      this.stopCaloricIrrigation();
       if (this.partsDrawerOpen) {
         this.closePartsDrawer();
       }
@@ -1696,17 +2758,26 @@ export class AppHUD {
       this.modeHearingBtn.setAttribute('aria-selected', 'false');
       this.modeVestibularBtn.classList.remove('active');
       this.modeVestibularBtn.setAttribute('aria-selected', 'false');
+      this.modeSurgicalBtn.classList.remove('active');
+      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
       this.modeRadiologyBtn.classList.add('active');
       this.modeRadiologyBtn.setAttribute('aria-selected', 'true');
 
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
+      this.surgicalDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'flex';
 
       const snap = this.scene.getSnapshot();
       this.syncRadiologyUI(snap.radiologyState);
     } else if (mode === 'hearing') {
+      this.closeSurgicalDrawer();
+      this.stopCIAutoInsert();
+      this.toneSynth.stopDrill();
+      this.toneSynth.stopEMGAlarm();
+
+      this.stopCaloricIrrigation();
       if (this.partsDrawerOpen) {
         this.closePartsDrawer();
       }
@@ -1726,17 +2797,26 @@ export class AppHUD {
       this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
       this.modeVestibularBtn.classList.remove('active');
       this.modeVestibularBtn.setAttribute('aria-selected', 'false');
+      this.modeSurgicalBtn.classList.remove('active');
+      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
       this.modeHearingBtn.classList.add('active');
       this.modeHearingBtn.setAttribute('aria-selected', 'true');
 
       this.anatomyDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
+      this.surgicalDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'flex';
 
       const snap = this.scene.getSnapshot();
       this.syncFrequencyUI(snap.hearingState.activeFrequency, true);
     } else {
+      this.closeSurgicalDrawer();
+      this.stopCIAutoInsert();
+      this.toneSynth.stopDrill();
+      this.toneSynth.stopEMGAlarm();
+
+      this.stopCaloricIrrigation();
       if (this.audiogramDrawer.getIsOpen()) {
         this.closeAudiogramDrawer();
       }
@@ -1761,13 +2841,247 @@ export class AppHUD {
       this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
       this.modeVestibularBtn.classList.remove('active');
       this.modeVestibularBtn.setAttribute('aria-selected', 'false');
+      this.modeSurgicalBtn.classList.remove('active');
+      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
       this.modeAnatomyBtn.classList.add('active');
       this.modeAnatomyBtn.setAttribute('aria-selected', 'true');
 
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
+      this.surgicalDockContent.style.display = 'none';
       this.anatomyDockContent.style.display = 'flex';
+    }
+  }
+
+  // ===========================================================================
+  // SURGICAL SIMULATION WORKBENCH HELPERS
+  // ===========================================================================
+  private switchSurgicalProcedure(proc: SurgicalProcedure): void {
+    this.activeSurgProcedure = proc;
+    const submodeMap: Record<SurgicalProcedure, string> = {
+      cochlear_implant: 'ci',
+      labyrinthectomy: 'labyrinthectomy',
+      neurectomy: 'neurectomy',
+    };
+    const submode = submodeMap[proc];
+
+    this.surgSubnavTabs.forEach((tab) => {
+      const match = tab.getAttribute('data-submode') === submode;
+      tab.classList.toggle('active', match);
+    });
+
+    this.surgSubviews.forEach((subview, key) => {
+      subview.style.display = key === submode ? 'flex' : 'none';
+    });
+
+    this.scene.setSurgicalProcedure(proc);
+    this.syncSurgicalUI();
+    this.renderInspectorCard(this.scene.getSelectedMesh());
+  }
+
+  private applyCIParameters(): void {
+    const depthMm = parseFloat(this.ciDepthSlider.value) / 10.0;
+    const pitchDev = parseFloat(this.ciPitchSlider.value);
+    const yawDev = parseFloat(this.ciYawSlider.value);
+
+    const activeApproachChip = this.ciApproachChips.find((c) => c.classList.contains('active'));
+    const approach = (activeApproachChip?.getAttribute('data-approach') as CIApproach) || 'round_window';
+
+    const activeArrayChip = this.ciArrayChips.find((c) => c.classList.contains('active'));
+    const arrayType = (activeArrayChip?.getAttribute('data-array') as CIArrayType) || 'lateral_wall';
+
+    const prevCiState = this.scene.getSurgicalState().ciState;
+    const ciState = this.scene.updateCIArray(depthMm, arrayType, approach, pitchDev, yawDev);
+
+    if (ciState.isRuptured && !prevCiState.isRuptured) {
+      this.toneSynth.triggerRuptureSnap();
+      if (this.audiogramDrawer) {
+        this.audiogramDrawer.setActivePreset('acoustic_trauma');
+      }
+    } else if (!ciState.isRuptured && prevCiState.isRuptured) {
+      if (this.audiogramDrawer) {
+        this.audiogramDrawer.setActivePreset('normal');
+      }
+    }
+
+    this.ciDepthTitleEl.textContent = `Insertion Depth: ${ciState.insertionDepthMm.toFixed(1)} mm (${ciState.angularDepthDeg.toFixed(1)}°)`;
+    this.ciForceBadgeEl.textContent = `F: ${ciState.insertionForceMilliNewtons.toFixed(1)} mN`;
+    this.ciRiskBadgeEl.textContent = ciState.translocationRisk.toUpperCase();
+
+    this.ciRiskBadgeEl.classList.remove('optimal', 'caution', 'breach');
+    if (ciState.translocationRisk === 'optimal') {
+      this.ciRiskBadgeEl.classList.add('optimal');
+      this.ciRiskBadgeEl.style.color = '#34d399';
+    } else if (ciState.translocationRisk === 'caution') {
+      this.ciRiskBadgeEl.classList.add('caution');
+      this.ciRiskBadgeEl.style.color = '#fbbf24';
+    } else {
+      this.ciRiskBadgeEl.classList.add('breach');
+      this.ciRiskBadgeEl.style.color = '#f87171';
+    }
+
+    this.ciPitchValEl.textContent = `${Math.round(pitchDev)}°`;
+    this.ciYawValEl.textContent = `${Math.round(yawDev)}°`;
+
+    this.renderInspectorCard(this.scene.getSelectedMesh());
+  }
+
+  private toggleCIAutoInsert(): void {
+    if (this.ciAutoInsertTimer !== null) {
+      this.stopCIAutoInsert();
+    } else {
+      this.startCIAutoInsert();
+    }
+  }
+
+  private startCIAutoInsert(): void {
+    if (this.ciAutoInsertTimer !== null) return;
+    this.ciAutoInsertBtn.classList.add('active');
+    const icon = this.ciAutoInsertBtn.querySelector('.play-icon');
+    if (icon) icon.textContent = '⏸';
+
+    this.ciAutoInsertTimer = window.setInterval(() => {
+      let currentVal = parseInt(this.ciDepthSlider.value, 10);
+      const maxVal = parseInt(this.ciDepthSlider.max, 10);
+      if (currentVal >= maxVal) {
+        this.stopCIAutoInsert();
+        return;
+      }
+      currentVal = Math.min(maxVal, currentVal + 1);
+      this.ciDepthSlider.value = String(currentVal);
+      this.applyCIParameters();
+    }, 200);
+  }
+
+  private stopCIAutoInsert(): void {
+    if (this.ciAutoInsertTimer !== null) {
+      window.clearInterval(this.ciAutoInsertTimer);
+      this.ciAutoInsertTimer = null;
+    }
+    if (this.ciAutoInsertBtn) {
+      this.ciAutoInsertBtn.classList.remove('active');
+      const icon = this.ciAutoInsertBtn.querySelector('.play-icon');
+      if (icon) icon.textContent = '▶';
+    }
+  }
+
+  private selectLabyrinthectomyStep(step: 0 | 1 | 2 | 3): void {
+    this.labyStepChips.forEach((chip) => {
+      const s = parseInt(chip.getAttribute('data-laby-step') ?? '0', 10);
+      chip.classList.toggle('active', s === step);
+    });
+
+    const stepTitles = [
+      'Step 1: Cortical Mastoidectomy',
+      'Step 2: Canal Milling (LSC/SSC/PSC)',
+      'Step 3: Vestibulotomy (Ampullary Openings)',
+      'Step 4: Neuroepithelial Curettage (Complete Ablation)',
+    ];
+    this.labyStepTitleEl.textContent = stepTitles[step];
+
+    const compHours = parseFloat(this.labyCompSlider.value);
+    this.applyLabyrinthectomyParameters(compHours);
+  }
+
+  private toggleLabyDrill(): void {
+    const isCurrentlyActive = this.labyDrillToggleBtn.classList.contains('active');
+    const nextActive = !isCurrentlyActive;
+    this.labyDrillToggleBtn.classList.toggle('active', nextActive);
+    this.labyDrillTextEl.textContent = nextActive ? 'Drill: Off' : 'Drill: On';
+    this.labyDrillBadgeEl.textContent = nextActive ? '70,000 RPM' : '0 RPM';
+
+    if (nextActive) {
+      this.toneSynth.startDrill(70000);
+    } else {
+      this.toneSynth.stopDrill();
+    }
+
+    const compHours = parseFloat(this.labyCompSlider.value);
+    this.applyLabyrinthectomyParameters(compHours);
+  }
+
+  private applyLabyrinthectomyParameters(compHours: number): void {
+    const activeChip = this.labyStepChips.find((c) => c.classList.contains('active'));
+    const step = parseInt(activeChip?.getAttribute('data-laby-step') ?? '0', 10) as 0 | 1 | 2 | 3;
+    const drillActive = this.labyDrillToggleBtn.classList.contains('active');
+
+    const labyState = this.scene.updateLabyrinthectomy(step, compHours, drillActive);
+
+    if (labyState.neuroepitheliumAblated) {
+      if (this.audiogramDrawer && this.audiogramDrawer.getActivePresetId() !== 'labyrinthectomy_anacusis') {
+        this.audiogramDrawer.setActivePreset('labyrinthectomy_anacusis');
+      }
+    } else if (step === 0 && this.audiogramDrawer && this.audiogramDrawer.getActivePresetId() === 'labyrinthectomy_anacusis') {
+      this.audiogramDrawer.setActivePreset('normal');
+    }
+
+    const phase = compHours === 0 ? 'Acute' : compHours < 72 ? 'Early Comp' : compHours < 168 ? 'Subacute' : 'Compensated';
+    this.labyCompValEl.textContent = `${compHours}h (${phase})`;
+    this.labySpvBadgeEl.textContent = `SPV: ${labyState.spontaneousSPVDegSec.toFixed(1)}°/s`;
+
+    this.renderInspectorCard(this.scene.getSelectedMesh());
+  }
+
+  private selectNeurectomyStep(step: 0 | 1 | 2 | 3): void {
+    this.neurectomyStepChips.forEach((chip) => {
+      const s = parseInt(chip.getAttribute('data-neurectomy-step') ?? '0', 10);
+      chip.classList.toggle('active', s === step);
+    });
+
+    const stepTitles = [
+      'Step 1: Retrosigmoid Craniotomy',
+      'Step 2: Cerebellopontine Angle (CPA) Exposure',
+      'Step 3: Vestibular-Cochlear Cleavage Plane',
+      'Step 4: Selective Vestibular Nerve Transection',
+    ];
+    this.neurectomyStepTitleEl.textContent = stepTitles[step];
+    this.applyNeurectomyParameters();
+  }
+
+  private applyNeurectomyParameters(): void {
+    const activeChip = this.neurectomyStepChips.find((c) => c.classList.contains('active'));
+    const step = parseInt(activeChip?.getAttribute('data-neurectomy-step') ?? '0', 10) as 0 | 1 | 2 | 3;
+
+    const koos = parseInt(this.neurectomyKoosSlider.value, 10) as KoosStage;
+
+    const activeToolBtn = this.neurectomyToolBtns.find((b) => b.classList.contains('active'));
+    const tool = (activeToolBtn?.getAttribute('data-tool') as 'scissors' | 'hook' | 'bipolar') || 'scissors';
+
+    const cleavage = this.neurectomyCleavageBtn.classList.contains('active');
+
+    const toolProximity = step === 3 ? 0.2 : step === 2 ? 0.8 : step === 1 ? 2.5 : 5.0;
+    const tractionGrams = step >= 2 ? (koos > 0 ? koos * 0.8 : 0.4) : 0.0;
+
+    const neuState = this.scene.updateNeurectomy(step, koos, toolProximity, tractionGrams, tool, cleavage);
+
+    if (neuState.vestibularNerveTransected && neuState.cochlearNervePreserved) {
+      if (this.audiogramDrawer && (this.audiogramDrawer.getActivePresetId() === 'acoustic_trauma' || this.audiogramDrawer.getActivePresetId() === 'labyrinthectomy_anacusis')) {
+        this.audiogramDrawer.setActivePreset('normal');
+      }
+    }
+
+    this.neurectomyAbrBadgeEl.textContent = `ABR V: ${neuState.abrWaveVLatencyMs.toFixed(2)} ms`;
+    this.neurectomyEmgBadgeEl.textContent = `EMG: ${neuState.facialEMGVoltageMicroVolts.toFixed(0)} μV`;
+
+    if (neuState.isEMGAlarmActive || neuState.facialEMGVoltageMicroVolts >= 500) {
+      this.toneSynth.triggerEMGAlarm(180);
+    } else {
+      this.toneSynth.stopEMGAlarm();
+    }
+
+    this.renderInspectorCard(this.scene.getSelectedMesh());
+  }
+
+  private syncSurgicalUI(): void {
+    const surg = this.scene.getSurgicalState();
+    if (surg.activeProcedure === 'cochlear_implant') {
+      this.applyCIParameters();
+    } else if (surg.activeProcedure === 'labyrinthectomy') {
+      const compHours = parseFloat(this.labyCompSlider.value);
+      this.applyLabyrinthectomyParameters(compHours);
+    } else if (surg.activeProcedure === 'neurectomy') {
+      this.applyNeurectomyParameters();
     }
   }
 
@@ -1913,6 +3227,9 @@ export class AppHUD {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.closeVORDrawer();
     }
+    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+      this.closeSurgicalDrawer();
+    }
     this.gyroFlyout.classList.add('open');
     this.gyroFlyout.style.display = 'flex';
     this.vestGyroToggleBtn.classList.add('active');
@@ -1942,7 +3259,474 @@ export class AppHUD {
   }
 
   public syncVestibularUI(): void {
-    this.selectManeuver(this.activeManeuverId);
+    if (this.vestSubmode === 'bppv') {
+      this.selectManeuver(this.activeManeuverId);
+    } else if (this.vestSubmode === 'caloric') {
+      this.selectCaloricTemp(this.activeCaloricTemp);
+    } else if (this.vestSubmode === 'vhit') {
+      this.selectVHITPreset(this.vhitPreset);
+    }
+  }
+
+  // ===========================================================================
+  // DIAGNOSTIC VESTIBULAR MODALITY METHODS (Caloric COWS & vHIT)
+  // ===========================================================================
+
+  public switchVestibularSubmode(submode: 'bppv' | 'caloric' | 'vhit'): void {
+    this.vestSubmode = submode;
+
+    // Update subnav tabs
+    this.vestSubnavTabs.forEach((tab) => {
+      const isTarget = tab.getAttribute('data-submode') === submode;
+      tab.classList.toggle('active', isTarget);
+      tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+
+    // Show/hide subviews
+    const bppvView = this.root.querySelector('#vest-bppv-subview') as HTMLElement;
+    const caloricView = this.root.querySelector('#vest-caloric-subview') as HTMLElement;
+    const vhitView = this.root.querySelector('#vest-vhit-subview') as HTMLElement;
+
+    if (bppvView) bppvView.style.display = submode === 'bppv' ? 'flex' : 'none';
+    if (caloricView) caloricView.style.display = submode === 'caloric' ? 'flex' : 'none';
+    if (vhitView) vhitView.style.display = submode === 'vhit' ? 'flex' : 'none';
+
+    if (submode !== 'vhit') {
+      this.scene.cancelVHITThrust();
+      if (this.vhitThrustBtn) {
+        this.vhitThrustBtn.disabled = false;
+        this.vhitThrustBtn.classList.remove('impulsing');
+      }
+    }
+
+    if (submode === 'caloric') {
+      this.vorDrawer.setDiagnosticViewMode('caloric');
+      const ear = this.activeCaloricTemp.startsWith('L') ? 'left' : 'right';
+      this.scene.setLabyrinthLaterality(ear);
+      this.scene.selectStructure('ls_Hsapiens_Sl', false);
+      this.selectCaloricTemp(this.activeCaloricTemp);
+    } else if (submode === 'vhit') {
+      this.stopCaloricIrrigation();
+      this.caloricElapsedSec = 0;
+      this.scene.setLabyrinthLaterality('right');
+      this.vorDrawer.setDiagnosticViewMode('vhit');
+      this.updateVHITReadout();
+    } else {
+      // bppv
+      this.stopCaloricIrrigation();
+      this.caloricElapsedSec = 0;
+      this.scene.setLabyrinthLaterality('right');
+      this.vorDrawer.setDiagnosticViewMode('nystagmogram');
+      this.selectManeuver(this.activeManeuverId);
+    }
+  }
+
+  public selectCaloricTemp(temp: CaloricIrrigationType): void {
+    this.stopCaloricIrrigation();
+    this.activeCaloricTemp = temp;
+
+    this.caloricTempChips.forEach((chip) => {
+      chip.classList.toggle('active', chip.getAttribute('data-caloric-temp') === temp);
+    });
+
+    const isLeft = temp.startsWith('L');
+    this.scene.setLabyrinthLaterality(isLeft ? 'left' : 'right');
+    if (this.caloricLateralityBadgeEl) {
+      this.caloricLateralityBadgeEl.textContent = isLeft
+        ? 'Left Ear (Contralateral Mirrored)'
+        : 'Right Ear (Ipsilateral)';
+    }
+
+    this.caloricElapsedSec = 0;
+    if (this.caloricTimerBadgeEl) {
+      this.caloricTimerBadgeEl.textContent = '⏱️ 0s / 40s';
+    }
+    if (this.caloricSpvBadgeEl) {
+      this.caloricSpvBadgeEl.textContent = 'SPV: 0.0°/s';
+    }
+    this.scene.setCaloricUniforms(false, 0, 0, 0);
+
+    const isWarm = temp === 'R44' || temp === 'L44';
+    const isIce = temp === 'Ice4';
+    if (this.caloricStatusTitleEl) {
+      this.caloricStatusTitleEl.textContent = isIce
+        ? 'Ice 4°C: Strong Ampullofugal Inhibition -> Opposite Fast Phase'
+        : isWarm
+        ? `Warm 44°C: Ampullopetal Excitation -> ${isLeft ? 'Left' : 'Right'} (Same) Fast Phase`
+        : `Cold 30°C: Ampullofugal Inhibition -> ${isLeft ? 'Right' : 'Left'} (Opposite) Fast Phase`;
+    }
+
+    this.selectCaloricAlexanderGaze(this.caloricAlexanderGaze);
+  }
+
+  public toggleCaloricIrrigation(): void {
+    if (this.isCaloricIrrigating) {
+      this.stopCaloricIrrigation();
+    } else {
+      this.startCaloricIrrigation();
+    }
+  }
+
+  public startCaloricIrrigation(restart = false): void {
+    this.stopCaloricIrrigation();
+    this.isCaloricIrrigating = true;
+
+    if (restart || this.caloricElapsedSec >= 40.0) {
+      this.caloricElapsedSec = 0;
+    }
+
+    if (this.caloricPlayBtn) {
+      this.caloricPlayBtn.classList.add('playing');
+    }
+    if (this.caloricPlayIconEl) {
+      this.caloricPlayIconEl.textContent = '⏸';
+    }
+
+    const deltaTIrr =
+      this.activeCaloricTemp === 'R44' || this.activeCaloricTemp === 'L44'
+        ? 7.0
+        : this.activeCaloricTemp === 'R30' || this.activeCaloricTemp === 'L30'
+        ? -7.0
+        : -33.0;
+
+    const ear = this.activeCaloricTemp.startsWith('L') ? 'left' : 'right';
+
+    this.caloricLastTickTime = performance.now();
+    this.caloricTimerInterval = setInterval(() => {
+      if (!this.isCaloricIrrigating) {
+        if (this.caloricTimerInterval) {
+          clearInterval(this.caloricTimerInterval);
+          this.caloricTimerInterval = null;
+        }
+        return;
+      }
+
+      const now = performance.now();
+      const dt = Math.max(0.01, Math.min(0.5, (now - this.caloricLastTickTime) / 1000.0));
+      this.caloricLastTickTime = now;
+      this.caloricElapsedSec += dt;
+
+      if (this.caloricElapsedSec >= 40.0) {
+        this.caloricElapsedSec = 40.0;
+        this.completeCaloricIrrigation();
+        return;
+      }
+
+      const conv = computeCaloricConvection(deltaTIrr, this.caloricElapsedSec, ear);
+      const beatSign =
+        conv.fastPhaseBeatDirection === 'Left-Beating'
+          ? -1
+          : conv.fastPhaseBeatDirection === 'Right-Beating'
+          ? 1
+          : 0;
+
+      const alex = computeAlexanderModulation(
+        conv.slowPhaseVelocity,
+        this.caloricAlexanderGaze,
+        beatSign
+      );
+
+      // Update shader uniforms on horizontal canal
+      this.scene.setCaloricUniforms(
+        true,
+        conv.deltaT,
+        Math.min(1.0, this.caloricElapsedSec / 40.0),
+        this.caloricElapsedSec
+      );
+
+      // Overlay live caloric convection onto 3D scene vestibular telemetry
+      this.scene.setCaloricSimulationState(true, conv, alex.modulatedSPV);
+
+      // Update active irrigation in VORDrawer's Caloric Butterfly plot
+      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, alex.modulatedSPV);
+
+      // Update badges
+      if (this.caloricTimerBadgeEl) {
+        this.caloricTimerBadgeEl.textContent = `⏱️ ${this.caloricElapsedSec.toFixed(1)}s / 40s`;
+      }
+      if (this.caloricSpvBadgeEl) {
+        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+      }
+      if (this.caloricAlexBadgeEl) {
+        this.caloricAlexBadgeEl.textContent = `${alex.clinicalDegree}`;
+      }
+      if (this.caloricStatusTitleEl) {
+        this.caloricStatusTitleEl.textContent = `COWS: ${conv.flowDirection.toUpperCase()} | ${conv.fastPhaseBeatDirection} (${conv.beatDirectionDescription})`;
+      }
+    }, 100);
+  }
+
+  public completeCaloricIrrigation(): void {
+    this.isCaloricIrrigating = false;
+    if (this.caloricTimerInterval) {
+      clearInterval(this.caloricTimerInterval);
+      this.caloricTimerInterval = null;
+    }
+    if (this.caloricPlayBtn) {
+      this.caloricPlayBtn.classList.remove('playing');
+    }
+    if (this.caloricPlayIconEl) {
+      this.caloricPlayIconEl.textContent = '▶';
+    }
+    this.scene.setCaloricUniforms(false, 0, 0, 0);
+    this.scene.setCaloricSimulationState(false, null);
+    this.vorDrawer.setCaloricActiveIrrigation(null, 0);
+    if (this.caloricTimerBadgeEl) {
+      this.caloricTimerBadgeEl.textContent = '⏱️ 40.0s / 40s (Complete)';
+    }
+
+    // Automatically link peak response to the Jongkees Bithermal Matrix
+    const deltaTIrr =
+      this.activeCaloricTemp === 'R44' || this.activeCaloricTemp === 'L44'
+        ? 7.0
+        : this.activeCaloricTemp === 'R30' || this.activeCaloricTemp === 'L30'
+        ? -7.0
+        : -33.0;
+    const ear = this.activeCaloricTemp.startsWith('L') ? 'left' : 'right';
+    const conv = computeCaloricConvection(deltaTIrr, 40.0, ear);
+    const peakSPV = Math.round(conv.slowPhaseVelocity);
+
+    if (this.activeCaloricTemp === 'R44' && this.jongkeesR44Input) {
+      this.jongkeesR44Input.value = String(peakSPV);
+    } else if (this.activeCaloricTemp === 'R30' && this.jongkeesR30Input) {
+      this.jongkeesR30Input.value = String(peakSPV);
+    } else if (this.activeCaloricTemp === 'L44' && this.jongkeesL44Input) {
+      this.jongkeesL44Input.value = String(peakSPV);
+    } else if (this.activeCaloricTemp === 'L30' && this.jongkeesL30Input) {
+      this.jongkeesL30Input.value = String(peakSPV);
+    }
+    this.recalculateJongkees();
+
+    this.selectCaloricAlexanderGaze(this.caloricAlexanderGaze);
+  }
+
+  public stopCaloricIrrigation(): void {
+    this.isCaloricIrrigating = false;
+    if (this.caloricTimerInterval) {
+      clearInterval(this.caloricTimerInterval);
+      this.caloricTimerInterval = null;
+    }
+    if (this.caloricPlayBtn) {
+      this.caloricPlayBtn.classList.remove('playing');
+    }
+    if (this.caloricPlayIconEl) {
+      this.caloricPlayIconEl.textContent = '▶';
+    }
+    this.scene.setCaloricUniforms(false, 0, 0, 0);
+    this.scene.setCaloricSimulationState(false, null);
+    this.vorDrawer.setCaloricActiveIrrigation(null, 0);
+  }
+
+  public alignCaloricPosture(): void {
+    this.scene.flyToCaloricPosture();
+    this.setHeadOrientationUI(0, 60, 0);
+  }
+
+  public selectCaloricAlexanderGaze(gazeDeg: number): void {
+    this.caloricAlexanderGaze = gazeDeg;
+    this.caloricGazeChips.forEach((chip) => {
+      chip.classList.toggle('active', parseInt(chip.getAttribute('data-alex-gaze') || '0', 10) === gazeDeg);
+    });
+    this.vorDrawer.setAlexanderGaze(gazeDeg, false);
+
+    const deltaTIrr =
+      this.activeCaloricTemp === 'R44' || this.activeCaloricTemp === 'L44'
+        ? 7.0
+        : this.activeCaloricTemp === 'R30' || this.activeCaloricTemp === 'L30'
+        ? -7.0
+        : -33.0;
+    const ear = this.activeCaloricTemp.startsWith('L') ? 'left' : 'right';
+
+    // If idle (t=0), compute against peak response (40s) so clinical degree shows anticipated degree
+    const evalSec = this.caloricElapsedSec > 0 ? this.caloricElapsedSec : 40.0;
+    const conv = computeCaloricConvection(deltaTIrr, evalSec, ear);
+    const beatSign =
+      conv.fastPhaseBeatDirection === 'Left-Beating'
+        ? -1
+        : conv.fastPhaseBeatDirection === 'Right-Beating'
+        ? 1
+        : 0;
+    const alex = computeAlexanderModulation(conv.slowPhaseVelocity, gazeDeg, beatSign);
+    if (this.caloricAlexBadgeEl) {
+      this.caloricAlexBadgeEl.textContent = `${alex.clinicalDegree}`;
+    }
+
+    if (this.isCaloricIrrigating) {
+      this.scene.setCaloricSimulationState(true, conv, alex.modulatedSPV);
+      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, alex.modulatedSPV);
+      if (this.caloricSpvBadgeEl) {
+        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+      }
+    } else if (this.caloricElapsedSec >= 40.0) {
+      if (this.caloricSpvBadgeEl) {
+        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+      }
+    } else if (this.caloricElapsedSec > 0) {
+      if (this.caloricSpvBadgeEl) {
+        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection}) (Paused)`;
+      }
+    } else {
+      if (this.caloricSpvBadgeEl) {
+        this.caloricSpvBadgeEl.textContent = 'SPV: 0.0°/s';
+      }
+    }
+  }
+
+  public openJongkeesModal(): void {
+    if (this.caloricJongkeesModal) {
+      this.caloricJongkeesModal.style.display = 'flex';
+      this.recalculateJongkees();
+    }
+  }
+
+  public closeJongkeesModal(): void {
+    if (this.caloricJongkeesModal) {
+      this.caloricJongkeesModal.style.display = 'none';
+    }
+  }
+
+  public recalculateJongkees(): void {
+    const r44 = parseFloat(this.jongkeesR44Input?.value || '22');
+    const r30 = parseFloat(this.jongkeesR30Input?.value || '20');
+    const l44 = parseFloat(this.jongkeesL44Input?.value || '21');
+    const l30 = parseFloat(this.jongkeesL30Input?.value || '21');
+
+    const res = calculateJongkees(r44, r30, l44, l30);
+    this.vorDrawer.setCaloricData(r44, r30, l44, l30);
+
+    if (this.resultUwValEl) {
+      this.resultUwValEl.textContent = `${res.canalParesisPercent.toFixed(1)}%`;
+      this.resultUwValEl.classList.toggle('pathologic', res.pareticEar !== 'symmetric');
+    }
+    if (this.resultDpValEl) {
+      this.resultDpValEl.textContent = `${res.directionalPreponderancePercent.toFixed(1)}%`;
+      this.resultDpValEl.classList.toggle('pathologic', res.preponderanceDirection !== 'symmetric');
+    }
+    if (this.resultTotalValEl) {
+      this.resultTotalValEl.textContent = `${res.totalResponseDegPerSec.toFixed(1)}°/s`;
+      this.resultTotalValEl.classList.toggle('pathologic', res.isBilateralWeakness);
+    }
+    if (this.caloricInterpCardEl) {
+      this.caloricInterpCardEl.textContent = res.clinicalInterpretation;
+    }
+  }
+
+  public loadJongkeesPreset(presetKey: string): void {
+    this.caloricPresetChips.forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-preset') === presetKey);
+    });
+
+    type PresetName = keyof typeof CALORIC_CLINICAL_PRESETS;
+    let mappedKey: PresetName = 'normal';
+    if (presetKey === 'right_uw') mappedKey = 'right_neuritis';
+    else if (presetKey === 'left_uw') mappedKey = 'left_schwannoma';
+    else if (presetKey === 'dp_right') mappedKey = 'directional_preponderance';
+    else if (presetKey === 'bilateral') mappedKey = 'bilateral_gentamicin';
+    else if (presetKey in CALORIC_CLINICAL_PRESETS) mappedKey = presetKey as PresetName;
+
+    const presetData = CALORIC_CLINICAL_PRESETS[mappedKey];
+    if (presetData) {
+      if (this.jongkeesR44Input) this.jongkeesR44Input.value = String(presetData.r44);
+      if (this.jongkeesR30Input) this.jongkeesR30Input.value = String(presetData.r30);
+      if (this.jongkeesL44Input) this.jongkeesL44Input.value = String(presetData.l44);
+      if (this.jongkeesL30Input) this.jongkeesL30Input.value = String(presetData.l30);
+      this.recalculateJongkees();
+    }
+  }
+
+  public selectVHITPair(pair: VHITCanalPair): void {
+    this.vhitPair = pair;
+    this.vhitPairChips.forEach((chip) => {
+      chip.classList.toggle('active', chip.getAttribute('data-vhit-pair') === pair);
+    });
+
+    const label = pair === 'horizontal' ? 'Horizontal (Yaw)' : pair.toUpperCase();
+    if (this.vhitStatusTitleEl) {
+      this.vhitStatusTitleEl.textContent = `High-Acceleration Head Impulse (${label}, 15°, 120ms)`;
+    }
+    this.updateVHITReadout();
+  }
+
+  public selectVHITDirection(dir: 1 | -1): void {
+    this.vhitDirection = dir;
+    if (this.vhitDirLeftBtn) this.vhitDirLeftBtn.classList.toggle('active', dir === -1);
+    if (this.vhitDirRightBtn) this.vhitDirRightBtn.classList.toggle('active', dir === 1);
+    this.updateVHITReadout();
+  }
+
+  public updateVHITReadout(): void {
+    this.vorDrawer.simulateVHIT(this.vhitPreset, this.vhitParadigm, this.vhitSlippage);
+    const buf = this.vorDrawer.getVHITBuffer();
+    const gain = buf.calculatedGain;
+    const saccadesList: string[] = [];
+    if (buf.covertSaccadePresent) saccadesList.push('Covert (75ms)');
+    if (buf.overtSaccadePresent) saccadesList.push('Overt (180ms)');
+    if (buf.shimpSaccadePresent) saccadesList.push('SHIMP Anti-Comp (180ms)');
+
+    if (this.vhitGainBadgeEl) {
+      this.vhitGainBadgeEl.textContent = `Gain: ${gain.toFixed(2)}`;
+    }
+    if (this.vhitSaccadeBadgeEl) {
+      if (saccadesList.length === 0) {
+        this.vhitSaccadeBadgeEl.textContent = 'Normal (No Saccades)';
+      } else {
+        this.vhitSaccadeBadgeEl.textContent = saccadesList.join(' + ');
+      }
+    }
+  }
+
+  public selectVHITPreset(preset: VHITPathologyPreset): void {
+    this.vhitPreset = preset;
+    this.vhitPresetChips.forEach((chip) => {
+      chip.classList.toggle('active', chip.getAttribute('data-vhit-preset') === preset);
+    });
+    this.updateVHITReadout();
+  }
+
+  public toggleVHITParadigm(): void {
+    this.vhitParadigm = this.vhitParadigm === 'himp' ? 'shimp' : 'himp';
+    if (this.vhitParadigmBtn) {
+      this.vhitParadigmBtn.textContent = this.vhitParadigm.toUpperCase();
+      this.vhitParadigmBtn.title =
+        this.vhitParadigm === 'himp'
+          ? 'HIMP: Target is Earth-fixed (catch-up saccades indicate hypofunction)'
+          : 'SHIMP: Target is Head-fixed (catch-up saccades indicate normal function)';
+    }
+    this.updateVHITReadout();
+  }
+
+  public toggleVHITSlippage(): void {
+    this.vhitSlippage = !this.vhitSlippage;
+    if (this.vhitSlippageBtn) {
+      this.vhitSlippageBtn.textContent = this.vhitSlippage ? 'Slippage: On' : 'Slippage: Off';
+      this.vhitSlippageBtn.classList.toggle('active', this.vhitSlippage);
+    }
+    this.updateVHITReadout();
+  }
+
+  public deliverVHITThrust(): void {
+    if (this.vhitThrustBtn && this.vhitThrustBtn.disabled) return;
+    if (this.vhitThrustBtn) {
+      this.vhitThrustBtn.disabled = true;
+      this.vhitThrustBtn.classList.add('impulsing');
+    }
+
+    // 1. Deliver 3D animated head impulse
+    this.scene.triggerVHITThrust(this.vhitPair, this.vhitDirection, () => {
+      if (this.vhitThrustBtn) {
+        this.vhitThrustBtn.disabled = false;
+        this.vhitThrustBtn.classList.remove('impulsing');
+      }
+    });
+
+    // 2. Switch drawer to vhit mode and simulate trial
+    this.vorDrawer.setDiagnosticViewMode('vhit');
+    this.updateVHITReadout();
+
+    // 3. Ensure VOR Drawer is open so user sees the high-speed trace immediately
+    if (!this.vorDrawer.getIsOpen()) {
+      this.openVORDrawer();
+    }
   }
 
   private handleFrequencyChange(freq: number, updateSlider: boolean): void {
@@ -2014,6 +3798,77 @@ export class AppHUD {
       item.meshName === 'ls_Hsapiens_Sa' ||
       item.meshName === 'segT2_th1.07_Otsu';
 
+    const isSurgicalMode = snap.labMode === 'surgical';
+    let surgBoxHtml = '';
+    if (isSurgicalMode) {
+      const surgState = this.scene.getSurgicalState();
+      let badgeHtml = '<span class="surg-safety-badge safe">SAFE</span>';
+      let title = 'Cochlear Implant Suite';
+      let metricsHtml = '';
+
+      if (surgState.activeProcedure === 'cochlear_implant') {
+        title = 'Cochlear Implant Navigation';
+        const ci = surgState.ciState;
+        if (ci.isRuptured || ci.translocationRisk === 'breach') {
+          badgeHtml = '<span class="surg-safety-badge danger">BREACH DETECTED</span>';
+        } else if (ci.translocationRisk === 'caution') {
+          badgeHtml = '<span class="surg-safety-badge warning">HIGH FORCE</span>';
+        } else {
+          badgeHtml = '<span class="surg-safety-badge safe">INTRA-SCALAR SAFE</span>';
+        }
+        metricsHtml = `
+          <div>Depth: <strong>${ci.insertionDepthMm.toFixed(1)} mm</strong></div>
+          <div>Force: <strong>${ci.insertionForceMilliNewtons.toFixed(1)} mN</strong></div>
+          <div>Dist to BM: <strong>${ci.distanceToBasilarMembraneMm.toFixed(2)} mm</strong></div>
+          <div>Angle: <strong>${ci.angularDepthDeg.toFixed(0)}°</strong></div>
+        `;
+      } else if (surgState.activeProcedure === 'labyrinthectomy') {
+        title = 'Transmastoid Labyrinthectomy';
+        const laby = surgState.labyState;
+        badgeHtml = laby.step === 3
+          ? '<span class="surg-safety-badge warning">DEAFFERENTATED</span>'
+          : '<span class="surg-safety-badge safe">RESECTION IN PROGRESS</span>';
+        metricsHtml = `
+          <div>Step: <strong>${laby.step + 1} / 4</strong></div>
+          <div>Drill: <strong>${laby.isDrillActive ? '70k RPM' : 'OFF'}</strong></div>
+          <div>Resting Firing: <strong>${laby.vestibularFiringRateSpikesSec.toFixed(0)} sp/s</strong></div>
+          <div>Paralytic SPV: <strong>${laby.spontaneousSPVDegSec.toFixed(1)}°/s</strong></div>
+        `;
+      } else {
+        title = 'Retrosigmoid Neurectomy (IAC)';
+        const neu = surgState.neurectomyState;
+        if (neu.tractionRisk === 'CRITICAL' || neu.facialEMGVoltageMicroVolts >= 500) {
+          badgeHtml = '<span class="surg-safety-badge danger">EMG DISCHARGE</span>';
+        } else if (neu.tractionRisk === 'WARNING') {
+          badgeHtml = '<span class="surg-safety-badge warning">CN VII TRACTION</span>';
+        } else {
+          badgeHtml = '<span class="surg-safety-badge safe">CN VII PRESERVED</span>';
+        }
+        const latencyShift = Math.max(0, neu.abrWaveVLatencyMs - 5.7);
+        metricsHtml = `
+          <div>ABR Wave V: <strong>${neu.abrWaveVLatencyMs.toFixed(2)} ms</strong></div>
+          <div>Latency Shift: <strong>+${latencyShift.toFixed(2)} ms</strong></div>
+          <div>Facial EMG: <strong>${neu.facialEMGVoltageMicroVolts.toFixed(0)} μV</strong></div>
+          <div>Koos Tumor: <strong>Stage ${neu.koosStage}</strong></div>
+        `;
+      }
+
+      surgBoxHtml = `
+        <div class="surgical-inspector-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong style="font-size: 11px; color: #e2e8f0;">🔬 ${title}</strong>
+            ${badgeHtml}
+          </div>
+          <div class="surg-metrics-grid">
+            ${metricsHtml}
+          </div>
+          <button type="button" class="surg-inspector-monitor-btn" id="surg-inspector-monitor-btn">
+            🔬 Open Surgical Monitor
+          </button>
+        </div>
+      `;
+    }
+
     const isVestibularMode = snap.labMode === 'vestibular';
     const isVestibularPart =
       item.systemGroup === 'semicircular_ducts' ||
@@ -2042,7 +3897,18 @@ export class AppHUD {
         canalPlane = 'RALP Plane — 45° Oblique';
       }
 
-      const firingRate = telem ? telem.afferentSpikesPerSec : 90;
+      let firingRate = telem ? telem.afferentSpikesPerSec : 90;
+      let ewaldLaw = telem?.ewaldLawActive || "Ewald's 3rd Law: Ampullofugal flow excites vertical canal";
+
+      // If Caloric Irrigation is active, reflect caloric excitation / inhibition on CN VIII
+      const caloricSim = this.scene.getCaloricSimulationState();
+      if (this.isCaloricIrrigating && caloricSim && caloricSim.active) {
+        firingRate = caloricSim.afferentFiringRate;
+        ewaldLaw = caloricSim.isAmpullopetal
+          ? "Ewald's 2nd Law: Ampullopetal excitation (horizontal canal)"
+          : "Ewald's 2nd Law: Ampullofugal inhibition (horizontal canal)";
+      }
+
       const clampedRate = Math.max(10, Math.min(310, firingRate));
       const firingPercent = ((clampedRate - 10) / (310 - 10)) * 100;
       let firingClass = 'rate-resting';
@@ -2054,8 +3920,6 @@ export class AppHUD {
         firingClass = 'rate-inhibition';
         firingFillClass = 'fill-inhibition';
       }
-
-      const ewaldLaw = telem?.ewaldLawActive || "Ewald's 3rd Law: Ampullofugal flow excites vertical canal";
       const clearancePercent = telem ? telem.clearancePercent : 0;
       let sensationText = 'Calm (No Spinning)';
       let sensationBadgeClass = 'sensation-calm';
@@ -2240,6 +4104,12 @@ export class AppHUD {
            : ''
        }
 
+       ${
+         isSurgicalMode
+           ? surgBoxHtml
+           : ''
+       }
+
        <p class="inspector-summary">${summaryText}</p>
 
        <div class="inspector-actions">
@@ -2333,6 +4203,11 @@ export class AppHUD {
          this.switchLabMode('vestibular');
        }
        this.openVORDrawer();
+     });
+
+     const surgMonitorBtn = this.inspectorCard.querySelector('#surg-inspector-monitor-btn') as HTMLButtonElement;
+     surgMonitorBtn?.addEventListener('click', () => {
+       this.openSurgicalDrawer();
      });
 
     const accordionBtn = this.inspectorCard.querySelector('#accordion-toggle-btn') as HTMLButtonElement;

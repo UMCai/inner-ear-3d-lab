@@ -13,8 +13,8 @@ flowchart LR
     S0["Stage 0: Pure 3D Anatomy Lab<br/><b>[DONE]</b><br/>• 27 Authentic Meshes<br/>• Bone Peel & Explode<br/>• 60fps WebGL MVP"] 
     --> S1["Stage 1: Hearing & Tonotopy<br/><b>[DONE]</b><br/>• Greenwood Place Map<br/>• Web Audio Pure Tones<br/>• Interactive Audiogram<br/>• Mode Switcher"]
     --> S2["Stage 2: Virtual Radiology<br/><b>[DONE]</b><br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• 2D CT MPR Canvas<br/>• SCDS Third-Window"]
-    --> S3["Stage 3: Vestibular & VOR<br/><b>[NEXT]</b><br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS Convection"]
-    --> S4["Stage 4: Surgical Scenarios<br/>• Cochlear Implant Insertion<br/>• Scalar Translocation Risk<br/>• Acoustic Neuroma Staging"]
+    --> S3["Stage 3: Vestibular & VOR<br/><b>[DONE]</b><br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS & vHIT"]
+    --> S4["Stage 4: Surgical Scenarios<br/><b>[DONE]</b><br/>• Cochlear Implant Insertion<br/>• Labyrinthectomy Compensation<br/>• Acoustic Neuroma Staging"]
 ```
 
 ---
@@ -119,37 +119,66 @@ Enable medical students, ENT residents, and neuroradiologists to master multipla
 
 ---
 
-## Stage 3: Multi-Canal Vestibular Dynamics & VOR Eye Avatar
+## Stage 3: Multi-Canal Vestibular Dynamics & VOR Eye Avatar — ✅ COMPLETE
 
 ### Objective
-Expand vestibular simulation beyond the posterior canal to encompass all 3 semicircular canals, complex BPPV maneuvers, caloric irrigation, and a synchronized 3D eye avatar demonstrating the vestibulo-ocular reflex.
+Expand vestibular simulation beyond the posterior canal to encompass all 3 semicircular canals, complex BPPV maneuvers, caloric irrigation, video head impulse testing, and a synchronized 3D eye avatar demonstrating the vestibulo-ocular reflex.
 
 > **Blueprint & Derivation Spec:** [`docs/STAGE3_PLAN.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/STAGE3_PLAN.md)  
-> **Status:** Phase 3A Architecture & Preparation Active
+> **Verification Suites:** `scripts/test_canal_paths.py`, `scripts/test_vestibular_engine.js` (72 tests), `scripts/test_eye_avatar_vor.js` (50 tests), `scripts/test_vor_workbench.js` (51 tests), `scripts/test_diagnostic_vestibular.js` (51 tests).
 
 ### Task Breakdown
-- [ ] **Step 3.1: Multi-Canal BPPV & Maneuver Presets**:
+- [x] **Step 3.1: Multi-Canal BPPV & Maneuver Presets**:
   - Horizontal Canal BPPV: Geotropic (canalithiasis) and Apogeotropic (cupulolithiasis) with Gufoni maneuver and Lempert 360° Barbecue roll.
   - Anterior Canal BPPV with Yacovino maneuver.
-- [ ] **Step 3.2: Synchronized 3D Dual-Eye Avatar**:
-  - Inset 3D eye model showing compensatory slow-phase gaze drift and fast-phase resetting saccades.
-- [ ] **Step 3.3: Caloric Testing Simulator (COWS Rule)**:
-  - Simulate warm ($44^\circ\text{C}$) vs. cold ($30^\circ\text{C}$) convective endolymph flow and Jongkees canal paresis calculation.
-- [ ] **Step 3.4: Video Head Impulse Test (vHIT)**:
-  - High-acceleration head thrust simulation across horizontal, RALP, and LARP canal planes with covert/overt saccade detection.
+  - 3-DOF $SO(3)$ head kinematics with side-lying lateral roll ($\gamma = \pm 90^\circ$).
+  - Two-phase Steinhausen cupular plunger model with passive elastic decay and Ewald's 2nd & 3rd laws neurophysiology.
+- [x] **Step 3.2: Synchronized 3D Dual-Eye Avatar & VOR Kinematics Engine**:
+  - 3D bilateral ocular avatar (`assets/iemap/eye_avatar.glb`, $PD = 62.0\text{ mm}$, 32 radial iris crypts for cyclotorsion tracking).
+  - 3-DOF Listing's law kinematics ($q_z \equiv 0$) with vestibular cyclotorsion around line of sight.
+  - Bilateral cyclovergent coupling, slow-phase peripheral drift integration, and ballistic resetting fast-phase saccades.
+  - Monochromatic near-infrared (NIR) VNG shader with pupil centroid tracking $\oplus$ and corneal Purkinje glints $\ast$.
+- [x] **Step 3.3: Caloric Testing Simulator (COWS Rule)**:
+  - 1D Fourier thermal diffusion ODE ($\alpha = 0.14\text{ mm}^2/\text{s}$, depth $L=4.0\text{ mm}$) with temperature-dependent endolymph buoyancy.
+  - Proves Cold Opposite, Warm Same (COWS) across both ears with warm (44°C), cold (30°C), and ice water (4°C) irrigations.
+  - Alexander's law gaze modulation ($k=0.0133/^\circ$) and Jongkees bithermal formulation ($UW\%$, $DP\%$).
+  - Claussen 4-quadrant butterfly vestibulogram with 15–30°/s normative corridor.
+- [x] **Step 3.4: Video Head Impulse Test (vHIT)**:
+  - 5th-order minimum-jerk kinematics ($T=120\text{ ms}$, $\Delta\theta = 15^\circ$, $250^\circ/\text{s}$) across Horizontal, RALP, and LARP canal planes.
+  - Curthoys 40–80ms area gain calculation, overt/covert saccades, goggle slippage artifact, and SHIMP paradigm.
+  - Dual-trace high-speed velocity plot with live $SO(3)$ 3D head thrusts.
 
 ---
 
-## Stage 4: Otologic Surgical Scenarios & Procedural Pathology
+## Stage 4: Otologic Surgical Scenarios & Procedural Pathology — ✅ COMPLETE
 
 ### Objective
-Deliver specialized otologic surgical planning tools for surgical residents and otologists.
+Deliver specialized otologic surgical planning tools, implant kinematics, and biotelemetry simulators for otologic surgeons, neurotology fellows, and residents.
+
+> **Blueprint & Derivation Spec:** [`stage4_surgical_simulation_plan.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/stage4_surgical_simulation_plan.md)  
+> **Verification Suite:** `scripts/test_surgical_engine.js` (56/56 assertions passing 100%)
 
 ### Task Breakdown
-- [ ] **Step 4.1: Cochlear Implant (CI) Scala Tympani Insertion**:
-  - Simulated electrode array insertion through Round Window vs. Cochleostomy approaches.
-  - Real-time angular insertion depth ($0^\circ \to 360^\circ \to 540^\circ$) and Greenwood frequency coverage readout.
-- [ ] **Step 4.2: Scalar Translocation Warning System**:
-  - Collision detection flagging basilar membrane rupture into the scala vestibuli.
-- [ ] **Step 4.3: Vestibular Schwannoma (Acoustic Neuroma) Koos Staging**:
-  - Tumor growth slider (Stages I–IV) demonstrating internal auditory canal compression of CN VII and CN VIII.
+- [x] **Step 4.1: Cochlear Implant (CI) Scala Tympani Insertion**:
+  - Continuous 3D Scala Tympani insertion trajectory ($0\dots 31.0\text{ mm}$ depth, $0^\circ \to 720^\circ$ angular coverage).
+  - Dynamic Advance Off-Stylet (AOS) curling factor ($0.0 \to 1.0$) with non-linear friction and curvature force accumulation.
+  - 22 platinum electrode band contacts mapping Donald D. Greenwood place-frequencies ($18\text{ kHz}$ to $250\text{ Hz}$).
+  - Procedural 3D electrode array tube (`THREE.BufferGeometry`) and 22 platinum sphere contact meshes in `DualStageScene.ts`.
+- [x] **Step 4.2: Scalar Translocation Warning System**:
+  - Continuous insertion force telemetry and basilar membrane proximity tracking.
+  - Critical safety threshold trigger ($F > 150\text{ mN}$) flagging basilar membrane rupture and scala vestibuli breach.
+  - Fragment shader crimson rupture emergency alarm (`uTranslocationBreach`) and Web Audio mechanical rupture snap transient.
+- [x] **Step 4.3: Transmastoid Labyrinthectomy & Central Compensation**:
+  - High-speed surgical drilling canal unroofing progression ($0\dots 100\%$) with milling luminescence shader (`uSurgicalDrillActive`, `uCanalUnroofed`).
+  - Web Audio 70,000 RPM otologic drill whine with high-frequency harmonics and mechanical flutter.
+  - Acute unilateral complete vestibular deafferentation and central vestibular compensation ODE ($\text{SPV}(t) = \text{SPV}_{\text{acute}} e^{-t / \tau}$ with $\tau = 4.0\text{ days}$) extinguishing spontaneous nystagmus to $0.0^\circ/\text{s}$.
+- [x] **Step 4.4: Retrosigmoid Neurectomy & IAC Vestibular Schwannoma Staging**:
+  - Porus acousticus 4-quadrant anatomical mapping (Anterosuperior = Facial VII, Anteroinferior = Cochlear, Posterosuperior = Superior Vestibular, Posteroinferior = Inferior Vestibular: "7-up, Coke down").
+  - Koos vestibular schwannoma tumor classification (Stages I–IV: intracanalicular $\le 10\text{ mm}$ to giant $>30\text{ mm}$ brainstem compression).
+  - Continuous electrophysiological biotelemetry: ABR Wave V latency prolongation $\Delta\tau_{\text{ABR}}$ ($5.6\dots 8.5\text{ ms}$) and amplitude degradation.
+  - Continuous facial nerve EMG neurotonic spike rate and voltage alarm ($\mu\text{V}$) triggered by mechanical traction ($F_{\text{traction}} > 2.0\text{ g}$) or sub-millimeter proximity ($d < 1.0\text{ mm}$), paired with Web Audio $180\text{ Hz}$ EMG acoustic alert.
+- [x] **Step 4.5: Docked Surgical Drawer, HUD Integration & Multi-Viewport Verification**:
+  - 5th docked modal card (`SurgicalDrawer.ts`, $360\times 360$ logical, $720\times 720$ physical) with 2D endoscopic monitor and live biotelemetry strip chart.
+  - Header mode switcher `[ 🔬 Surgical Suites ]` and contextual bottom dock `#surgical-dock-content` with CI, Labyrinthectomy, and Neurectomy workbenches.
+  - Strict 5-drawer mutual exclusivity (`partsDrawer`, `audiogramDrawer`, `ctSliceDrawer`, `vorDrawer`, `surgicalDrawer`, and `gyroFlyout`).
+  - 100% test pass on `scripts/test_surgical_engine.js` (56 tests), root `npm test` (all 7 suites passing), `cd web && npm run build` (0 errors), and headless Chrome CDP visual multi-viewport validation.

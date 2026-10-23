@@ -20,6 +20,14 @@ export class ToneSynthesizer {
   private currentVolume = 0.8;
   private initialized = false;
 
+  // Surgical procedural audio nodes
+  private drillOsc: OscillatorNode | null = null;
+  private drillGain: GainNode | null = null;
+  private isDrilling = false;
+  private emgOsc: OscillatorNode | null = null;
+  private emgGain: GainNode | null = null;
+  private isEMGAlarm = false;
+
   private static readonly GAIN_FLOOR = 0.0001; // Non-zero floor required for exponential ramps
   private static readonly MAX_SAFE_GAIN = 0.65; // Acoustic safety ceiling
   private static readonly ATTACK_SEC = 0.05; // 50ms smooth exponential attack
@@ -225,7 +233,170 @@ export class ToneSynthesizer {
     return this.isPlaying;
   }
 
+  /**
+   * Starts high-speed otologic drill whine (70,000 RPM pneumatic burr ~ 1,166.7 Hz).
+   */
+  public async startDrill(rpm = 70000): Promise<void> {
+    await this.resumeContextIfNeeded();
+    if (!this.ensureAudioGraph() || !this.audioCtx || !this.masterGain) return;
+    if (this.isDrilling) return;
+
+    try {
+      const now = this.audioCtx.currentTime;
+      const drillFreq = Math.max(200, Math.min(2000, (rpm / 60) * 1.0)); // ~1166.7 Hz
+
+      this.drillGain = this.audioCtx.createGain();
+      this.drillGain.gain.setValueAtTime(ToneSynthesizer.GAIN_FLOOR, now);
+
+      this.drillOsc = this.audioCtx.createOscillator();
+      this.drillOsc.type = 'triangle';
+      this.drillOsc.frequency.setValueAtTime(drillFreq, now);
+
+      this.drillOsc.connect(this.drillGain);
+      this.drillGain.connect(this.masterGain);
+
+      this.drillOsc.start(now);
+      this.drillGain.gain.exponentialRampToValueAtTime(0.08, now + 0.04);
+      this.isDrilling = true;
+    } catch (err) {
+      console.warn('[ToneSynthesizer] startDrill error:', err);
+    }
+  }
+
+  /**
+   * Stops otologic drill whine with a smooth 40ms decay.
+   */
+  public stopDrill(): void {
+    if (!this.isDrilling || !this.audioCtx || !this.drillGain || !this.drillOsc) {
+      this.isDrilling = false;
+      return;
+    }
+
+    try {
+      const now = this.audioCtx.currentTime;
+      this.drillGain.gain.cancelScheduledValues(now);
+      this.drillGain.gain.setValueAtTime(Math.max(ToneSynthesizer.GAIN_FLOOR, this.drillGain.gain.value), now);
+      this.drillGain.gain.exponentialRampToValueAtTime(ToneSynthesizer.GAIN_FLOOR, now + 0.04);
+
+      const osc = this.drillOsc;
+      setTimeout(() => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch {
+          // ignore
+        }
+      }, 50);
+    } catch {
+      // ignore
+    }
+
+    this.isDrilling = false;
+    this.drillOsc = null;
+    this.drillGain = null;
+  }
+
+  public getIsDrilling(): boolean {
+    return this.isDrilling;
+  }
+
+  /**
+   * Triggers facial nerve EMG neurotonic buzz/whine (180 Hz rapid pulse).
+   */
+  public async triggerEMGAlarm(freqHz = 180): Promise<void> {
+    await this.resumeContextIfNeeded();
+    if (!this.ensureAudioGraph() || !this.audioCtx || !this.masterGain) return;
+    if (this.isEMGAlarm) return;
+
+    try {
+      const now = this.audioCtx.currentTime;
+      this.emgGain = this.audioCtx.createGain();
+      this.emgGain.gain.setValueAtTime(ToneSynthesizer.GAIN_FLOOR, now);
+
+      this.emgOsc = this.audioCtx.createOscillator();
+      this.emgOsc.type = 'sawtooth';
+      this.emgOsc.frequency.setValueAtTime(freqHz, now);
+
+      this.emgOsc.connect(this.emgGain);
+      this.emgGain.connect(this.masterGain);
+
+      this.emgOsc.start(now);
+      this.emgGain.gain.exponentialRampToValueAtTime(0.12, now + 0.03);
+      this.isEMGAlarm = true;
+    } catch (err) {
+      console.warn('[ToneSynthesizer] triggerEMGAlarm error:', err);
+    }
+  }
+
+  /**
+   * Stops facial nerve EMG alarm.
+   */
+  public stopEMGAlarm(): void {
+    if (!this.isEMGAlarm || !this.audioCtx || !this.emgGain || !this.emgOsc) {
+      this.isEMGAlarm = false;
+      return;
+    }
+
+    try {
+      const now = this.audioCtx.currentTime;
+      this.emgGain.gain.cancelScheduledValues(now);
+      this.emgGain.gain.setValueAtTime(Math.max(ToneSynthesizer.GAIN_FLOOR, this.emgGain.gain.value), now);
+      this.emgGain.gain.exponentialRampToValueAtTime(ToneSynthesizer.GAIN_FLOOR, now + 0.04);
+
+      const osc = this.emgOsc;
+      setTimeout(() => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch {
+          // ignore
+        }
+      }, 50);
+    } catch {
+      // ignore
+    }
+
+    this.isEMGAlarm = false;
+    this.emgOsc = null;
+    this.emgGain = null;
+  }
+
+  public getIsEMGAlarm(): boolean {
+    return this.isEMGAlarm;
+  }
+
+  /**
+   * Synthesizes basilar membrane rupture transient snap/pop on scalar translocation breach.
+   */
+  public async triggerRuptureSnap(): Promise<void> {
+    await this.resumeContextIfNeeded();
+    if (!this.ensureAudioGraph() || !this.audioCtx || !this.masterGain) return;
+
+    try {
+      const now = this.audioCtx.currentTime;
+      const snapOsc = this.audioCtx.createOscillator();
+      const snapGain = this.audioCtx.createGain();
+
+      snapOsc.type = 'sine';
+      snapOsc.frequency.setValueAtTime(90.0, now);
+      snapOsc.frequency.exponentialRampToValueAtTime(25.0, now + 0.06);
+
+      snapGain.gain.setValueAtTime(0.28, now);
+      snapGain.gain.exponentialRampToValueAtTime(ToneSynthesizer.GAIN_FLOOR, now + 0.06);
+
+      snapOsc.connect(snapGain);
+      snapGain.connect(this.masterGain);
+
+      snapOsc.start(now);
+      snapOsc.stop(now + 0.07);
+    } catch (err) {
+      console.warn('[ToneSynthesizer] triggerRuptureSnap error:', err);
+    }
+  }
+
   public dispose(): void {
+    this.stopDrill();
+    this.stopEMGAlarm();
     if (this.oscillator) {
       try {
         this.oscillator.stop();

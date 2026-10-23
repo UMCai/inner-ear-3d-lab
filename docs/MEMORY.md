@@ -133,7 +133,77 @@
 
 ---
 
+### 2026-10-20: Stage 3 — Phase 3B: Diagnostic Vestibular Testing Suite (Caloric Irrigation & vHIT) (Completed & Verified)
+- **Objective:** Expand the vestibular laboratory with an authentic, medically rigorous neurotological diagnostic testing suite modeling Caloric Thermal Convection (COWS rule, Alexander's law gaze modulation, Jongkees formula) and Video Head Impulse Testing (vHIT 3-canal minimum-jerk kinematics, Curthoys 40–80ms area gain, overt/covert compensatory saccades, goggle slippage artifact, SHIMP paradigm, and SO(3) 3D head thrusts).
+- **Key Deliverables Achieved:**
+  - `web/src/physics/diagnosticVestibularEngine.ts`:
+    - 1D Fourier Thermal Diffusion ODE: Models endolymph temperature delta over 40s irrigation with tissue thermal diffusivity $\alpha = 0.14\text{ mm}^2/\text{s}$ and external auditory canal depth $L = 4.0\text{ mm}$, driving temperature-dependent density change ($\Delta\rho = -\beta \rho_0 \Delta T$), hydrostatic buoyancy pressure in $+30^\circ$ supine posture, and Poiseuille convective endolymph flow driving cupular deflection and CN VIII firing rates ($10\dots 310\text{ sp/s}$).
+    - COWS Rule Neurophysiology: Proves Cold Opposite, Warm Same across both ears. Warm 44°C (+7°C) produces ampullopetal convective flow and CN VIII excitation ($153.9\text{ sp/s}$), eliciting ipsilateral slow drift and contralateral/same-side fast phase. Cold 30°C (-7°C) produces ampullofugal convective flow and CN VIII inhibition ($58.1\text{ sp/s}$), eliciting contralateral fast phase. Ice water 4°C (-33°C) tests residual function in vestibular paresis ($30.0\text{ sp/s}$).
+    - Alexander's Law Gaze Modulation: $SPV(\theta_g) = SPV_0 \cdot \max(0.15, 1.0 + k \cdot \text{sign}(SPV_0) \cdot \theta_g)$ with $k = 0.0133/^\circ$ ($\pm 40\%$ modulation at $\pm 30^\circ$ gaze), maintaining peripheral nystagmus non-reversal floor, with automated 1st Degree ($<10^\circ/\text{s}$), 2nd Degree ($10\dots 25^\circ/\text{s}$), and 3rd Degree ($>25^\circ/\text{s}$) classification.
+    - Jongkees Bithermal Formulation: Calculates Unilateral Weakness ($UW$, threshold $25\%$), Directional Preponderance ($DP$, threshold $30\%$), and total response sum ($\sum < 20^\circ/\text{s}$ bilateral weakness flag) with complete areflexia zero-division protection, paretic ear flagging, and automated clinical interpretation generator.
+    - vHIT Minimum-Jerk Kinematics: 5th-order polynomial minimum-jerk head impulse kinematics ($T=120\text{ ms}$, $\Delta\theta = 15^\circ$, peak velocity $250^\circ/\text{s}$, peak acceleration $6545^\circ/\text{s}^2$) projecting along canal pair axes (Horizontal Yaw $[0, 0, 1]$, RALP $[0.707, -0.707, 0]$, LARP $[0.707, 0.707, 0]$) with orthonormal unit SO(3) quaternions.
+    - Curthoys 40–80ms Area Gain & Saccades: Curthoys area gain ($G = \frac{\int_{40}^{80} |v_{\text{eye}}| dt}{\int_{40}^{80} |v_{\text{head}}| dt}$), overt saccades (post-impulse latency $140\text{–}180\text{ ms}$), covert saccades (intra-impulse latency $75\text{–}95\text{ ms}$), goggle slippage transient artifacts, and SHIMP (Suppression Head Impulse) anti-compensatory saccade generation.
+    - Zero-Allocation `VHITImpulseBuffer`: Pre-allocated contiguous Float32Array buffers (350 samples at 1ms resolution) with zero heap allocations during simulation or rendering.
+  - `web/src/render/gate3Materials.ts` & `web/src/render/DualStageScene.ts`:
+    - GLSL convective glow fragment uniforms (`uCaloricActive`, `uCaloricTempDiff`, `uCaloricDiffusion`, `uCaloricTime`) rendering dynamic warmth (crimson) and cold (cyan) convective glow inside the horizontal canal lumen.
+    - Contralateral mirrored labyrinth mode (`scale.x = -1.0`) with `uMirrored` uniform flipping `isFacingOut = !gl_FrontFacing` to resolve inverted face normals, rim Fresnel shading, and `uSingleSurface` cutaway backface culling for seamless right/left ear switching.
+    - Live SO(3) head quaternion animation during thrusts and caloric $+30^\circ$ supine posture fly-to.
+    - Telemetry bridge connecting `setCaloricSimulationState()` to horizontal slow-phase eye drift and nystagmus fast-phase beats in the main render loop.
+  - `web/src/ui/VORDrawer.ts`:
+    - Diagnostic strip modes (`'nystagmogram' | 'caloric' | 'vhit'`), Alexander gaze buttons & modulation badge, zero-allocation `VHITImpulseBuffer`, and `renderVHITDualTracePlot()` with 40–80ms shaded gain window, target gain badge, and saccade tags.
+    - Authentic Claussen 4-quadrant Caloric Butterfly Plot (`renderCaloricButterflyPlot()`): visualizes $R_{44}, R_{30}, L_{44}, L_{30}$ peak slow phase velocities in an amber/cyan butterfly vestibulogram with a 15–30°/s normative corridor, live pulsing active irrigation ring marker, and dynamic Jongkees UW%/DP% calculation badge.
+  - `web/src/ui/AppHUD.ts` & `web/src/style.css`:
+    - Subnav modality switcher [ 🌀 BPPV │ 🌡️ Caloric │ ⚡ vHIT ].
+    - Caloric workbench: temperature chips (Warm 44°C, Cold 30°C, Ice 4°C), laterality selector (Right / Left), irrigation countdown timer, Alexander gaze chips, and Jongkees Calculator modal with clinical presets.
+    - vHIT workbench: canal pair selector (Horizontal, RALP, LARP), direction selector, clinical presets, HIMP/SHIMP toggle, slippage toggle, and Deliver Thrust button.
+    - Backward-compatible CSS chip names (`.caloric-chip`, `.vhit-pair-chip`) preserving BPPV test assertions.
+  - Verification:
+    - Standalone Node.js ESM test suite `scripts/test_diagnostic_vestibular.js` passing 51/51 assertions (100%).
+    - Root `npm test` running all 6 test suites passing 336/336 assertions (100%).
+    - Headless Chrome CDP tests (`scripts/verify_mvp_cdp.js`) passing 100% across Desktop, Tablet, and Mobile viewports with zero console errors.
+
+---
+
+### 2026-10-21: Stage 4 — Surgical Approaches & Implant Simulations (Completed & Verified)
+- **Objective:** Construct an authentic otologic and neurotologic surgical simulation suite covering Cochlear Implant (CI) insertion along the Scala Tympani with Advance Off-Stylet (AOS) curling and basilar membrane translocation rupture warning; Transmastoid Labyrinthectomy with high-speed drilling canal unroofing, acute deafferentation, and central vestibular compensation ODE; and Retrosigmoid Neurectomy with internal auditory canal (IAC) 4-quadrant anatomy ("7-up, Coke down"), Koos tumor staging, and continuous ABR Wave V / facial nerve EMG neurotelemetry.
+- **Key Deliverables Achieved:**
+  - `web/src/physics/surgicalEngine.ts`:
+    - CI Kinematics & Insertion Dynamics: 3D Scala Tympani insertion depth ($0\dots 31.0\text{ mm}$), angular insertion depth ($0^\circ \to 360^\circ \to 540^\circ \to 720^\circ$), Greenwood tonotopic place-frequency mapping across 22 platinum electrode band contacts ($18\text{ kHz}$ to $250\text{ Hz}$), non-linear friction and curvature force accumulation ($F_{\text{insert}}(L) = F_{\text{base}} + k_{\text{fric}} \cdot L + k_{\text{curv}} \cdot \theta(L)^2$ with stylet release relief), basilar membrane proximity tracking, and scalar translocation breach risk flag when $F > 150\text{ mN}$ ($0.15\text{ N}$).
+    - Transmastoid Labyrinthectomy & Central Compensation ODE: High-speed surgical drilling canal unroofing progression ($0\dots 100\%$), acute complete vestibular deafferentation, and pure central vestibular compensation ODE ($\text{SPV}(t) = \text{SPV}_{\text{acute}} e^{-t / \tau}$ with $\tau = 4.0\text{ days}$) extinguishing spontaneous nystagmus to $0.0^\circ/\text{s}$ (Alexander 0th degree) at complete static compensation.
+    - Retrosigmoid Neurectomy & IAC 4-Quadrant Anatomy: Stereotaxic 4-quadrant mapping at porus acousticus (Anterosuperior = Facial VII, Anteroinferior = Cochlear, Posterosuperior = Superior Vestibular, Posteroinferior = Inferior Vestibular), Koos vestibular schwannoma staging (I–IV: $\le 10\text{ mm}$ intracanalicular to $>30\text{ mm}$ giant brainstem compression), continuous ABR Wave V latency prolongation $\Delta\tau_{\text{ABR}}$ ($5.6\dots 8.5\text{ ms}$) and amplitude degradation, and continuous facial nerve EMG neurotonic spike rate and voltage alarm ($\mu\text{V}$) triggered by mechanical traction ($F_{\text{traction}} > 2.0\text{ g}$) or sub-millimeter proximity ($d < 1.0\text{ mm}$).
+  - `web/src/render/gate3Materials.ts` & `web/src/render/DualStageScene.ts`:
+    - Shader Uniforms: `uSurgicalDrillActive` (bone milling luminescence with high-frequency flicker), `uCanalUnroofed` (discrete superior arch ceiling cutaway reveal across all 3 canals and otic capsule), `uTranslocationBreach` (pulsing crimson basilar membrane rupture emergency visual alarm driven by `uSurgicalTime * 16.0`), and Greenwood tonotopic color helper `getGreenwoodColor()`.
+    - Procedural 3D Electrode Array: Pre-allocated 64-segment $\times$ 8-slice silicone carrier tube (`THREE.BufferGeometry`) with zero-heap vertex updates, 3D pitch/yaw trajectory deviation, and 22 platinum contact sphere meshes with Greenwood tonotopic coloring ($E_1$ apical violet $\to$ $E_{22}$ basal red).
+    - Dynamic Surgical Perspectives: Camera tweens for Round Window micro-focus ($[12.5, -4.5, -1.8] \to [7.2, 0.8, -1.5]$), Mastoid posterior-lateral view ($[18.0, -14.0, 6.0] \to [4.5, 1.5, 0.5]$), and Retrosigmoid IAC view ($[-15.0, -8.0, 3.0] \to [1.0, 3.5, 0.5]$).
+  - `web/src/audio/ToneSynthesizer.ts`:
+    - Otologic Sound Synthesis: High-speed otologic drill whine ($70{,}000\text{ RPM} \to \sim 1167\text{ Hz}$ with $2.3\text{ kHz}$ harmonic and mechanical flutter), facial nerve EMG neurotonic burst alarm ($180\text{ Hz}$ sawtooth with rapid amplitude modulation), and scalar translocation rupture transient snap (low-frequency impulse click with exponential decay).
+  - `web/src/ui/SurgicalDrawer.ts`:
+    - Docked 5th modal card ($360\times 360$ logical, $720\times 720$ physical retina) mounting 2D Endoscopic Monitor canvas (`#surg-monitor-canvas`) and lower live force/biotelemetry plot canvas (`#surg-plot-canvas`).
+    - 2D Endoscopic Monitor: Cross-sectional Scala Tympani view with RW membrane and basilar membrane, canal unroofing mastoidectomy view with drill burr, and IAC 4-quadrants view with Bill's bar, falciform crest, and Koos tumor cleavage planes.
+    - Live Biotelemetry Strip: CI insertion depth vs. force curve with $150\text{ mN}$ threshold, labyrinthectomy post-op compensation decay curve, and synchronized ABR Wave V trace ($5.6\dots 8.5\text{ ms}$) and real-time facial nerve EMG neurotonic voltage strip ($\mu\text{V}$).
+  - `web/src/ui/AppHUD.ts` & `web/src/style.css`:
+    - Mode 5 button `[ 🔬 Surgical Suites ]` in top header.
+    - Contextual bottom dock `#surgical-dock-content` supporting 3 subview workbenches (CI, Labyrinthectomy, Neurectomy) with insertion sliders, motorized auto-insertion, drill whine toggles, Koos tumor stage chips, traction force slider, nerve cleavage highlight, and EMG audio alarms.
+    - Bidirectional AudiogramDrawer integration: Automatically switches to `acoustic_trauma` (120 dB HL) on CI scalar rupture, `labyrinthectomy_anacusis` (120 dB HL) on neuroepithelial curettage, and restores `normal` hearing upon selective neurectomy with cochlear nerve preservation.
+    - Strict 5-drawer mutual exclusivity (`partsDrawer`, `audiogramDrawer`, `ctSliceDrawer`, `vorDrawer`, `surgicalDrawer`, and `gyroFlyout`).
+    - Mobile z-index protection and $\ge 85\%$ canvas stage command across all devices.
+  - Verification:
+    - Standalone Node.js ESM test suite `scripts/test_surgical_engine.js` passing 56/56 assertions (100%).
+    - Root `npm test` running all 7 test suites passing 392/392 assertions (100%).
+    - Headless Chrome CDP tests (`scripts/verify_mvp_cdp.js`) passing 100% across Desktop (1440×900), Desktop Standard (1280×800), Tablet (768×1024), and Mobile (390×844) viewports with zero console errors.
+    - Production build compile (`cd web && npm run build`) passing cleanly with 0 TypeScript/Vite errors.
+
+---
+
 ## 2. Key Architecture & Engineering Decisions (ADRs)
+
+### ADR-011: Otologic Surgical Kinematics, Translocation Mechanics & Intraoperative Neurotelemetry
+- **Decision:** Model Cochlear Implant (CI) insertion along the authentic 3D Scala Tympani path with Advance Off-Stylet (AOS) non-linear mechanical curling and a strict $150\text{ mN}$ basilar membrane rupture threshold triggering fragment shader emergency alarms (`uTranslocationBreach`) and Web Audio acoustic transients. Model Labyrinthectomy deafferentation using a pure central vestibular compensation ODE ($\text{SPV}(t) = \text{SPV}_{\text{acute}} e^{-t / \tau}$) that extinguishes spontaneous nystagmus to $0.0^\circ/\text{s}$ at static compensation. Model Retrosigmoid Neurectomy using authentic 4-quadrant porus acousticus anatomy ("7-up, Coke down"), Koos tumor staging (I–IV), and continuous electrophysiological biotelemetry (ABR Wave V latency prolongation $\Delta\tau_{\text{ABR}}$ and facial nerve EMG neurotonic spike rate / voltage alarm ($\mu\text{V}$)).
+- **Rationale:** Delivers authoritative otologic and neurotologic simulation fidelity for surgical planning and resident training without external static assets or performance degradation, maintaining 60fps WebGL execution and zero heap allocations.
+
+### ADR-010: Diagnostic Caloric Thermal Convection & Minimum-Jerk vHIT Kinematics
+- **Decision:** Model caloric convection through coupled 1D Fourier thermal diffusion ODE and hydrostatic buoyancy pressure in $+30^\circ$ supine posture rather than arbitrary timers. Model high-velocity head thrusts using 5th-order minimum-jerk kinematics with closed-form SO(3) quaternions and evaluate Curthoys area gain strictly over the physiological 40–80ms integration window.
+- **Rationale:** Ensures complete physiological fidelity to Ewald's laws and the COWS rule without heuristic hacks, while maintaining 60fps performance and zero heap allocations across both continuous irrigation and discrete 120ms impulse trials.
 
 ### ADR-009: Pre-Allocated Scratch Buffers & Complete WebGL Resource Disposal
 - **Decision:** Mandate pre-allocated static scratch arrays and objects (`SplineSampleRAS`, `Float32Array`, `scratchPinVector`) for all render loop operations across physics stepping and 2D pin projections. Enforce dedicated non-overlapping scratch buffers (`scratchSample` for canal center telemetry vs `particleScratchSample` for particle cloud interpolation) to prevent internal state corruption of `arcMm`, `centerRAS`, and `tangentRAS`. Pre-allocate fixed `acceptedBoxes` and filter structures inline in `computeProjectedPins()` to eliminate all heap allocations at 60fps. Enforce complete unbinding of DOM event listeners, container DOM detachment, and recursive Three.js geometry/material disposal on `DualStageScene.dispose()`.
@@ -199,6 +269,7 @@
 │   ├── CLINICAL_PILLARS.md # 4 expansion pillars (Hearing, Vestibular, CT, Surgery)
 │   ├── STAGE2_PLAN.md      # Stage 2 implementation blueprint & mathematical derivations
 │   ├── STAGE3_PLAN.md      # Stage 3 implementation blueprint & multi-canal VOR architecture
+│   ├── stage4_surgical_simulation_plan.md # Stage 4 otologic surgical simulation plan
 │   └── MEMORY.md           # This file: chronological memory & ADRs
 │
 ├── scripts/                # Verification, headless test & render scripts
@@ -208,9 +279,11 @@
 │   ├── test_vestibular_engine.js# Stage 3 Step 2 physics & Ewald verification (72 tests)
 │   ├── test_eye_avatar_vor.js   # Stage 3 Step 3 3D eye avatar & Listing VOR verifier (50 tests)
 │   ├── test_vor_workbench.js    # Stage 3 Step 4 vestibular workbench & VORDrawer verifier (51 tests)
+│   ├── test_diagnostic_vestibular.js # Stage 3 Phase 3B Caloric & vHIT verifier (51 tests)
+│   ├── test_surgical_engine.js  # Stage 4 CI, Labyrinthectomy & Neurectomy verifier (56 tests)
 │   ├── generate_multicanal_splines.py # Continuous 3D spline generator for Horizontal & Anterior canals
 │   ├── export_eye_avatar_glb.py # CC0 sculpted eye extractor & cyclotorsion texture generator
-│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test (Modes 1-4)
+│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test (Modes 1-5)
 │
 ├── assets/
 │   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, canal splines, eye avatar, and metadata
@@ -237,7 +310,9 @@
         │   └── radiologyEngine.ts # Stage 2 MPR planes & SCDS math
         ├── physics/
         │   ├── epleyPhysics.ts     # TypeScript BPPV kinematics & steps (legacy wrapper)
-        │   └── vestibularEngine.ts # Multi-canal BPPV Stokes & Steinhausen engine
+        │   ├── vestibularEngine.ts # Multi-canal BPPV Stokes & Steinhausen engine
+        │   ├── diagnosticVestibularEngine.ts # Caloric thermal convection & vHIT kinematics engine
+        │   └── surgicalEngine.ts   # Stage 4 CI insertion, deafferentation & neurotelemetry
         ├── render/
         │   ├── DualStageScene.ts # Core Three.js render loop & camera controller
         │   ├── eyeAvatar.ts      # 3D Eye Avatar & Listing's Law kinematic engine
@@ -246,6 +321,7 @@
             ├── AppHUD.ts         # DOM manager, search, floating inspector, bottom dock
             ├── AudiogramDrawer.ts# Interactive clinical audiogram drawer
             ├── CTSliceDrawer.ts  # Interactive 2D CT MPR canvas slice viewer
-            └── VORDrawer.ts      # Interactive 3D VOR eye avatar & VNG strip chart drawer
+            ├── VORDrawer.ts      # Interactive 3D VOR eye avatar & VNG strip chart drawer
+            └── SurgicalDrawer.ts # Interactive 2D endoscopic monitor & live biotelemetry drawer
 ```
 

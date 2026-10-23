@@ -25,6 +25,13 @@ import {
   type VisualMode,
 } from '../render/eyeAvatar.ts';
 import type { VestibularTelemetryState } from '../physics/vestibularEngine.ts';
+import {
+  VHITImpulseBuffer,
+  type VHITPathologyPreset,
+  type VHITParadigm,
+  computeAlexanderModulation,
+  calculateJongkees,
+} from '../physics/diagnosticVestibularEngine.ts';
 
 export class VORDrawer {
   private container: HTMLElement;
@@ -39,6 +46,32 @@ export class VORDrawer {
   private isOpen = false;
   private visualMode: VisualMode = 'natural';
   private onCloseCallbacks: Array<() => void> = [];
+
+  // Diagnostic Vestibular Modes: Nystagmogram vs Caloric Butterfly vs vHIT Dual-Trace
+  private diagnosticViewMode: 'nystagmogram' | 'caloric' | 'vhit' = 'nystagmogram';
+  private alexanderGazeYaw = 0; // -30, 0, +30 degrees
+  private readonly vhitBuffer = new VHITImpulseBuffer();
+
+  // Caloric Butterfly Plot dataset
+  private caloricValues = {
+    r44: 22,
+    r30: 20,
+    l44: 21,
+    l30: 21,
+    activeTemp: null as string | null,
+    activeSPV: 0,
+  };
+  private onAlexGazeChangeCallbacks: Array<(gaze: number) => void> = [];
+  private onDiagnosticModeChangeCallbacks: Array<(mode: 'nystagmogram' | 'caloric' | 'vhit') => void> = [];
+
+  // Mode DOM Elements
+  private stripTitleEl!: HTMLElement;
+  private stripRangeEl!: HTMLElement;
+  private stripTabs: HTMLButtonElement[] = [];
+  private alexanderRowEl!: HTMLElement;
+  private alexGazeBtns: HTMLButtonElement[] = [];
+  private alexBadgeEl!: HTMLElement;
+  private stripLegendEl!: HTMLElement;
 
   // DOM Elements
   private modeToggleBtn!: HTMLButtonElement;
@@ -172,12 +205,31 @@ export class VORDrawer {
           </div>
         </div>
 
-        <!-- Rolling 3-Lead Nystagmogram Strip Chart -->
+        <!-- Rolling 3-Lead Nystagmogram / Caloric / vHIT Dual-Trace Strip Chart -->
         <div class="vor-strip-section">
           <div class="vor-strip-header">
-            <span class="vor-strip-title">3-Lead Nystagmogram (10s Rolling)</span>
-            <span class="vor-strip-range">±25° Range</span>
+            <span class="vor-strip-title" id="vor-strip-title">3-Lead Nystagmogram (10s Rolling)</span>
+            <span class="vor-strip-range" id="vor-strip-range">±25° Range</span>
           </div>
+
+          <!-- Diagnostic Strip Tabs -->
+          <div class="vor-strip-mode-tabs" id="vor-strip-mode-tabs" role="tablist" aria-label="Diagnostic Strip Modes">
+            <button type="button" class="vor-strip-tab active" data-strip-mode="nystagmogram">3-Lead</button>
+            <button type="button" class="vor-strip-tab" data-strip-mode="caloric">Caloric Butterfly</button>
+            <button type="button" class="vor-strip-tab" data-strip-mode="vhit">vHIT Dual-Trace</button>
+          </div>
+
+          <!-- Alexander's Law Gaze Modulation Row (Active in Caloric Mode) -->
+          <div class="vor-alexander-row" id="vor-alexander-row" style="display: none;">
+            <span class="alex-label">Alexander Gaze:</span>
+            <div class="alex-btn-group" role="group" aria-label="Alexander Gaze Positions">
+              <button type="button" class="alex-gaze-btn" data-gaze="-30">◀ -30°</button>
+              <button type="button" class="alex-gaze-btn active" data-gaze="0">◉ 0°</button>
+              <button type="button" class="alex-gaze-btn" data-gaze="30">+30° ▶</button>
+            </div>
+            <span class="alex-badge" id="vor-alex-badge">2nd Degree</span>
+          </div>
+
           <div class="vor-strip-wrap">
             <canvas
               class="vor-strip-canvas"
@@ -187,7 +239,7 @@ export class VORDrawer {
               style="width: ${VORDrawer.STRIP_LOGICAL_W}px; height: ${VORDrawer.STRIP_LOGICAL_H}px;"
             ></canvas>
           </div>
-          <div class="vor-strip-legend">
+          <div class="vor-strip-legend" id="vor-strip-legend">
             <span class="leg-item leg-h"><span class="leg-line h-line"></span> Horiz (Cyan)</span>
             <span class="leg-item leg-v"><span class="leg-line v-line"></span> Vert (Lime)</span>
             <span class="leg-item leg-t"><span class="leg-line t-line"></span> Torsion (Amber)</span>
@@ -210,6 +262,19 @@ export class VORDrawer {
     this.tValEl = this.rootEl.querySelector('#vor-t-val') as HTMLElement;
     this.spvValEl = this.rootEl.querySelector('#vor-spv-val') as HTMLElement;
     this.statusEl = this.rootEl.querySelector('#vor-nystagmus-status') as HTMLElement;
+
+    this.stripTitleEl = this.rootEl.querySelector('#vor-strip-title') as HTMLElement;
+    this.stripRangeEl = this.rootEl.querySelector('#vor-strip-range') as HTMLElement;
+    this.alexanderRowEl = this.rootEl.querySelector('#vor-alexander-row') as HTMLElement;
+    this.alexBadgeEl = this.rootEl.querySelector('#vor-alex-badge') as HTMLElement;
+    this.stripLegendEl = this.rootEl.querySelector('#vor-strip-legend') as HTMLElement;
+
+    this.stripTabs = Array.from(
+      this.rootEl.querySelectorAll('#vor-strip-mode-tabs .vor-strip-tab')
+    ) as HTMLButtonElement[];
+    this.alexGazeBtns = Array.from(
+      this.rootEl.querySelectorAll('.alex-gaze-btn')
+    ) as HTMLButtonElement[];
   }
 
   private initCanvases(): void {
@@ -229,6 +294,156 @@ export class VORDrawer {
     if (this.modeToggleBtn) {
       this.modeToggleBtn.addEventListener('click', () => this.toggleVisualMode());
     }
+
+    // Diagnostic strip mode tab clicks
+    this.stripTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const mode = tab.dataset.stripMode as 'nystagmogram' | 'caloric' | 'vhit';
+        if (mode) {
+          this.setDiagnosticViewMode(mode);
+          for (const cb of this.onDiagnosticModeChangeCallbacks) {
+            cb(mode);
+          }
+        }
+      });
+    });
+
+    // Alexander gaze button clicks
+    this.alexGazeBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const gaze = parseInt(btn.dataset.gaze || '0', 10);
+        this.setAlexanderGaze(gaze);
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Diagnostic Mode API
+  // ---------------------------------------------------------------------------
+
+  public setDiagnosticViewMode(mode: 'nystagmogram' | 'caloric' | 'vhit'): void {
+    this.diagnosticViewMode = mode;
+
+    this.stripTabs.forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.stripMode === mode);
+    });
+
+    if (mode === 'vhit') {
+      if (this.stripTitleEl) this.stripTitleEl.textContent = 'vHIT High-Speed Dual-Trace Velocity (0–350ms)';
+      if (this.stripRangeEl) this.stripRangeEl.textContent = '0–300°/s Range';
+      if (this.alexanderRowEl) this.alexanderRowEl.style.display = 'none';
+      if (this.stripLegendEl) {
+        this.stripLegendEl.innerHTML = `
+          <span class="leg-item leg-head"><span class="leg-line head-line"></span> Head Vel (Amber)</span>
+          <span class="leg-item leg-eye"><span class="leg-line eye-line"></span> Inv Eye (Cyan)</span>
+          <span class="leg-item leg-covert"><span class="leg-dot covert-dot"></span> Covert (Purple)</span>
+          <span class="leg-item leg-overt"><span class="leg-dot overt-dot"></span> Overt (Red)</span>
+        `;
+      }
+      this.renderVHITDualTracePlot();
+    } else if (mode === 'caloric') {
+      if (this.stripTitleEl) this.stripTitleEl.textContent = "Caloric COWS Butterfly Plot (Claussen Diagram)";
+      if (this.stripRangeEl) this.stripRangeEl.textContent = '0–50°/s SPV Range';
+      if (this.alexanderRowEl) this.alexanderRowEl.style.display = 'flex';
+      if (this.stripLegendEl) {
+        this.stripLegendEl.innerHTML = `
+          <span class="leg-item leg-eye"><span class="leg-line eye-line"></span> Left-Beating (Cyan)</span>
+          <span class="leg-item leg-head"><span class="leg-line head-line"></span> Right-Beating (Amber)</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#22c55e;"></span> Norm Zone (15–30°/s)</span>
+        `;
+      }
+      this.renderCaloricButterflyPlot();
+    } else {
+      // nystagmogram
+      if (this.stripTitleEl) this.stripTitleEl.textContent = '3-Lead Nystagmogram (10s Rolling)';
+      if (this.stripRangeEl) this.stripRangeEl.textContent = '±25° Range';
+      if (this.alexanderRowEl) this.alexanderRowEl.style.display = 'none';
+      if (this.stripLegendEl) {
+        this.stripLegendEl.innerHTML = `
+          <span class="leg-item leg-h"><span class="leg-line h-line"></span> Horiz (Cyan)</span>
+          <span class="leg-item leg-v"><span class="leg-line v-line"></span> Vert (Lime)</span>
+          <span class="leg-item leg-t"><span class="leg-line t-line"></span> Torsion (Amber)</span>
+        `;
+      }
+      this.renderStripChart();
+    }
+  }
+
+  public getDiagnosticViewMode(): 'nystagmogram' | 'caloric' | 'vhit' {
+    return this.diagnosticViewMode;
+  }
+
+  public onDiagnosticModeChange(cb: (mode: 'nystagmogram' | 'caloric' | 'vhit') => void): void {
+    this.onDiagnosticModeChangeCallbacks.push(cb);
+  }
+
+  public onAlexanderGazeChange(cb: (gaze: number) => void): void {
+    this.onAlexGazeChangeCallbacks.push(cb);
+  }
+
+  public setAlexanderGaze(gazeDeg: number, notify = true): void {
+    this.alexanderGazeYaw = gazeDeg;
+    this.alexGazeBtns.forEach((btn) => {
+      btn.classList.toggle('active', parseInt(btn.dataset.gaze || '0', 10) === gazeDeg);
+    });
+    if (notify) {
+      for (const cb of this.onAlexGazeChangeCallbacks) {
+        cb(gazeDeg);
+      }
+    }
+    if (this.diagnosticViewMode === 'caloric' && this.alexBadgeEl) {
+      const eyeTelem = this.eyeEngine ? this.eyeEngine.getTelemetry() : null;
+      const beatSign = eyeTelem && eyeTelem.fastPhaseBeatDirection === 'Left-Beating' ? -1 : 1;
+      const baseSPV = this.caloricValues.activeSPV > 0
+        ? this.caloricValues.activeSPV
+        : (eyeTelem ? eyeTelem.slowPhaseVelocityDegPerSec : 0);
+      const alex = computeAlexanderModulation(baseSPV, this.alexanderGazeYaw, beatSign);
+      this.alexBadgeEl.textContent = `${alex.clinicalDegree} (${alex.modulatedSPV.toFixed(1)}°/s)`;
+    }
+    if (this.diagnosticViewMode === 'caloric') {
+      this.renderCaloricButterflyPlot();
+    }
+  }
+
+  public getAlexanderGaze(): number {
+    return this.alexanderGazeYaw;
+  }
+
+  public setCaloricData(r44: number, r30: number, l44: number, l30: number): void {
+    this.caloricValues.r44 = r44;
+    this.caloricValues.r30 = r30;
+    this.caloricValues.l44 = l44;
+    this.caloricValues.l30 = l30;
+    if (this.diagnosticViewMode === 'caloric') {
+      this.renderCaloricButterflyPlot();
+    }
+  }
+
+  public setCaloricActiveIrrigation(temp: string | null, currentSPV = 0): void {
+    this.caloricValues.activeTemp = temp;
+    this.caloricValues.activeSPV = currentSPV;
+    if (this.diagnosticViewMode === 'caloric') {
+      this.renderCaloricButterflyPlot();
+    }
+  }
+
+  public getCaloricData(): { r44: number; r30: number; l44: number; l30: number; activeTemp: string | null; activeSPV: number } {
+    return { ...this.caloricValues };
+  }
+
+  public getVHITBuffer(): VHITImpulseBuffer {
+    return this.vhitBuffer;
+  }
+
+  public simulateVHIT(
+    preset: VHITPathologyPreset = 'normal',
+    paradigm: VHITParadigm = 'himp',
+    goggleSlippage = false
+  ): void {
+    this.vhitBuffer.simulateTrial(preset, paradigm, goggleSlippage);
+    if (this.diagnosticViewMode === 'vhit') {
+      this.renderVHITDualTracePlot();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -238,7 +453,13 @@ export class VORDrawer {
     this.isOpen = true;
     this.rootEl.classList.add('open');
     if (this.stripCtx) {
-      this.renderStripChart();
+      if (this.diagnosticViewMode === 'vhit') {
+        this.renderVHITDualTracePlot();
+      } else if (this.diagnosticViewMode === 'caloric') {
+        this.renderCaloricButterflyPlot();
+      } else {
+        this.renderStripChart();
+      }
     }
   }
 
@@ -321,8 +542,25 @@ export class VORDrawer {
     // 5. Update live metric text badges
     this.updateMetricBadges(eyeTelem, telem);
 
-    // 6. Draw rolling 3-channel strip chart
-    this.renderStripChart();
+    // 6. Alexander's Law modulation badge in Caloric mode
+    if (this.diagnosticViewMode === 'caloric' && this.alexBadgeEl) {
+      const beatSign = eyeTelem.fastPhaseBeatDirection === 'Left-Beating' ? -1 : 1;
+      const alex = computeAlexanderModulation(
+        eyeTelem.slowPhaseVelocityDegPerSec,
+        this.alexanderGazeYaw,
+        beatSign
+      );
+      this.alexBadgeEl.textContent = `${alex.clinicalDegree} (${alex.modulatedSPV.toFixed(1)}°/s)`;
+    }
+
+    // 7. Draw strip chart, Caloric Butterfly plot, or vHIT plot
+    if (this.diagnosticViewMode === 'vhit') {
+      this.renderVHITDualTracePlot();
+    } else if (this.diagnosticViewMode === 'caloric') {
+      this.renderCaloricButterflyPlot();
+    } else {
+      this.renderStripChart();
+    }
   }
 
   private updateMetricBadges(eyeTelem: EyeTelemetry, vestTelem: VestibularTelemetryState): void {
@@ -572,9 +810,320 @@ export class VORDrawer {
     ctx.stroke();
   }
 
+  public renderVHITDualTracePlot(): void {
+    if (!this.stripCtx) return;
+
+    const ctx = this.stripCtx;
+    const w = this.stripCanvas.width;
+    const h = this.stripCanvas.height;
+
+    // Background
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, w, h);
+
+    const maxVel = 300.0; // 0 to 300°/s
+    const maxT = 0.350;   // 0 to 350 ms
+
+    // Baselines at 100°/s, 200°/s, 0°/s
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#1e293b';
+    ctx.setLineDash([4, 4]);
+
+    const y200 = h - (200.0 / maxVel) * (h * 0.82) - 14;
+    const y100 = h - (100.0 / maxVel) * (h * 0.82) - 14;
+    const yZero = h - 14;
+
+    ctx.beginPath();
+    ctx.moveTo(0, y200);
+    ctx.lineTo(w, y200);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, y100);
+    ctx.lineTo(w, y100);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, yZero);
+    ctx.lineTo(w, yZero);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = '#64748b';
+    ctx.font = '16px monospace';
+    ctx.fillText('200°/s', 6, y200 - 4);
+    ctx.fillText('100°/s', 6, y100 - 4);
+    ctx.fillText('0ms', 6, yZero + 12);
+    ctx.fillText('120ms', (0.120 / maxT) * w - 24, yZero + 12);
+    ctx.fillText('350ms', w - 50, yZero + 12);
+
+    // 40–80 ms Curthoys Shaded Regression Window
+    const x40 = (0.040 / maxT) * w;
+    const x80 = (0.080 / maxT) * w;
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.12)';
+    ctx.fillRect(x40, 4, x80 - x40, yZero - 4);
+
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.40)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x40, 4);
+    ctx.lineTo(x40, yZero);
+    ctx.moveTo(x80, 4);
+    ctx.lineTo(x80, yZero);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Curthoys Gain Readout Badge in Window
+    const gain = this.vhitBuffer.calculatedGain;
+    ctx.fillStyle = gain >= 0.80 ? '#22c55e' : '#ef4444';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(`VOR Gain: ${gain.toFixed(2)}`, x80 + 12, 24);
+
+    // Plot Head Velocity (Amber, #f59e0b)
+    const cap = this.vhitBuffer.getCapacity();
+    const headVel = this.vhitBuffer.headVelArray;
+    const invEyeVel = this.vhitBuffer.invertedEyeVelArray;
+    const flags = this.vhitBuffer.saccadeFlags;
+
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i < cap; i++) {
+      const x = (i / (cap - 1)) * w;
+      const v = headVel[i];
+      const y = yZero - (v / maxVel) * (h * 0.82);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Plot Inverted Eye Velocity (Cyan, #06b6d4)
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i < cap; i++) {
+      const x = (i / (cap - 1)) * w;
+      const v = invEyeVel[i];
+      const y = yZero - (v / maxVel) * (h * 0.82);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Saccade Marker Tags
+    for (let i = 0; i < cap; i++) {
+      const f = flags[i];
+      if (f > 0) {
+        const x = (i / (cap - 1)) * w;
+        if (f === 1) {
+          // Covert Saccade (Purple #a855f7)
+          ctx.fillStyle = '#a855f7';
+          ctx.fillRect(x - 2, 4, 4, 10);
+        } else if (f === 2) {
+          // Overt Saccade (Crimson #ef4444)
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(x - 2, 4, 4, 10);
+        } else if (f === 3) {
+          // SHIMP (Emerald #10b981)
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(x - 2, 4, 4, 10);
+        }
+      }
+    }
+  }
+
+  public renderCaloricButterflyPlot(): void {
+    if (!this.stripCtx) return;
+
+    const ctx = this.stripCtx;
+    const w = this.stripCanvas.width;
+    const h = this.stripCanvas.height;
+
+    // Background
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxSPV = 50.0;
+    const scaleX = (w * 0.40) / maxSPV;
+    const scaleY = (h * 0.38) / maxSPV;
+
+    // 1. Shaded Normative Corridor (15°/s to 30°/s)
+    const normMax = 30.0;
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.06)';
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.25)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - normMax * scaleY);
+    ctx.lineTo(cx + normMax * scaleX, cy);
+    ctx.lineTo(cx, cy + normMax * scaleY);
+    ctx.lineTo(cx - normMax * scaleX, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 2. Crosshair Grid Baselines
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+
+    // Horizontal baseline
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(w, cy);
+    ctx.stroke();
+
+    // Vertical baseline
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, h);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+    // 3. Axis Labels
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px monospace';
+    ctx.fillText('◀ Left-Beating', 10, cy - 6);
+    ctx.fillText('Right-Beating ▶', w - 130, cy - 6);
+
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('Warm 44°C ▲', cx + 8, 18);
+    ctx.fillStyle = '#06b6d4';
+    ctx.fillText('Cold 30°C ▼', cx + 8, h - 8);
+
+    // 4. Coordinates for the 4 responses:
+    // Right Warm (R44): Beats Right (+x), Warm (-y)
+    // Left Cold (L30): Beats Right (+x), Cold (+y)
+    // Left Warm (L44): Beats Left (-x), Warm (-y)
+    // Right Cold (R30): Beats Left (-x), Cold (+y)
+    const { r44, r30, l44, l30, activeTemp, activeSPV } = this.caloricValues;
+
+    // Modulate with active irrigation if matching
+    const effR44 = (activeTemp === 'R44' && activeSPV > 0) ? activeSPV : r44;
+    const effR30 = (activeTemp === 'R30' && activeSPV > 0) ? activeSPV : r30;
+    const effL44 = (activeTemp === 'L44' && activeSPV > 0) ? activeSPV : l44;
+    const effL30 = (activeTemp === 'L30' && activeSPV > 0) ? activeSPV : l30;
+
+    const xR44 = cx + Math.min(effR44, maxSPV) * scaleX;
+    const yR44 = cy - Math.min(effR44, maxSPV) * scaleY;
+
+    const xL30 = cx + Math.min(effL30, maxSPV) * scaleX;
+    const yL30 = cy + Math.min(effL30, maxSPV) * scaleY;
+
+    const xL44 = cx - Math.min(effL44, maxSPV) * scaleX;
+    const yL44 = cy - Math.min(effL44, maxSPV) * scaleY;
+
+    const xR30 = cx - Math.min(effR30, maxSPV) * scaleX;
+    const yR30 = cy + Math.min(effR30, maxSPV) * scaleY;
+
+    // 5. Right Butterfly Wing (Amber: Right-beating R44 and L30)
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(xR44, yR44);
+    ctx.lineTo(xL30, yL30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 6. Left Butterfly Wing (Cyan: Left-beating L44 and R30)
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.22)';
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(xL44, yL44);
+    ctx.lineTo(xR30, yR30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 7. Data Points and Text Badges
+    const drawPoint = (
+      x: number,
+      y: number,
+      color: string,
+      label: string,
+      isRightAligned: boolean,
+      isTopAligned: boolean
+    ) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = 'bold 15px monospace';
+      const textX = isRightAligned ? x + 8 : x - 75;
+      const textY = isTopAligned ? y - 6 : y + 16;
+      ctx.fillText(label, textX, textY);
+    };
+
+    drawPoint(xR44, yR44, '#fbbf24', `R44: ${Math.round(effR44)}°/s`, true, true);
+    drawPoint(xL30, yL30, '#fbbf24', `L30: ${Math.round(effL30)}°/s`, true, false);
+    drawPoint(xL44, yL44, '#38bdf8', `L44: ${Math.round(effL44)}°/s`, false, true);
+    drawPoint(xR30, yR30, '#38bdf8', `R30: ${Math.round(effR30)}°/s`, false, false);
+
+    // 8. Pulsing Active Irrigation Ring
+    if (activeTemp) {
+      let activeX = cx;
+      let activeY = cy;
+      let activeColor = '#ffffff';
+      if (activeTemp === 'R44') {
+        activeX = xR44;
+        activeY = yR44;
+        activeColor = '#f59e0b';
+      } else if (activeTemp === 'R30') {
+        activeX = xR30;
+        activeY = yR30;
+        activeColor = '#06b6d4';
+      } else if (activeTemp === 'L44') {
+        activeX = xL44;
+        activeY = yL44;
+        activeColor = '#f59e0b';
+      } else if (activeTemp === 'L30') {
+        activeX = xL30;
+        activeY = yL30;
+        activeColor = '#06b6d4';
+      }
+
+      const pulseRadius = 7 + Math.sin(performance.now() * 0.01) * 3;
+      ctx.strokeStyle = activeColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(activeX, activeY, pulseRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 9. Calculated Jongkees Summary Badge
+    const jRes = calculateJongkees(effR44, effR30, effL44, effL30);
+    const uwStr = `UW: ${jRes.canalParesisPercent.toFixed(1)}%`;
+    const dpStr = `DP: ${jRes.directionalPreponderancePercent.toFixed(1)}%`;
+    const flag =
+      jRes.pareticEar === 'symmetric'
+        ? 'Symmetric'
+        : `${jRes.pareticEar.toUpperCase()} Paresis`;
+
+    ctx.fillStyle = jRes.canalParesisPercent > 25.0 ? '#ef4444' : '#22c55e';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText(`${uwStr} · ${dpStr} (${flag})`, 10, 20);
+  }
+
   private drawStripBaselines(): void {
     if (this.stripCtx) {
-      this.renderStripChart();
+      if (this.diagnosticViewMode === 'vhit') {
+        this.renderVHITDualTracePlot();
+      } else if (this.diagnosticViewMode === 'caloric') {
+        this.renderCaloricButterflyPlot();
+      } else {
+        this.renderStripChart();
+      }
     }
   }
 

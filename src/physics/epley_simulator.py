@@ -16,7 +16,179 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    class _MiniNdarray:
+        def __init__(self, data):
+            if isinstance(data, _MiniNdarray):
+                self._data = [list(r) if isinstance(r, (list, tuple, _MiniNdarray)) else r for r in data._data]
+            elif isinstance(data, (list, tuple)):
+                self._data = [list(r) if isinstance(r, (list, tuple, _MiniNdarray)) else r for r in data]
+            else:
+                self._data = data
+
+        def __len__(self):
+            return len(self._data)
+
+        def __iter__(self):
+            for item in self._data:
+                if isinstance(item, list):
+                    yield _MiniNdarray(item)
+                else:
+                    yield item
+
+        def __getitem__(self, item):
+            if isinstance(item, tuple):
+                rows, col = item
+                if rows == slice(None):
+                    return _MiniNdarray([r[col] for r in self._data])
+            res = self._data[item]
+            if isinstance(res, list):
+                return _MiniNdarray(res)
+            return res
+
+        def __setitem__(self, item, val):
+            self._data[item] = val
+
+        def __matmul__(self, other):
+            b = other._data if isinstance(other, _MiniNdarray) else other
+            a = self._data
+            first_b = b[0]._data if isinstance(b[0], _MiniNdarray) else b[0]
+            if isinstance(first_b, (list, tuple)):
+                n_cols = len(first_b)
+                res = []
+                for r in range(len(a)):
+                    row = []
+                    for c in range(n_cols):
+                        val = sum(a[r][k] * (b[k][c] if not isinstance(b[k], _MiniNdarray) else b[k]._data[c]) for k in range(len(b)))
+                        row.append(val)
+                    res.append(row)
+                return _MiniNdarray(res)
+            else:
+                res = []
+                for r in range(len(a)):
+                    val = sum(a[r][k] * (b[k] if not isinstance(b[k], _MiniNdarray) else b[k]._data) for k in range(len(b)))
+                    res.append(val)
+                return _MiniNdarray(res)
+
+        @property
+        def T(self):
+            trans = [list(x) for x in zip(*self._data)]
+            return _MiniNdarray(trans)
+
+        def __add__(self, other):
+            b = other._data if isinstance(other, _MiniNdarray) else other
+            if isinstance(b, (int, float)):
+                return _MiniNdarray([x + b for x in self._data])
+            return _MiniNdarray([x + y for x, y in zip(self._data, b)])
+
+        def __radd__(self, other):
+            return self.__add__(other)
+
+        def __sub__(self, other):
+            b = other._data if isinstance(other, _MiniNdarray) else other
+            if isinstance(b, (int, float)):
+                return _MiniNdarray([x - b for x in self._data])
+            return _MiniNdarray([x - y for x, y in zip(self._data, b)])
+
+        def __mul__(self, other):
+            b = other._data if isinstance(other, _MiniNdarray) else other
+            if isinstance(b, (int, float)):
+                return _MiniNdarray([x * b for x in self._data])
+            return _MiniNdarray([x * y for x, y in zip(self._data, b)])
+
+        def __rmul__(self, other):
+            return self.__mul__(other)
+
+        def __truediv__(self, other):
+            if isinstance(other, (int, float)):
+                return _MiniNdarray([x / other for x in self._data])
+            b = other._data if isinstance(other, _MiniNdarray) else other
+            return _MiniNdarray([x / y for x, y in zip(self._data, b)])
+
+        def __repr__(self):
+            return f"{self._data}"
+
+    class _MiniLinalg:
+        @staticmethod
+        def norm(v):
+            data = v._data if isinstance(v, _MiniNdarray) else v
+            return math.hypot(*data)
+
+    class _MiniRandom:
+        def __init__(self, seed=None):
+            import random
+            self.r = random.Random(seed)
+
+        def normal(self, loc, scale, size):
+            return _MiniNdarray([self.r.gauss(loc, scale) for _ in range(size)])
+
+        def uniform(self, low, high, size):
+            return _MiniNdarray([self.r.uniform(low, high) for _ in range(size)])
+
+    class _MiniNumpy:
+        float64 = float
+        ndarray = _MiniNdarray
+        linalg = _MiniLinalg()
+
+        @staticmethod
+        def array(data, dtype=None):
+            return _MiniNdarray(data)
+
+        @staticmethod
+        def clip(val, a_min, a_max):
+            if isinstance(val, (int, float)):
+                return max(a_min, min(a_max, val))
+            data = val._data if isinstance(val, _MiniNdarray) else val
+            return _MiniNdarray([max(a_min, min(a_max, x)) for x in data])
+
+        @staticmethod
+        def dot(a, b):
+            da = a._data if isinstance(a, _MiniNdarray) else a
+            db = b._data if isinstance(b, _MiniNdarray) else b
+            return sum(x * y for x, y in zip(da, db))
+
+        @staticmethod
+        def cross(a, b):
+            da = a._data if isinstance(a, _MiniNdarray) else a
+            db = b._data if isinstance(b, _MiniNdarray) else b
+            if len(da) > 0 and isinstance(da[0], (list, tuple, _MiniNdarray)):
+                res = []
+                for va, vb in zip(da, db):
+                    v_a = va._data if isinstance(va, _MiniNdarray) else va
+                    v_b = vb._data if isinstance(vb, _MiniNdarray) else vb
+                    res.append([
+                        v_a[1] * v_b[2] - v_a[2] * v_b[1],
+                        v_a[2] * v_b[0] - v_a[0] * v_b[2],
+                        v_a[0] * v_b[1] - v_a[1] * v_b[0],
+                    ])
+                return _MiniNdarray(res)
+            return _MiniNdarray([
+                da[1] * db[2] - da[2] * db[1],
+                da[2] * db[0] - da[0] * db[2],
+                da[0] * db[1] - da[1] * db[0],
+            ])
+
+        @staticmethod
+        def interp(x, xp, fp):
+            dxp = xp._data if isinstance(xp, _MiniNdarray) else xp
+            dfp = fp._data if isinstance(fp, _MiniNdarray) else fp
+            if x <= dxp[0]: return dfp[0]
+            if x >= dxp[-1]: return dfp[-1]
+            for i in range(len(dxp) - 1):
+                if dxp[i] <= x <= dxp[i + 1]:
+                    span = dxp[i + 1] - dxp[i]
+                    if span == 0: return dfp[i]
+                    t = (x - dxp[i]) / span
+                    return dfp[i] + t * (dfp[i + 1] - dfp[i])
+            return dfp[-1]
+
+        @staticmethod
+        def default_rng(seed=None):
+            return _MiniRandom(seed)
+
+    np = _MiniNumpy()
 
 
 def smoothstep(edge0: float, edge1: float, x: float) -> float:

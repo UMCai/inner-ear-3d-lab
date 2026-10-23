@@ -65,6 +65,24 @@ export const AUDIOGRAM_PRESETS: Record<string, AudiogramPreset> = {
     lossSector: [0.0, 0.25], // < 1 kHz, acoustic energy leakage
     description: 'Third-window acoustic energy leakage causes low-frequency conductive loss on air conduction (25–30 dB HL at 250 Hz) while bone conduction remains supranormal (-5 to 0 dB HL).',
   },
+  acoustic_trauma: {
+    id: 'acoustic_trauma',
+    title: 'Scalar Translocation Acoustic Trauma',
+    shortLabel: 'Trauma',
+    subtitle: 'Basilar membrane rupture threshold drop (120 dB HL)',
+    thresholds: { 125: 120, 250: 120, 500: 120, 1000: 120, 2000: 120, 4000: 120, 8000: 120 },
+    lossSector: [0.0, 1.0],
+    description: 'Mechanical tear of the basilar membrane collapses the endocochlear potential (+80 mV -> 0 mV), triggering immediate profound sensorineural deafness (120 dB HL).',
+  },
+  labyrinthectomy_anacusis: {
+    id: 'labyrinthectomy_anacusis',
+    title: 'Surgical Labyrinthectomy Dead Ear',
+    shortLabel: 'Dead Ear',
+    subtitle: 'Surgical ablation anacusis (120 dB HL)',
+    thresholds: { 125: 120, 250: 120, 500: 120, 1000: 120, 2000: 120, 4000: 120, 8000: 120 },
+    lossSector: [0.0, 1.0],
+    description: 'Complete unroofing and neuroepithelial curettage permanently ablates the labyrinth, resulting in complete anacusis (flat 120 dB HL).',
+  },
 };
 
 export class AudiogramDrawer {
@@ -125,6 +143,10 @@ export class AudiogramDrawer {
 
   public getIsOpen(): boolean {
     return this.isOpen;
+  }
+
+  public getActivePresetId(): string {
+    return this.activePresetId;
   }
 
   public setActivePreset(presetId: string): void {
