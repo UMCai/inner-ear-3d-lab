@@ -558,17 +558,17 @@ export class SurgicalDrawer {
     ctx.arc(cx - 30, cy - 30, 14, 0, Math.PI * 2);
     ctx.fillStyle = '#fbbf24';
     ctx.fill();
-    ctx.font = 'bold 9px sans-serif';
+    ctx.font = 'bold 8.5px sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('VII', cx - 36, cy - 27);
+    ctx.fillText('VII Motor', cx - 42, cy - 27);
 
-    // Posterosuperior: Superior Vestibular Nerve (SVN)
+    // Posterosuperior: Superior Vestibular Nerve (SVN of CN VIII)
     ctx.beginPath();
     ctx.arc(cx + 30, cy - 30, 14, 0, Math.PI * 2);
     ctx.fillStyle = neurectomyState.vestibularNerveTransected ? '#ef4444' : '#60a5fa';
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('SVN', cx + 22, cy - 27);
+    ctx.fillText(neurectomyState.vestibularNerveTransected ? 'VIII Cut' : 'VIII SVN', cx + 14, cy - 27);
 
     // Anteroinferior: Cochlear Nerve (CN VIII cochlear)
     ctx.beginPath();
@@ -576,15 +576,15 @@ export class SurgicalDrawer {
     ctx.fillStyle = '#34d399'; // Green = preserved!
     ctx.fill();
     ctx.fillStyle = '#0f172a';
-    ctx.fillText('COCH', cx - 42, cy + 33);
+    ctx.fillText('VIII Coch', cx - 44, cy + 33);
 
-    // Posteroinferior: Inferior Vestibular Nerve (IVN)
+    // Posteroinferior: Inferior Vestibular Nerve (IVN of CN VIII)
     ctx.beginPath();
     ctx.arc(cx + 30, cy + 30, 14, 0, Math.PI * 2);
     ctx.fillStyle = neurectomyState.vestibularNerveTransected ? '#ef4444' : '#60a5fa';
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('IVN', cx + 22, cy + 33);
+    ctx.fillText(neurectomyState.vestibularNerveTransected ? 'VIII Cut' : 'VIII IVN', cx + 14, cy + 33);
 
     // Cleavage plane dissection line
     if (neurectomyState.cleavagePlaneVisible) {
@@ -604,6 +604,10 @@ export class SurgicalDrawer {
     ctx.fillText('SUPERIOR (Bill\'s Bar)', cx - 45, cy - r - 4);
     ctx.fillText('ANTERIOR', cx - r - 22, cy + 3);
     ctx.fillText('POSTERIOR', cx + r + 5, cy + 3);
+
+    // Educational Mnemonic: "7-up, Coke down"
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText('"7-up, Coke down": VII Sup-Ant · Coch Inf-Ant · Vestibular Post', 10, h - 6);
 
     ctx.restore();
   }
@@ -785,11 +789,11 @@ export class SurgicalDrawer {
   ): void {
     ctx.save();
 
-    // Lead 1: ABR Wave V Trace (Top half)
+    // Lead 1: ABR Wave V Trace (Top half - Auditory / CN VIII preservation)
     const abrY = 28;
     ctx.font = '8px monospace';
     ctx.fillStyle = '#4ade80';
-    ctx.fillText('LEAD 1: ABR CLICK (0.55μV)', 10, 14);
+    ctx.fillText(`LEAD 1: CN VIII / Brainstem ABR Wave V (${neurectomyState.abrWaveVLatencyMs.toFixed(2)} ms)`, 10, 14);
 
     ctx.beginPath();
     ctx.strokeStyle = '#4ade80';
@@ -806,11 +810,11 @@ export class SurgicalDrawer {
     }
     ctx.stroke();
 
-    // Lead 2: Facial Nerve EMG Trace (Bottom half)
+    // Lead 2: Facial Nerve EMG Trace (Bottom half - CN VII motor preservation)
     const emgY = 85;
     ctx.font = '8px monospace';
     ctx.fillStyle = neurectomyState.isEMGAlarmActive ? '#f87171' : '#fbbf24';
-    ctx.fillText(`LEAD 2: CN VII EMG (${neurectomyState.facialEMGVoltageMicroVolts.toFixed(0)}μV)`, 10, 68);
+    ctx.fillText(`LEAD 2: CN VII Facial Nerve EMG (${neurectomyState.facialEMGVoltageMicroVolts.toFixed(0)}μV)`, 10, 68);
 
     ctx.beginPath();
     ctx.strokeStyle = neurectomyState.isEMGAlarmActive ? '#ef4444' : '#fbbf24';

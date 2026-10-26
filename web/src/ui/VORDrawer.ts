@@ -51,6 +51,7 @@ export class VORDrawer {
   private diagnosticViewMode: 'nystagmogram' | 'caloric' | 'vhit' = 'nystagmogram';
   private alexanderGazeYaw = 0; // -30, 0, +30 degrees
   private readonly vhitBuffer = new VHITImpulseBuffer();
+  private vhitCursorMs: number | null = null;
 
   // Caloric Butterfly Plot dataset
   private caloricValues = {
@@ -446,6 +447,92 @@ export class VORDrawer {
     }
   }
 
+  public updateVHITPlayback(
+    elapsedSec: number,
+    msIndex: number,
+    pair: 'horizontal' | 'ralp' | 'larp' = 'horizontal',
+    direction: 1 | -1 = 1
+  ): void {
+    const cap = this.vhitBuffer.getCapacity();
+    const clampedMs = Math.max(0, Math.min(cap - 1, msIndex));
+    this.vhitCursorMs = clampedMs;
+
+    const eyePos = this.vhitBuffer.eyePosArray[clampedMs];
+    const flag = this.vhitBuffer.saccadeFlags[clampedMs];
+    const isFast = flag > 0;
+    const headVel = this.vhitBuffer.headVelArray[clampedMs];
+    const eyeVel = this.vhitBuffer.invertedEyeVelArray[clampedMs];
+    const cn8Rate = this.vhitBuffer.cn8FiringRateArray ? this.vhitBuffer.cn8FiringRateArray[clampedMs] : 90;
+
+    let eyeDeg = -direction * eyePos;
+    if (flag === 3) {
+      // In SHIMP, anti-compensatory saccade refixates toward the head-fixed target
+      const headPos = this.vhitBuffer.headPosArray[clampedMs];
+      eyeDeg = direction * (headPos * 0.8 - eyePos * 0.3);
+    }
+
+    if (pair === 'horizontal') {
+      this.eyeEngine.setGazeAngles(eyeDeg, 0, 0, isFast);
+    } else if (pair === 'larp') {
+      this.eyeEngine.setGazeAngles(eyeDeg * 0.707, eyeDeg * 0.707, eyeDeg * 0.3, isFast);
+    } else {
+      this.eyeEngine.setGazeAngles(-eyeDeg * 0.707, eyeDeg * 0.707, -eyeDeg * 0.3, isFast);
+    }
+
+    this.eyeEngine.render();
+    this.renderTrackingHud(this.eyeEngine.getTelemetry());
+
+    if (this.hValEl) {
+      this.hValEl.textContent = `${eyeDeg >= 0 ? '+' : ''}${eyeDeg.toFixed(1)}°`;
+    }
+    if (this.spvValEl) {
+      this.spvValEl.textContent = `${eyeVel.toFixed(0)}°/s`;
+    }
+    if (this.statusEl) {
+      if (flag === 1) {
+        this.statusEl.textContent = `vHIT: Covert Catch-Up Saccade (Intra-Thrust · CN VIII: ${cn8Rate.toFixed(0)} sp/s)`;
+        this.statusEl.className = 'vor-nystagmus-status active';
+      } else if (flag === 2) {
+        this.statusEl.textContent = `vHIT: Overt Catch-Up Saccade (Post-Thrust Refixation · CN VIII: ${cn8Rate.toFixed(0)} sp/s)`;
+        this.statusEl.className = 'vor-nystagmus-status active';
+      } else if (flag === 3) {
+        this.statusEl.textContent = `vHIT: SHIMP Anti-Compensatory Saccade (CN VIII: ${cn8Rate.toFixed(0)} sp/s)`;
+        this.statusEl.className = 'vor-nystagmus-status active';
+      } else if (headVel > 10.0) {
+        this.statusEl.textContent = `vHIT: High-Acceleration VOR (${headVel.toFixed(0)}°/s Thrust · CN VIII: ${cn8Rate.toFixed(0)} sp/s)`;
+        this.statusEl.className = 'vor-nystagmus-status';
+      } else {
+        this.statusEl.textContent = `Target Fixed (CN VIII: ${cn8Rate.toFixed(0)} sp/s)`;
+        this.statusEl.className = 'vor-nystagmus-status';
+      }
+    }
+
+    if (this.diagnosticViewMode === 'vhit') {
+      this.renderVHITDualTracePlot();
+    }
+  }
+
+  public clearVHITPlayback(): void {
+    this.vhitCursorMs = null;
+    this.eyeEngine.setGazeAngles(0, 0, 0, false);
+    this.eyeEngine.render();
+    this.renderTrackingHud(this.eyeEngine.getTelemetry());
+    if (this.statusEl) {
+      const g = this.vhitBuffer.calculatedGain;
+      const hasSacc = this.vhitBuffer.covertSaccadePresent || this.vhitBuffer.overtSaccadePresent;
+      if (hasSacc || g < 0.7) {
+        this.statusEl.textContent = `vHIT Trial Complete: Low Gain (${g.toFixed(2)}) with Catch-Up Saccades`;
+        this.statusEl.className = 'vor-nystagmus-status active';
+      } else {
+        this.statusEl.textContent = `vHIT Trial Complete: Normal VOR Gain (${g.toFixed(2)}) — Target Retained`;
+        this.statusEl.className = 'vor-nystagmus-status';
+      }
+    }
+    if (this.diagnosticViewMode === 'vhit') {
+      this.renderVHITDualTracePlot();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Drawer Lifecycle & Mutual Exclusivity
   // ---------------------------------------------------------------------------
@@ -527,6 +614,14 @@ export class VORDrawer {
   // 60FPS Telemetry & Simulation Step
   // ---------------------------------------------------------------------------
   public updateTelemetry(telem: VestibularTelemetryState, dt: number): void {
+    if (this.diagnosticViewMode === 'vhit') {
+      // In vHIT mode, if not in an active high-speed playback, keep plot rendered without BPPV interference
+      if (this.vhitCursorMs === null) {
+        this.renderVHITDualTracePlot();
+      }
+      return;
+    }
+
     // 1. Advance eye avatar kinematic ODE
     this.eyeEngine.update(dt, telem);
 
@@ -553,10 +648,8 @@ export class VORDrawer {
       this.alexBadgeEl.textContent = `${alex.clinicalDegree} (${alex.modulatedSPV.toFixed(1)}°/s)`;
     }
 
-    // 7. Draw strip chart, Caloric Butterfly plot, or vHIT plot
-    if (this.diagnosticViewMode === 'vhit') {
-      this.renderVHITDualTracePlot();
-    } else if (this.diagnosticViewMode === 'caloric') {
+    // 7. Draw strip chart or Caloric Butterfly plot
+    if (this.diagnosticViewMode === 'caloric') {
       this.renderCaloricButterflyPlot();
     } else {
       this.renderStripChart();
@@ -583,12 +676,22 @@ export class VORDrawer {
       this.spvValEl.textContent = `${eyeTelem.slowPhaseVelocityDegPerSec.toFixed(1)}°/s`;
     }
     if (this.statusEl) {
-      if (eyeTelem.slowPhaseVelocityDegPerSec > 1.0) {
-        this.statusEl.textContent = `Nystagmus: ${eyeTelem.fastPhaseBeatDirection} (${vestTelem.ewaldLawActive || "Ewald's Law"})`;
-        this.statusEl.className = 'vor-nystagmus-status active';
+      if (this.diagnosticViewMode === 'caloric') {
+        if (eyeTelem.slowPhaseVelocityDegPerSec > 1.0) {
+          this.statusEl.textContent = `Caloric Nystagmus: ${eyeTelem.fastPhaseBeatDirection} (COWS · SPV ${eyeTelem.slowPhaseVelocityDegPerSec.toFixed(1)}°/s)`;
+          this.statusEl.className = 'vor-nystagmus-status active';
+        } else {
+          this.statusEl.textContent = 'Caloric Convection: Resting Equilibrium (Ready to Irrigate)';
+          this.statusEl.className = 'vor-nystagmus-status';
+        }
       } else {
-        this.statusEl.textContent = 'Resting Equilibrium (No Nystagmus)';
-        this.statusEl.className = 'vor-nystagmus-status';
+        if (eyeTelem.slowPhaseVelocityDegPerSec > 1.0) {
+          this.statusEl.textContent = `Nystagmus: ${eyeTelem.fastPhaseBeatDirection} (${vestTelem.ewaldLawActive || "Ewald's Law"})`;
+          this.statusEl.className = 'vor-nystagmus-status active';
+        } else {
+          this.statusEl.textContent = 'Resting Equilibrium (No Nystagmus)';
+          this.statusEl.className = 'vor-nystagmus-status';
+        }
       }
     }
   }
@@ -932,6 +1035,40 @@ export class VORDrawer {
           ctx.fillRect(x - 2, 4, 4, 10);
         }
       }
+    }
+
+    // Live Animated Playhead Scanning Needle during Impulse
+    if (this.vhitCursorMs !== null && this.vhitCursorMs >= 0 && this.vhitCursorMs < cap) {
+      const curX = (this.vhitCursorMs / (cap - 1)) * w;
+      ctx.save();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.0;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      ctx.moveTo(curX, 4);
+      ctx.lineTo(curX, yZero);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Point on Head Velocity
+      const curHeadY = yZero - (headVel[this.vhitCursorMs] / maxVel) * (h * 0.82);
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(curX, curHeadY, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Point on Inverted Eye Velocity
+      const curEyeY = yZero - (invEyeVel[this.vhitCursorMs] / maxVel) * (h * 0.82);
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.arc(curX, curEyeY, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Time readout badge
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(`${this.vhitCursorMs}ms`, Math.min(w - 60, Math.max(10, curX - 18)), 16);
+      ctx.restore();
     }
   }
 

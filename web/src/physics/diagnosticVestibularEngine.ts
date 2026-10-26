@@ -529,6 +529,8 @@ export class VHITImpulseBuffer {
   public readonly invertedEyeVelArray: Float32Array;
   public readonly rawEyeVelArray: Float32Array;
   public readonly headPosArray: Float32Array;
+  public readonly eyePosArray: Float32Array;
+  public readonly cn8FiringRateArray: Float32Array;
   public readonly saccadeFlags: Uint8Array; // 0: None, 1: Covert, 2: Overt, 3: SHIMP
 
   public calculatedGain = 1.0;
@@ -542,6 +544,8 @@ export class VHITImpulseBuffer {
     this.invertedEyeVelArray = new Float32Array(VHITImpulseBuffer.CAPACITY);
     this.rawEyeVelArray = new Float32Array(VHITImpulseBuffer.CAPACITY);
     this.headPosArray = new Float32Array(VHITImpulseBuffer.CAPACITY);
+    this.eyePosArray = new Float32Array(VHITImpulseBuffer.CAPACITY);
+    this.cn8FiringRateArray = new Float32Array(VHITImpulseBuffer.CAPACITY);
     this.saccadeFlags = new Uint8Array(VHITImpulseBuffer.CAPACITY);
 
     for (let i = 0; i < VHITImpulseBuffer.CAPACITY; i++) {
@@ -587,6 +591,19 @@ export class VHITImpulseBuffer {
     this.overtSaccadePresent = hasOvert && paradigm === 'himp';
     this.shimpSaccadePresent = paradigm === 'shimp' && targetGain >= 0.70;
 
+    let baseRate = 90.0;
+    let rateSensitivity = 1.1; // spikes/s per deg/s
+    if (preset === 'acute_neuritis') {
+      baseRate = 25.0;
+      rateSensitivity = 0.15; // Damaged CN VIII cannot drive high-frequency burst
+    } else if (preset === 'chronic_schwannoma') {
+      baseRate = 40.0;
+      rateSensitivity = 0.20; // Tumor compression impairs spike conduction
+    } else if (preset === 'bilateral_loss') {
+      baseRate = 12.0;
+      rateSensitivity = 0.02; // Severe bilateral loss
+    }
+
     for (let i = 0; i < VHITImpulseBuffer.CAPACITY; i++) {
       const t = this.timeArray[i];
       const headVel = computeVHITHeadVelocity(t);
@@ -595,6 +612,11 @@ export class VHITImpulseBuffer {
       this.headVelArray[i] = headVel;
       this.headPosArray[i] = headPos;
       this.saccadeFlags[i] = 0;
+
+      // CN VIII (8th Cranial Nerve) Primary Afferent Spike Rate
+      const spikeMod = headVel * rateSensitivity;
+      const cn8Rate = Math.max(10.0, Math.min(310.0, baseRate + spikeMod));
+      this.cn8FiringRateArray[i] = cn8Rate;
 
       // Base VOR eye response (inverted trace = G * headVel)
       let invEyeVel = targetGain * headVel;
@@ -635,6 +657,12 @@ export class VHITImpulseBuffer {
 
       this.invertedEyeVelArray[i] = Math.max(0.0, invEyeVel);
       this.rawEyeVelArray[i] = -this.invertedEyeVelArray[i];
+    }
+
+    let cumEyePos = 0.0;
+    for (let i = 0; i < VHITImpulseBuffer.CAPACITY; i++) {
+      cumEyePos += this.invertedEyeVelArray[i] * VHITImpulseBuffer.DT_SEC;
+      this.eyePosArray[i] = cumEyePos;
     }
 
     // Curthoys 40–80 ms area gain

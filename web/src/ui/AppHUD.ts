@@ -300,6 +300,7 @@ export class AppHUD {
     this.scene.onStateChange((snap) => this.renderState(snap));
     this.scene.onPinsUpdate((pins) => this.renderProjectedPins(pins));
     this.scene.onStructurePicked((meshName) => this.handleStructurePicked(meshName));
+    this.scene.onVestibularTelemetry((telem) => this.handleLiveVestibularTelemetry(telem));
     this.scene.onHearingToneRequest((freqHz) => {
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.setFrequency(freqHz);
@@ -2193,12 +2194,32 @@ export class AppHUD {
       return;
     }
 
+    const q = query.toLowerCase();
+    const isV8Query =
+      q === 'v8' ||
+      q === 'cn8' ||
+      q === 'cn viii' ||
+      q === 'cnviii' ||
+      q === 'viii' ||
+      q === '8' ||
+      q.includes('cranial nerve 8') ||
+      q.includes('cranial nerve viii') ||
+      q.includes('vestibulocochlear') ||
+      q.includes('acoustic nerve') ||
+      q.includes('vestibular nerve') ||
+      q.includes('cochlear nerve') ||
+      q === 'nerve';
+
     const matches = IEMAP_STRUCTURES.filter((item) => {
-      const matchName = item.displayName.toLowerCase().includes(query);
-      const matchLatin = item.latinName.toLowerCase().includes(query);
-      const matchShort = item.shortLabel.toLowerCase().includes(query);
-      const matchGroup = SYSTEM_GROUPS[item.systemGroup]?.title.toLowerCase().includes(query);
-      return matchName || matchLatin || matchShort || matchGroup;
+      const matchName = item.displayName.toLowerCase().includes(q);
+      const matchLatin = item.latinName.toLowerCase().includes(q);
+      const matchShort = item.shortLabel.toLowerCase().includes(q);
+      const matchGroup = SYSTEM_GROUPS[item.systemGroup]?.title.toLowerCase().includes(q);
+      const matchInnervation = item.innervation && item.innervation.toLowerCase().includes(q);
+      const matchPearl = item.clinicalPearl && item.clinicalPearl.toLowerCase().includes(q);
+      const matchV8 = isV8Query && Boolean(item.innervation && (item.innervation.includes('CN VIII') || item.innervation.includes('Nerve')));
+
+      return matchName || matchLatin || matchShort || matchGroup || matchInnervation || matchPearl || matchV8;
     });
 
     if (matches.length === 0) {
@@ -2219,6 +2240,7 @@ export class AppHUD {
             <div class="result-info">
               <span class="result-name">${item.displayName}</span>
               <span class="result-latin">${item.latinName}</span>
+              ${item.innervation ? `<span class="result-innervation">⚡ ${item.innervation}</span>` : ''}
             </div>
             <span class="result-badge" style="background: ${groupMeta?.accentHex ?? '#52dcf2'}22; color: ${groupMeta?.accentHex ?? '#52dcf2'}; border-color: ${groupMeta?.accentHex ?? '#52dcf2'}55;">
               ${groupMeta?.shortTitle ?? 'Structure'}
@@ -3274,6 +3296,7 @@ export class AppHUD {
 
   public switchVestibularSubmode(submode: 'bppv' | 'caloric' | 'vhit'): void {
     this.vestSubmode = submode;
+    this.scene.setVestibularSubmode(submode);
 
     // Update subnav tabs
     this.vestSubnavTabs.forEach((tab) => {
@@ -3519,6 +3542,7 @@ export class AppHUD {
 
   public alignCaloricPosture(): void {
     this.scene.flyToCaloricPosture();
+    this.scene.setHeadOrientation(0, 60, 0);
     this.setHeadOrientationUI(0, 60, 0);
   }
 
@@ -3640,9 +3664,15 @@ export class AppHUD {
       chip.classList.toggle('active', chip.getAttribute('data-vhit-pair') === pair);
     });
 
+    let branchLabel = 'CN VIII SVN';
+    if (pair === 'ralp') {
+      branchLabel = 'CN VIII Post IVN / Ant SVN';
+    } else if (pair === 'larp') {
+      branchLabel = 'CN VIII Ant SVN / Post IVN';
+    }
     const label = pair === 'horizontal' ? 'Horizontal (Yaw)' : pair.toUpperCase();
     if (this.vhitStatusTitleEl) {
-      this.vhitStatusTitleEl.textContent = `High-Acceleration Head Impulse (${label}, 15°, 120ms)`;
+      this.vhitStatusTitleEl.textContent = `Head Impulse (${label}, 15°, 120ms) · ${branchLabel}`;
     }
     this.updateVHITReadout();
   }
@@ -3762,6 +3792,86 @@ export class AppHUD {
     this.toneLabelEl.textContent = isPlaying ? 'Pause Tone' : 'Play Tone';
   }
 
+  private handleLiveVestibularTelemetry(telem: VestibularTelemetryState): void {
+    if (!telem) return;
+
+    // 1. Update live clearance on bottom dock badge in BPPV mode
+    if (this.vestClearanceBadgeEl && this.vestSubmode === 'bppv') {
+      const clearanceVal = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
+      this.vestClearanceBadgeEl.textContent = `${clearanceVal.toFixed(0)}% Cleared`;
+    }
+
+    // 2. If Floating Inspector Card is displaying a vestibular structure, update CN VIII gauge & status
+    const cn8Val = this.inspectorCard.querySelector('.cn8-val');
+    const cn8BarFill = this.inspectorCard.querySelector('.cn8-bar-fill') as HTMLElement | null;
+    const ewaldText = this.inspectorCard.querySelector('.ewald-text');
+    const vestClearancePill = this.inspectorCard.querySelector('.vest-clearance-pill strong');
+    const vestStatusBadge = this.inspectorCard.querySelector('.vest-status-badge');
+
+    if (cn8Val && cn8BarFill) {
+      const firingRate = typeof telem.afferentSpikesPerSec === 'number' ? telem.afferentSpikesPerSec : 90;
+      const clampedRate = Math.max(10, Math.min(310, firingRate));
+      const firingPercent = ((clampedRate - 10) / (310 - 10)) * 100;
+
+      let firingClass = 'rate-resting';
+      let fillClass = 'fill-resting';
+      if (firingRate > 140) {
+        firingClass = 'rate-excitation';
+        fillClass = 'fill-excitation';
+      } else if (firingRate < 50) {
+        firingClass = 'rate-inhibition';
+        fillClass = 'fill-inhibition';
+      }
+
+      cn8Val.textContent = `${firingRate.toFixed(0)} sp/s`;
+      cn8Val.className = `cn8-val ${firingClass}`;
+
+      cn8BarFill.style.width = `${firingPercent.toFixed(1)}%`;
+      cn8BarFill.className = `cn8-bar-fill ${fillClass}`;
+
+      if (ewaldText && telem.ewaldLawActive) {
+        ewaldText.textContent = telem.ewaldLawActive;
+      }
+      if (vestClearancePill) {
+        if (this.vestSubmode === 'bppv') {
+          const cp = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
+          vestClearancePill.parentElement!.innerHTML = `Clearance: <strong>${cp.toFixed(0)}%</strong>`;
+        } else if (this.vestSubmode === 'caloric') {
+          vestClearancePill.parentElement!.innerHTML = `Modality: <strong>COWS Caloric</strong>`;
+        } else {
+          vestClearancePill.parentElement!.innerHTML = `Modality: <strong>vHIT (CN VIII)</strong>`;
+        }
+      }
+      if (vestStatusBadge) {
+        if (this.vestSubmode === 'bppv') {
+          const cp = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
+          if (cp >= 99) {
+            vestStatusBadge.textContent = 'Cleared (Crystals in Utricle)';
+            vestStatusBadge.className = 'vest-status-badge sensation-cleared';
+          } else if (telem.patientSensation && telem.patientSensation.includes('Spinning')) {
+            vestStatusBadge.textContent = 'Spinning Vertigo (Crystals Moving)';
+            vestStatusBadge.className = 'vest-status-badge sensation-spinning';
+          } else {
+            vestStatusBadge.textContent = 'Calm (No Spinning)';
+            vestStatusBadge.className = 'vest-status-badge sensation-calm';
+          }
+        } else if (this.vestSubmode === 'caloric') {
+          vestStatusBadge.textContent = telem.patientSensation || 'Caloric Convection Active';
+          const horizSpv = telem.slowPhaseVelocityDegPerSec?.horizontal ?? 0;
+          vestStatusBadge.className = horizSpv !== 0
+            ? 'vest-status-badge sensation-spinning'
+            : 'vest-status-badge sensation-calm';
+        } else {
+          // vHIT
+          vestStatusBadge.textContent = telem.patientSensation || 'Target Fixed (Visual Fixation)';
+          vestStatusBadge.className = telem.fastPhaseBeatDirection.includes('Saccade')
+            ? 'vest-status-badge sensation-spinning'
+            : 'vest-status-badge sensation-calm';
+        }
+      }
+    }
+  }
+
   // ===========================================================================
   // FLOATING PART INSPECTOR CARD
   // ===========================================================================
@@ -3783,6 +3893,12 @@ export class AppHUD {
       return;
     }
 
+    const prevMesh = this.inspectorCard.getAttribute('data-active-mesh');
+    if (prevMesh !== selectedMesh) {
+      this.inspectorCard.scrollTop = 0;
+      this.inspectorCard.setAttribute('data-active-mesh', selectedMesh);
+    }
+
     const groupMeta = SYSTEM_GROUPS[item.systemGroup];
     const snap = this.scene.getSnapshot();
     const isIsolated = snap.isIsolated;
@@ -3793,10 +3909,9 @@ export class AppHUD {
         : item.patientSummary;
 
     const showSCDSBox =
-      snap.radiologyState.scdsActive ||
-      snap.labMode === 'radiology' ||
-      item.meshName === 'ls_Hsapiens_Sa' ||
-      item.meshName === 'segT2_th1.07_Otsu';
+      (snap.radiologyState.scdsActive && snap.labMode === 'radiology') ||
+      (snap.radiologyState.scdsActive && item.meshName === 'ls_Hsapiens_Sa') ||
+      (snap.labMode === 'radiology' && (item.meshName === 'ls_Hsapiens_Sa' || item.meshName === 'segT2_th1.07_Otsu'));
 
     const isSurgicalMode = snap.labMode === 'surgical';
     let surgBoxHtml = '';
@@ -3884,21 +3999,38 @@ export class AppHUD {
       const currPreset = vestEngine ? vestEngine.getCurrentPreset() : null;
 
       let canalTitle = 'Posterior Semicircular Canal';
-      let canalPlane = 'RALP Plane — 45° Oblique';
-      const canalId = telem?.canalId ?? (item.meshName.includes('Hsapiens_Sl') ? 'horizontal' : item.meshName.includes('Hsapiens_Sa') ? 'anterior' : 'posterior');
-      if (canalId === 'horizontal') {
-        canalTitle = 'Horizontal Semicircular Canal';
-        canalPlane = 'Axial Plane — 30° Anterior-Superior';
-      } else if (canalId === 'anterior') {
-        canalTitle = 'Anterior Semicircular Canal';
-        canalPlane = 'LARP Plane — 45° Oblique';
-      } else {
-        canalTitle = 'Posterior Semicircular Canal';
-        canalPlane = 'RALP Plane — 45° Oblique';
+      let canalPlane = 'LARP Plane — 45° Oblique · CN VIII Inferior Division';
+      let ewaldLaw = "Ewald's 3rd Law: Ampullofugal flow excites posterior canal";
+
+      let canalId = 'posterior';
+      if (item.meshName.includes('Hsapiens_Sl')) {
+        canalId = 'horizontal';
+      } else if (item.meshName.includes('Hsapiens_Sa')) {
+        canalId = 'anterior';
+      } else if (item.meshName.includes('Hsapiens_Sp')) {
+        canalId = 'posterior';
+      } else if (telem?.canalId) {
+        canalId = telem.canalId;
       }
 
-      let firingRate = telem ? telem.afferentSpikesPerSec : 90;
-      let ewaldLaw = telem?.ewaldLawActive || "Ewald's 3rd Law: Ampullofugal flow excites vertical canal";
+      if (canalId === 'horizontal') {
+        canalTitle = 'Horizontal Semicircular Canal';
+        canalPlane = 'Axial Plane — 30° Oblique · CN VIII Superior Division';
+        ewaldLaw = "Ewald's 2nd Law: Ampullopetal excitation (horizontal canal)";
+      } else if (canalId === 'anterior') {
+        canalTitle = 'Anterior (Superior) Semicircular Canal';
+        canalPlane = 'RALP Plane — 45° Oblique · CN VIII Superior Division';
+        ewaldLaw = "Ewald's 3rd Law: Ampullofugal flow excites anterior canal";
+      } else {
+        canalTitle = 'Posterior Semicircular Canal';
+        canalPlane = 'LARP Plane — 45° Oblique · CN VIII Inferior Division';
+        ewaldLaw = "Ewald's 3rd Law: Ampullofugal flow excites posterior canal";
+      }
+
+      let firingRate = typeof telem?.afferentSpikesPerSec === 'number' ? telem.afferentSpikesPerSec : 90;
+      if (telem?.ewaldLawActive && this.vestSubmode === 'bppv') {
+        ewaldLaw = telem.ewaldLawActive;
+      }
 
       // If Caloric Irrigation is active, reflect caloric excitation / inhibition on CN VIII
       const caloricSim = this.scene.getCaloricSimulationState();
@@ -3920,7 +4052,7 @@ export class AppHUD {
         firingClass = 'rate-inhibition';
         firingFillClass = 'fill-inhibition';
       }
-      const clearancePercent = telem ? telem.clearancePercent : 0;
+      const clearancePercent = typeof telem?.clearancePercent === 'number' ? telem.clearancePercent : 0;
       let sensationText = 'Calm (No Spinning)';
       let sensationBadgeClass = 'sensation-calm';
       if (clearancePercent >= 99) {
@@ -3970,7 +4102,7 @@ export class AppHUD {
                 ${sensationText}
               </div>
               <div class="vest-clearance-pill">
-                Clearance: <strong>${clearancePercent.toFixed(0)}%</strong>
+                ${this.vestSubmode === 'bppv' ? `Clearance: <strong>${clearancePercent.toFixed(0)}%</strong>` : this.vestSubmode === 'caloric' ? `Modality: <strong>COWS Caloric</strong>` : `Modality: <strong>vHIT (CN VIII)</strong>`}
               </div>
             </div>
 

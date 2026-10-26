@@ -11,7 +11,7 @@
     "test:hearing": "node scripts/test_hearing_engine.js",
     "test:radiology": "node scripts/test_radiology_engine.js",
     "test:vestibular": "node scripts/test_vestibular_engine.js",
-    "test:eye-avatar": "node scripts/test_eye_avatar_vor.js",
+    "test:eye-avatar": "node --expose-gc scripts/test_eye_avatar_vor.js",
     "test:workbench": "node scripts/test_vor_workbench.js",
     "test:diagnostic": "node scripts/test_diagnostic_vestibular.js",
     "test:surgical": "node scripts/test_surgical_engine.js",

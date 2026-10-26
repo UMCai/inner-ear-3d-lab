@@ -183,8 +183,8 @@ const _vTemp = new THREE.Vector3();
  * Real-time 3D ocular avatar and VOR kinematic rendering engine.
  */
 export class EyeAvatarEngine {
-  public static readonly IR_LIGHT_POS = new THREE.Vector3(0.02, 0.04, -0.20);
-  public static readonly CAMERA_POS = new THREE.Vector3(0.0, 0.0, -0.22);
+  public static readonly IR_LIGHT_POS = new THREE.Vector3(0.02, 0.04, -0.16);
+  public static readonly CAMERA_POS = new THREE.Vector3(0.0, 0.0, -0.165);
   public static readonly CORNEA_RADIUS = 0.0078; // 7.8 mm anatomical corneal curvature
 
   // Scene Graph
@@ -642,7 +642,9 @@ export class EyeAvatarEngine {
       // -----------------------------------------------------------------------
       this.timeSinceLastSaccade += safeDt;
 
-      if (cupulaDeflection > 0.12 && spvMag > 0.1) {
+      const hasVestibularDrive = (cupulaDeflection > 0.08 || spvMag > 0.5) && spvMag > 0.1;
+
+      if (hasVestibularDrive) {
         // Active vestibular drive
         this.retinalSlip.h += spv.horizontal * safeDt;
         this.retinalSlip.v += spv.vertical * safeDt;
@@ -841,6 +843,39 @@ export class EyeAvatarEngine {
 
   public getSaccadeDuration(): number {
     return this.saccadeDuration;
+  }
+
+  /**
+   * Directly drives instantaneous gaze angles and screen projections (for high-speed vHIT trials)
+   */
+  public setGazeAngles(hDeg: number, vDeg: number, tDeg = 0, isFastPhase = false): void {
+    this.eyeAngle.h = hDeg;
+    this.eyeAngle.v = vDeg;
+    this.eyeAngle.t = tDeg;
+    this.isFastPhase = isFastPhase;
+
+    EyeAvatarEngine.computeEyeQuaternion(this.eyeAngle.h, this.eyeAngle.v, this.eyeAngle.t, _qEyeR);
+    EyeAvatarEngine.computeEyeQuaternion(this.eyeAngle.h, this.eyeAngle.v, this.eyeAngle.t, _qEyeL);
+
+    if (this.pivotR) {
+      if (this.gazeMode === 'bilateral' || this.gazeMode === 'right_only') {
+        this.pivotR.quaternion.copy(_qEyeR);
+      } else {
+        this.pivotR.quaternion.identity();
+      }
+      this.pivotR.position.copy(this.initialPivotPosR);
+    }
+
+    if (this.pivotL) {
+      if (this.gazeMode === 'bilateral' || this.gazeMode === 'left_only') {
+        this.pivotL.quaternion.copy(_qEyeL);
+      } else {
+        this.pivotL.quaternion.identity();
+      }
+      this.pivotL.position.copy(this.initialPivotPosL);
+    }
+
+    this.updateScreenCoordinates();
   }
 
   public setVisualMode(mode: VisualMode): void {

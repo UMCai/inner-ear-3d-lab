@@ -487,6 +487,7 @@ assert(
   vhitBuf.getCapacity() === 350 &&
   vhitBuf.headVelArray.length === 350 &&
   vhitBuf.invertedEyeVelArray.length === 350 &&
+  vhitBuf.cn8FiringRateArray.length === 350 &&
   vhitBuf.saccadeFlags.length === 350,
   `VHITImpulseBuffer pre-allocates contiguous typed arrays (350 samples at 1ms resolution, zero heap alloc)`
 );

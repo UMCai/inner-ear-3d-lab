@@ -225,6 +225,7 @@ export class DualStageScene {
   private currentYaw = 0;
   private currentPitch = 0;
   private currentRoll = 0;
+  private vestSubmode: 'bppv' | 'caloric' | 'vhit' = 'bppv';
 
   // Diagnostic Vestibular Testing State: Laterality & vHIT Kinematic Animation
   private currentLaterality: 'right' | 'left' = 'right';
@@ -301,6 +302,7 @@ export class DualStageScene {
   private onStateChangeCallbacks: Array<(snap: LabSceneSnapshot) => void> = [];
   private onPinsUpdateCallbacks: Array<(pins: ProjectedPin2D[]) => void> = [];
   private onStructurePickedCallbacks: Array<(meshName: string) => void> = [];
+  private onVestibularTelemetryCallbacks: Array<(telem: VestibularTelemetryState) => void> = [];
 
   private raycaster = new THREE.Raycaster();
   private pointerDownPos = new THREE.Vector2();
@@ -1833,42 +1835,82 @@ export class DualStageScene {
       if (this.state.labMode === 'vestibular') {
         const simDt = Math.min(dt, 0.033);
         let telem: VestibularTelemetryState;
-        if (this.vestibularEngine) {
-          telem = this.vestibularEngine.stepPhysics(
-            simDt,
-            this.currentYaw,
-            this.currentPitch,
-            this.currentRoll
-          );
-          const particles = this.vestibularEngine.getParticles();
-          for (let i = 0; i < 5; i++) {
-            const p = particles[i];
-            if (p && this.otoconiaMeshes[i]) {
-              this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+
+        if (this.vestSubmode === 'bppv') {
+          if (this.vestibularEngine) {
+            telem = this.vestibularEngine.stepPhysics(
+              simDt,
+              this.currentYaw,
+              this.currentPitch,
+              this.currentRoll
+            );
+            const particles = this.vestibularEngine.getParticles();
+            for (let i = 0; i < 5; i++) {
+              const p = particles[i];
+              if (p && this.otoconiaMeshes[i]) {
+                this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+              }
             }
+          } else {
+            telem = this.createDefaultVestibularTelemetry('posterior');
           }
         } else {
-          telem = {} as VestibularTelemetryState;
-        }
+          // Diagnostic testing modes: caloric or vhit
+          if (this.vestibularEngine) {
+            telem = { ...this.vestibularEngine.getTelemetry(this.currentYaw, this.currentPitch, this.currentRoll) };
+          } else {
+            telem = this.createDefaultVestibularTelemetry('horizontal');
+          }
 
-        // Overlay active Caloric Convection if irrigating
-        if (this.activeCaloricState && this.activeCaloricState.active) {
-          telem.cupulaDeflectionNormalized = this.activeCaloricState.cupulaDeflection;
-          telem.afferentSpikesPerSec = this.activeCaloricState.afferentFiringRate;
-          telem.slowPhaseVelocityDegPerSec = {
-            horizontal: this.activeCaloricState.slowPhaseHorizDegPerSec,
-            vertical: 0,
-            torsional: 0,
-          };
-          telem.fastPhaseBeatDirection = this.activeCaloricState.fastPhaseBeatDirection;
-          telem.ewaldLawActive = this.activeCaloricState.isAmpullopetal
-            ? "Ewald's 2nd Law: Ampullopetal excitation (horizontal canal)"
-            : "Ewald's 2nd Law: Ampullofugal inhibition (horizontal canal)";
-          telem.nystagmusState = `Caloric Convection: ${this.activeCaloricState.fastPhaseBeatDirection}`;
+          if (this.vestSubmode === 'caloric') {
+            telem.canalId = 'horizontal';
+            telem.clearancePercent = 0;
+            telem.patientSensation = 'Calm (No Spinning)';
+            telem.nystagmusState = 'Resting Equilibrium';
+
+            if (this.activeCaloricState && this.activeCaloricState.active) {
+              telem.cupulaDeflectionNormalized = this.activeCaloricState.cupulaDeflection;
+              telem.afferentSpikesPerSec = this.activeCaloricState.afferentFiringRate;
+              telem.slowPhaseVelocityDegPerSec = {
+                horizontal: this.activeCaloricState.slowPhaseHorizDegPerSec,
+                vertical: 0,
+                torsional: 0,
+              };
+              telem.fastPhaseBeatDirection = this.activeCaloricState.fastPhaseBeatDirection;
+              telem.ewaldLawActive = this.activeCaloricState.isAmpullopetal
+                ? "Ewald's 2nd Law: Ampullopetal excitation (horizontal canal)"
+                : "Ewald's 2nd Law: Ampullofugal inhibition (horizontal canal)";
+              telem.nystagmusState = `Caloric Convection: ${this.activeCaloricState.fastPhaseBeatDirection}`;
+              telem.patientSensation = this.activeCaloricState.slowPhaseHorizDegPerSec !== 0
+                ? 'Spinning (Crystals Moving)'
+                : 'Calm (No Spinning)';
+            }
+          } else {
+            // 'vhit'
+            const vCanal: CanalId =
+              this.vhitAnim?.pair === 'ralp'
+                ? 'anterior'
+                : this.vhitAnim?.pair === 'larp'
+                ? 'posterior'
+                : 'horizontal';
+            telem.canalId = vCanal;
+            telem.clearancePercent = 0;
+            telem.cupulaDeflectionNormalized = 0;
+            telem.afferentSpikesPerSec = 90;
+            telem.slowPhaseVelocityDegPerSec = { horizontal: 0, vertical: 0, torsional: 0 };
+            telem.fastPhaseBeatDirection = 'None (Resting)';
+            telem.ewaldLawActive = "Ewald's Law: High-Acceleration Dynamic VOR Evaluation";
+            telem.patientSensation = 'Calm (No Spinning)';
+            telem.nystagmusState = 'Target Fixed (Resting Fixation)';
+          }
         }
 
         if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
           this.vorDrawer.updateTelemetry(telem, simDt);
+        }
+
+        for (let i = 0; i < this.onVestibularTelemetryCallbacks.length; i++) {
+          this.onVestibularTelemetryCallbacks[i](telem);
         }
       }
 
@@ -1892,9 +1934,56 @@ export class DualStageScene {
         } else {
           this.labyrinthRoot.quaternion.identity();
           this.controls.enabled = true;
+          if (this.vorDrawer) {
+            this.vorDrawer.clearVHITPlayback();
+          }
           const cb = this.vhitAnim.onComplete;
           this.vhitAnim = null;
           if (cb) cb();
+        }
+
+        // Live high-speed vHIT playback stream to VORDrawer & Eye Avatar
+        if (this.vhitAnim && this.vorDrawer && elapsed <= 0.350) {
+          const ms = Math.min(349, Math.floor(elapsed * 1000));
+          this.vorDrawer.updateVHITPlayback(elapsed, ms, this.vhitAnim.pair, this.vhitAnim.direction);
+
+          // Stream live vHIT CN VIII firing rate and kinematics to telemetry bus
+          const vhitBuf = this.vorDrawer.getVHITBuffer();
+          if (vhitBuf) {
+            const cn8Firing = vhitBuf.cn8FiringRateArray[ms];
+            const vCanal: CanalId =
+              this.vhitAnim.pair === 'ralp'
+                ? 'anterior'
+                : this.vhitAnim.pair === 'larp'
+                ? 'posterior'
+                : 'horizontal';
+            const baseTelem = this.vestibularEngine
+              ? this.vestibularEngine.getTelemetry(this.currentYaw, this.currentPitch, this.currentRoll)
+              : this.createDefaultVestibularTelemetry(vCanal);
+            const vhitTelem: VestibularTelemetryState = {
+              ...baseTelem,
+              canalId: vCanal,
+              cupulaDeflectionNormalized: Math.min(1.0, vhitBuf.headVelArray[ms] / 150.0),
+              afferentSpikesPerSec: cn8Firing,
+              slowPhaseVelocityDegPerSec: { horizontal: vhitBuf.invertedEyeVelArray[ms], vertical: 0, torsional: 0 },
+              fastPhaseBeatDirection: vhitBuf.saccadeFlags[ms] > 0 ? 'Catch-Up Saccade' : 'VOR Compensation',
+              ewaldLawActive: cn8Firing > 120
+                ? "Ewald's Law: High-speed ampullopetal angular acceleration excitation"
+                : "Ewald's Law: High-speed angular acceleration response",
+              clearancePercent: 0,
+              patientSensation: vhitBuf.saccadeFlags[ms] > 0
+                ? 'Spinning (Crystals Moving)'
+                : 'Calm (No Spinning)',
+              nystagmusState: vhitBuf.saccadeFlags[ms] === 1
+                ? 'Covert Saccade (Intra-Thrust)'
+                : vhitBuf.saccadeFlags[ms] === 2
+                ? 'Overt Saccade (Post-Thrust Refixation)'
+                : 'VOR Conjugate Slow Phase',
+            };
+            for (let i = 0; i < this.onVestibularTelemetryCallbacks.length; i++) {
+              this.onVestibularTelemetryCallbacks[i](vhitTelem);
+            }
+          }
         }
       }
 
@@ -1948,6 +2037,42 @@ export class DualStageScene {
     this.onStructurePickedCallbacks.push(cb);
   }
 
+  public onVestibularTelemetry(cb: (telem: VestibularTelemetryState) => void): void {
+    this.onVestibularTelemetryCallbacks.push(cb);
+  }
+
+  private createDefaultVestibularTelemetry(canal: CanalId = 'posterior'): VestibularTelemetryState {
+    return {
+      canalId: canal,
+      maneuverId: 'epley',
+      stepIndex: 0,
+      psiYawDeg: this.currentYaw,
+      thetaPitchDeg: this.currentPitch,
+      thetaReclineDeg: 0,
+      gammaRollDeg: this.currentRoll,
+      phiDeg: 0,
+      arcMm: 0,
+      velocityDegPerSec: 0,
+      gravityAlongCanal: 0,
+      cupulaDeflectionNormalized: 0,
+      afferentSpikesPerSec: 90,
+      nystagmusState: 'Target Fixed (Resting Fixation)',
+      slowPhaseVelocityDegPerSec: { horizontal: 0, vertical: 0, torsional: 0 },
+      fastPhaseBeatDirection: 'None (Resting)',
+      ewaldLawActive: canal === 'posterior'
+        ? "Ewald's 3rd Law: Ampullofugal flow excites posterior canal"
+        : "Ewald's 2nd Law: Ampullopetal flow excites horizontal canal",
+      anatomicalRegion: canal === 'posterior' ? 'Posterior Ampulla' : 'Horizontal Ampulla',
+      clearancePercent: 0,
+      patientSensation: 'Calm (No Spinning)',
+      patientLocation: 'Sitting Upright',
+      centerRAS: [0, 0, 0],
+      tangentRAS: [0, 0, 0],
+      tangentWorld: [0, 0, 0],
+      particlesRAS: [],
+    };
+  }
+
   private notifyStructurePicked(meshName: string): void {
     for (const cb of this.onStructurePickedCallbacks) {
       cb(meshName);
@@ -1981,6 +2106,14 @@ export class DualStageScene {
     this.currentYaw = yaw;
     this.currentPitch = pitch;
     this.currentRoll = roll;
+  }
+
+  public setVestibularSubmode(submode: 'bppv' | 'caloric' | 'vhit'): void {
+    this.vestSubmode = submode;
+  }
+
+  public getVestibularSubmode(): 'bppv' | 'caloric' | 'vhit' {
+    return this.vestSubmode;
   }
 
   public getHeadOrientation(): { yaw: number; pitch: number; roll: number } {
@@ -2498,6 +2631,7 @@ export class DualStageScene {
     this.onStateChangeCallbacks.length = 0;
     this.onPinsUpdateCallbacks.length = 0;
     this.onStructurePickedCallbacks.length = 0;
+    this.onVestibularTelemetryCallbacks.length = 0;
 
     this.renderer.dispose();
   }
