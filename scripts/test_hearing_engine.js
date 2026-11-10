@@ -1,9 +1,13 @@
 import assert from 'node:assert';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const WEB_SRC = '/Users/umcai/Documents/antigravity/radiant-darwin/web/src';
-const WEB_DIST = '/Users/umcai/Documents/antigravity/radiant-darwin/web/dist';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const REPO_ROOT = resolve(__dirname, '..');
+const WEB_SRC = join(REPO_ROOT, 'web', 'src');
+const WEB_DIST = join(REPO_ROOT, 'web', 'dist');
 
 console.log('================================================================');
 console.log('🧪 STAGE 1: AUDIO-VISUAL TONOTOPY & HEARING LAB VERIFICATION');

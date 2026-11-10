@@ -1,7 +1,7 @@
 # Product Engineering Roadmap: Stage-by-Stage Implementation (`ROADMAP.md`)
 
 > **Project:** Inner Ear 3D Lab  
-> **Repository:** `radiant-darwin`  
+> **Repository:** `inner-ear-3d-lab`  
 > **Execution Strategy:** Phased modular delivery adhering to the "Modal Workbench" zero-clutter architecture.
 
 ---
@@ -82,7 +82,7 @@ Transform the static cochlea into an interactive frequency analyzer driven by th
 ### Objective
 Enable medical students, ENT residents, and neuroradiologists to master multiplanar CT/MRI cross-sections of the petrous temporal bone directly against the 3D anatomical model.
 
-> **Blueprint & Derivation Spec:** [`docs/STAGE2_PLAN.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/STAGE2_PLAN.md)  
+> **Blueprint & Derivation Spec:** [`docs/STAGE2_PLAN.md`](docs/STAGE2_PLAN.md)  
 > **Verification Suite:** `scripts/test_radiology_engine.js` (52/52 tests passing)
 
 ### Task Breakdown
@@ -124,7 +124,7 @@ Enable medical students, ENT residents, and neuroradiologists to master multipla
 ### Objective
 Expand vestibular simulation beyond the posterior canal to encompass all 3 semicircular canals, complex BPPV maneuvers, caloric irrigation, video head impulse testing, and a synchronized 3D eye avatar demonstrating the vestibulo-ocular reflex.
 
-> **Blueprint & Derivation Spec:** [`docs/STAGE3_PLAN.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/STAGE3_PLAN.md)  
+> **Blueprint & Derivation Spec:** [`docs/STAGE3_PLAN.md`](docs/STAGE3_PLAN.md)  
 > **Verification Suites:** `scripts/test_canal_paths.py`, `scripts/test_vestibular_engine.js` (72 tests), `scripts/test_eye_avatar_vor.js` (50 tests), `scripts/test_vor_workbench.js` (51 tests), `scripts/test_diagnostic_vestibular.js` (51 tests).
 
 ### Task Breakdown
@@ -155,7 +155,7 @@ Expand vestibular simulation beyond the posterior canal to encompass all 3 semic
 ### Objective
 Deliver specialized otologic surgical planning tools, implant kinematics, and biotelemetry simulators for otologic surgeons, neurotology fellows, and residents.
 
-> **Blueprint & Derivation Spec:** [`stage4_surgical_simulation_plan.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/stage4_surgical_simulation_plan.md)  
+> **Blueprint & Derivation Spec:** `stage4_surgical_simulation_plan.md`  
 > **Verification Suite:** `scripts/test_surgical_engine.js` (56/56 assertions passing 100%)
 
 ### Task Breakdown

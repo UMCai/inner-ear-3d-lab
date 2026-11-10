@@ -1,10 +1,15 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const DIST_DIR = '/Users/umcai/Documents/antigravity/radiant-darwin/web/dist';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const REPO_ROOT = resolve(__dirname, '..');
+const DIST_DIR = join(REPO_ROOT, 'web', 'dist');
+const OUTPUT_DIR = join(REPO_ROOT, 'output');
 const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 4188;
 const DEBUG_PORT = 9225;
@@ -523,8 +528,8 @@ async function run() {
       console.log(`✓ Settings Popover & About & Citations Modal verified (3D Labels: Off/Key/All, Reading Depth: Simple/Detailed, Citations)`);
 
       const ss = await client.send('Page.captureScreenshot', { format: 'png' });
-      mkdirSync('/Users/umcai/Documents/antigravity/radiant-darwin/output', { recursive: true });
-      const ssPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/mvp_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      mkdirSync(OUTPUT_DIR, { recursive: true });
+      const ssPath = join(OUTPUT_DIR, `mvp_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(ssPath, Buffer.from(ss.data, 'base64'));
       console.log(`✓ Captured visual screenshot to ${ssPath}`);
 
@@ -651,7 +656,7 @@ async function run() {
 
       // 16. Capture Stage 1 Hearing Lab Screenshot
       const hearingSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const hearingSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage1_hearing_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const hearingSsPath = join(OUTPUT_DIR, `stage1_hearing_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(hearingSsPath, Buffer.from(hearingSs.data, 'base64'));
       console.log(`✓ Captured Stage 1 Hearing Lab visual screenshot to ${hearingSsPath}`);
 
@@ -788,7 +793,7 @@ async function run() {
 
       // 22. Capture Stage 2 Virtual Radiology Visual Screenshot
       const radSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const radSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage2_radiology_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const radSsPath = join(OUTPUT_DIR, `stage2_radiology_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(radSsPath, Buffer.from(radSs.data, 'base64'));
       console.log(`✓ Captured Stage 2 Virtual Radiology visual screenshot to ${radSsPath}`);
 
@@ -1014,7 +1019,7 @@ async function run() {
 
       // 28. Capture Stage 3 BPPV Visual Screenshot
       const vestSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const vestSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_vestibular_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const vestSsPath = join(OUTPUT_DIR, `stage3_vestibular_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(vestSsPath, Buffer.from(vestSs.data, 'base64'));
       console.log(`✓ Captured Stage 3 BPPV visual screenshot to ${vestSsPath}`);
 
@@ -1151,7 +1156,7 @@ async function run() {
 
       // Capture Stage 3 Caloric Screenshot
       const caloricSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const caloricSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_caloric_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const caloricSsPath = join(OUTPUT_DIR, `stage3_caloric_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(caloricSsPath, Buffer.from(caloricSs.data, 'base64'));
       console.log(`✓ Captured Stage 3 Caloric visual screenshot to ${caloricSsPath}`);
 
@@ -1274,7 +1279,7 @@ async function run() {
 
       // Capture Stage 3 vHIT Screenshot
       const vhitSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const vhitSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage3_vhit_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const vhitSsPath = join(OUTPUT_DIR, `stage3_vhit_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(vhitSsPath, Buffer.from(vhitSs.data, 'base64'));
       console.log(`✓ Captured Stage 3 vHIT visual screenshot to ${vhitSsPath}`);
 
@@ -1358,7 +1363,7 @@ async function run() {
 
       // Capture Stage 4 Surgical Visual Screenshot
       const surgSs = await client.send('Page.captureScreenshot', { format: 'png' });
-      const surgSsPath = `/Users/umcai/Documents/antigravity/radiant-darwin/output/stage4_surgical_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`;
+      const surgSsPath = join(OUTPUT_DIR, `stage4_surgical_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(surgSsPath, Buffer.from(surgSs.data, 'base64'));
       console.log(`✓ Captured Stage 4 Surgical visual screenshot to ${surgSsPath}`);
 

@@ -1,7 +1,7 @@
 # Stage 3 Engineering Plan: Multi-Canal Vestibular Dynamics, BPPV Maneuvers & 3D VOR Eye Avatar
 
 > **Project:** Inner Ear 3D Lab (Gate 3 Medaium)  
-> **Repository:** `radiant-darwin`  
+> **Repository:** `inner-ear-3d-lab`  
 > **Status:** Detailed Implementation Blueprint (`/plan /boost`)  
 > **Predecessors:**  
 > - Stage 0: Pure 3D Anatomy Lab MVP — ✅ COMPLETE & VERIFIED  
@@ -215,7 +215,7 @@ Stage 3 implements 5 canonical therapeutic maneuvers and diagnostic tests:
 
 ## 6. UI/UX Architecture: The Vestibular Workbench
 
-In strict compliance with [`docs/UI_DESIGN_SPEC.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/UI_DESIGN_SPEC.md), the 3D stage commands $\ge 85\%$ of the screen.
+In strict compliance with [`docs/UI_DESIGN_SPEC.md`](UI_DESIGN_SPEC.md), the 3D stage commands $\ge 85\%$ of the screen.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐

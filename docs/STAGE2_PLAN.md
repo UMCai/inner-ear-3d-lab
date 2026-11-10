@@ -87,7 +87,7 @@ This allows seamless, bi-directional scrubbing without mesh reconstruction or me
 
 ## 3. UI/UX Architecture: The Radiology Workbench
 
-In adherence to [`docs/UI_DESIGN_SPEC.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/UI_DESIGN_SPEC.md), Stage 2 introduces **Mode 3 (`🩻 Virtual Radiology`)** without adding persistent sidebars or reducing the 3D canvas below $85\%$ screen area.
+In adherence to [`docs/UI_DESIGN_SPEC.md`](UI_DESIGN_SPEC.md), Stage 2 introduces **Mode 3 (`🩻 Virtual Radiology`)** without adding persistent sidebars or reducing the 3D canvas below $85\%$ screen area.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐

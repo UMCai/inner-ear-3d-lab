@@ -1,7 +1,7 @@
 # AI Agent Guidelines (`AGENTS.md`)
 
 > **Project:** Inner Ear 3D Lab (Gate 3 Medaium)  
-> **Repository:** `radiant-darwin`  
+> **Repository:** `inner-ear-3d-lab`  
 > **Scope:** WebGL 3D Anatomy & Clinical Simulation Platform  
 > **Tech Stack:** TypeScript, Three.js, Vite, Web Audio API, Python 3, Blender 5.2.1 LTS
 
@@ -13,10 +13,10 @@ When contributing to this repository, you must adhere to these non-negotiable pr
 
 1. **Preserve the "Zero-Clutter / Anti-Cockpit" UI:**
    - Never add persistent telemetry sidebars, nested sub-windows, or fixed toolbars that steal space from the 3D canvas.
-   - All new features must conform to the **"Modal Workbench"** paradigm outlined in [`docs/UI_DESIGN_SPEC.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/UI_DESIGN_SPEC.md). The 3D stage commands 85%+ of the screen.
+   - All new features must conform to the **"Modal Workbench"** paradigm outlined in [`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md). The 3D stage commands 85%+ of the screen.
 2. **Maintain 60fps WebGL Performance:**
    - Never instantiate new geometries, materials, or large object allocations inside the `requestAnimationFrame` render loop.
-   - Do not perform CPU-based mesh slicing; utilize the analytic GPU shader clipping uniforms in [`web/src/render/gate3Materials.ts`](file:///Users/umcai/Documents/antigravity/radiant-darwin/web/src/render/gate3Materials.ts).
+   - Do not perform CPU-based mesh slicing; utilize the analytic GPU shader clipping uniforms in [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts).
 3. **Medical & Anatomical Rigor:**
    - All spatial calculations must respect the Right-Anterior-Superior (RAS) stereotaxic coordinate frame in millimeters.
    - Ensure medical copy adheres to authoritative otologic and neurotologic standards (e.g., Greenwood frequency function, Ewald's laws, Stokes gravity sedimentation).
@@ -98,4 +98,4 @@ Before finalizing any task, verify:
 - [ ] Responsive layout remains unbroken across desktop (`1440×900`), tablet (`768×1024`), and mobile (`390×844`).
 - [ ] 3D canvas maintains 60fps orbit/pan/zoom responsiveness.
 - [ ] No regression in core anatomy tools (search bar, bone peeling slider, exploded view slider, 27-parts drawer).
-- [ ] [`docs/MEMORY.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/docs/MEMORY.md) and [`STATUS.md`](file:///Users/umcai/Documents/antigravity/radiant-darwin/STATUS.md) are updated if new milestones or architectural changes occur.
+- [ ] [`docs/MEMORY.md`](docs/MEMORY.md) and [`STATUS.md`](STATUS.md) are updated if new milestones or architectural changes occur.

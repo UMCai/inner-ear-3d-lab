@@ -1,6 +1,6 @@
 # Repository Long-Term Memory & Chronological Timeline (`docs/MEMORY.md`)
 
-> **Repository:** `radiant-darwin` (Inner Ear 3D Lab / Gate 3 Medaium)  
+> **Repository:** `inner-ear-3d-lab` (Inner Ear 3D Lab / Gate 3 Medaium)  
 > **Maintainers:** AI Pair Programming Team (Antigravity & Claude)  
 > **Purpose:** Permanent repository memory capturing milestones, architectural pivots, clinical validations, and critical engineering decisions.
 
@@ -301,7 +301,7 @@
 ## 3. Directory & File Memory Map
 
 ```
-/Users/umcai/Documents/antigravity/radiant-darwin/
+inner-ear-3d-lab/
 ├── AGENTS.md               # Unified instructions for AI agents working in this repo
 ├── CLAUDE.md               # Claude-specific environment and style guidelines
 ├── ARCHITECTURE.md         # High-abstract system architecture and data flow

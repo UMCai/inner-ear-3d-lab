@@ -1,7 +1,7 @@
 # High-Level System Architecture (`ARCHITECTURE.md`)
 
 > **System:** Inner Ear 3D Lab  
-> **Repository:** `radiant-darwin`  
+> **Repository:** `inner-ear-3d-lab`  
 > **Scope:** High-fidelity 3D Anatomical Atlas & Real-Time Biomechanical Simulation Platform
 
 ---
