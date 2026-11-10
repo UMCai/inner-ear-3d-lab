@@ -3,9 +3,9 @@
 ## 1. Executive Summary
 - **Final Video Artifact**: [output/epley_maneuver_right_bppv.mp4](output/epley_maneuver_right_bppv.mp4)
 - **Subtitle Artifact**: [output/epley_maneuver_right_bppv.srt](output/epley_maneuver_right_bppv.srt)
-- **QA Review Sheets**:
-  - [build/qa/review-contact-1080p.png](build/qa/review-contact-1080p.png) (8-frame full-HD review grid)
-  - [build/qa/review-small-screen-640x360.png](build/qa/review-small-screen-640x360.png) (`640x360` small-screen legibility proof grid)
+- **QA Review Sheets** (local `build/qa/` outputs, gitignored):
+  - `build/qa/review-contact-1080p.png` (8-frame full-HD review grid)
+  - `build/qa/review-small-screen-640x360.png` (`640x360` small-screen legibility proof grid)
 - **3D Anatomical Asset & Look Bundle**:
   - [assets/iemap/iemap_right_labyrinth.glb](assets/iemap/iemap_right_labyrinth.glb), [assets/iemap/look-config.json](assets/iemap/look-config.json), [assets/iemap/iemap_Metadata.json](assets/iemap/iemap_Metadata.json), `assets/iemap/vtk/*.vtk` (27 authentic meshes), `assets/iemap/obj/*.obj` (27 authentic meshes), `assets/iemap/fcsv/*.fcsv` (4 Slicer fiducial sets), [assets/iemap/posterior_canal_path.json](assets/iemap/posterior_canal_path.json) (313 samples, 19.33 mm, 0.25–0.31 mm clearance inside `ls_Hsapiens_Sp`)
 - **Video Technical Specification**:
@@ -52,16 +52,16 @@
 
 ---
 
-## 3. Inspected QA Keyframes (`build/qa/`)
-1. [build/qa/scene1_locate_part1.png](build/qa/scene1_locate_part1.png) (`t = 2.8s`: Cutaway Head & Shoulders showing embedded Right Inner Ear Labyrinth + linked `RIGHT INNER EAR · LIVE POSE` PiP)
-2. [build/qa/scene1_locate_part2.png](build/qa/scene1_locate_part2.png) (`t = 8.8s`: Dynamic Role Swap to Gate 3 Right Labyrinth Close-Up highlighting `Posterior Semicircular Canal` and `Utricle`)
-3. [build/qa/scene2_pathology.png](build/qa/scene2_pathology.png) (`t = 20.0s`: Gate 3 Pathology Close-Up showing 5 warm amber canaliths at `-90°` near the posterior ampulla and the `Common Crus → Utricle` pathway)
-4. [build/qa/scene3_step1.png](build/qa/scene3_step1.png) (`t = 32.5s`: Step 1 Hold — Right posterior canal aligned with upcoming recline plane)
-5. [build/qa/scene4_step2.png](build/qa/scene4_step2.png) (`t = 48.0s`: Step 2 Hold — Supine `20–30°` neck extension; otoconia migrate to `+30°` posterolateral apex)
-6. [build/qa/scene5_step3.png](build/qa/scene5_step3.png) (`t = 63.5s`: Step 3 Hold — `90°` contralateral left turn; otoconia cross superior arch into common crus at `+110°`)
-7. [build/qa/scene6_step4.png](build/qa/scene6_step4.png) (`t = 79.5s`: Step 4 Hold — Left-shoulder lateral decubitus with nose `45°` down; otoconia drain down common crus to `+165°`)
-8. [build/qa/scene7_step5.png](build/qa/scene7_step5.png) (`t = 92.5s`: Step 5 Return Upright — `Otoconia Repositioned → Maneuver Complete` at `+188°` inside the utricle)
-9. [build/qa/scene8_summary.png](build/qa/scene8_summary.png) (`t = 106.0s`: Post-Maneuver Clinical Observation & 4-item `KEY CLINICAL CHECKPOINTS — RIGHT EPLEY MANEUVER` card)
+## 3. Inspected QA Keyframes (`build/qa/`, gitignored build artifacts)
+1. `build/qa/scene1_locate_part1.png` (`t = 2.8s`: Cutaway Head & Shoulders showing embedded Right Inner Ear Labyrinth + linked `RIGHT INNER EAR · LIVE POSE` PiP)
+2. `build/qa/scene1_locate.png` (`t = 8.8s`: Dynamic Role Swap to Gate 3 Right Labyrinth Close-Up highlighting `Posterior Semicircular Canal` and `Utricle`)
+3. `build/qa/scene2_pathology.png` (`t = 20.0s`: Gate 3 Pathology Close-Up showing 5 warm amber canaliths at `-90°` near the posterior ampulla and the `Common Crus → Utricle` pathway)
+4. `build/qa/scene3_step1.png` (`t = 32.5s`: Step 1 Hold — Right posterior canal aligned with upcoming recline plane)
+5. `build/qa/scene4_step2.png` (`t = 48.0s`: Step 2 Hold — Supine `20–30°` neck extension; otoconia migrate to `+30°` posterolateral apex)
+6. `build/qa/scene5_step3.png` (`t = 63.5s`: Step 3 Hold — `90°` contralateral left turn; otoconia cross superior arch into common crus at `+110°`)
+7. `build/qa/scene6_step4.png` (`t = 79.5s`: Step 4 Hold — Left-shoulder lateral decubitus with nose `45°` down; otoconia drain down common crus to `+165°`)
+8. `build/qa/scene7_step5.png` (`t = 92.5s`: Step 5 Return Upright — `Otoconia Repositioned → Maneuver Complete` at `+188°` inside the utricle)
+9. `build/qa/scene8_summary.png` (`t = 106.0s`: Post-Maneuver Clinical Observation & 4-item `KEY CLINICAL CHECKPOINTS — RIGHT EPLEY MANEUVER` card)
 
 ---
 

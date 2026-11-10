@@ -157,9 +157,10 @@ console.log('\n--- Test Suite 7: Production Build Artifacts Verification ---');
 const distHtml = readFileSync(join(WEB_DIST, 'index.html'), 'utf-8');
 const assetFiles = readdirSync(join(WEB_DIST, 'assets'));
 const cssFile = assetFiles.find((f) => f.endsWith('.css'));
-const jsFile = assetFiles.find((f) => f.endsWith('.js'));
+const jsFiles = assetFiles.filter((f) => f.endsWith('.js'));
+assert(cssFile && jsFiles.length > 0, 'Production CSS and JS bundles must exist in web/dist/assets');
 const distCss = readFileSync(join(WEB_DIST, 'assets', cssFile), 'utf-8');
-const distJs = readFileSync(join(WEB_DIST, 'assets', jsFile), 'utf-8');
+const distJs = jsFiles.map((f) => readFileSync(join(WEB_DIST, 'assets', f), 'utf-8')).join('\n');
 
 assert(distHtml.length > 500, 'Production index.html must be populated');
 assert(distCss.includes('.mode-switcher'), 'Production CSS must include .mode-switcher');

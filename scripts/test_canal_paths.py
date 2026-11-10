@@ -119,7 +119,10 @@ def test_canal_file(json_path, expected_len_range, mesh_files):
 def test_eye_avatar():
     print("\n[TEST SUITE] Verifying 3D Eye Avatar GLB...")
     for p in [IEMAP_DIR / "eye_avatar.glb", WEB_ASSETS_DIR / "eye_avatar.glb"]:
-        assert p.exists(), f"Error: Missing GLB file {p}"
+        assert p.exists(), (
+            f"Error: Missing GLB file {p}. "
+            "Run `node scripts/sync_web_assets.mjs` (or `npm run build`) first."
+        )
         size_kb = p.stat().st_size / 1024.0
         print(f"  {p.relative_to(REPO_ROOT)}: {size_kb:.1f} kB")
         assert 50.0 < size_kb < 500.0, f"GLB size {size_kb} kB outside target range (50 - 500 kB)"

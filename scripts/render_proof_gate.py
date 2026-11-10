@@ -11,7 +11,7 @@ Verifies:
 
 Usage:
   /Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/render_proof_gate.py
-  /Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/render_proof_gate.py --composite-only
+  python3 scripts/render_proof_gate.py --composite-only
 """
 
 import json

@@ -155,7 +155,7 @@ Expand vestibular simulation beyond the posterior canal to encompass all 3 semic
 ### Objective
 Deliver specialized otologic surgical planning tools, implant kinematics, and biotelemetry simulators for otologic surgeons, neurotology fellows, and residents.
 
-> **Blueprint & Derivation Spec:** `stage4_surgical_simulation_plan.md`  
+> **Implementation & Telemetry Spec:** [`web/src/physics/surgicalEngine.ts`](web/src/physics/surgicalEngine.ts) & [`STATUS.md`](STATUS.md)  
 > **Verification Suite:** `scripts/test_surgical_engine.js` (56/56 assertions passing 100%)
 
 ### Task Breakdown

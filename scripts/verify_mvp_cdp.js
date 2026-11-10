@@ -20,6 +20,8 @@ const MIME_TYPES = {
   '.css': 'text/css',
   '.json': 'application/json',
   '.obj': 'text/plain',
+  '.fcsv': 'text/plain',
+  '.glb': 'model/gltf-binary',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
@@ -28,8 +30,19 @@ const MIME_TYPES = {
 // 1. Static file server for built dist
 function startServer() {
   const server = createServer((req, res) => {
-    let filePath = join(DIST_DIR, req.url === '/' ? 'index.html' : req.url.split('?')[0]);
+    const reqPath = (req.url === '/' ? '/index.html' : req.url.split('?')[0]);
+    if (reqPath === '/favicon.ico') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    let filePath = join(DIST_DIR, reqPath);
     if (!existsSync(filePath)) {
+      if (reqPath.startsWith('/assets/') || extname(reqPath)) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
       filePath = join(DIST_DIR, 'index.html');
     }
     const ext = extname(filePath);
@@ -189,9 +202,18 @@ async function run() {
       console.error(`[Browser Exception] ${text}`);
       consoleErrors.push(`[Uncaught Exception] ${text}`);
     });
+    client.on('Network.responseReceived', (params) => {
+      const resp = params.response;
+      if (resp && resp.url.startsWith(`http://127.0.0.1:${PORT}/`) && resp.status >= 400) {
+        const msg = `HTTP ${resp.status} for ${resp.url}`;
+        console.error(`[Network Error] ${msg}`);
+        consoleErrors.push(`[Network Error] ${msg}`);
+      }
+    });
 
     await client.send('Page.enable');
     await client.send('Runtime.enable');
+    await client.send('Network.enable');
     await client.send('DOM.enable');
 
     const viewports = [

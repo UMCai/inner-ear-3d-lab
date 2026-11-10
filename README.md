@@ -6,23 +6,22 @@ An interactive WebGL 3D anatomy and clinical simulation platform, paired with a 
 
 ## ⚡ Quick Start: Running the 3D Web Application
 
-The interactive web application runs on **Vite**, **TypeScript**, and **Three.js**, featuring real-time 3D anatomy exploration, Greenwood tonotopy audio synthesis, pure-tone audiometry, and virtual temporal bone CT multi-planar reformatting (MPR).
+The interactive web application runs on **Vite**, **TypeScript**, and **Three.js**, featuring real-time 3D anatomy exploration, Greenwood tonotopy audio synthesis, pure-tone audiometry, virtual temporal bone CT multi-planar reformatting (MPR), multi-canal BPPV & VOR/Caloric/vHIT eye simulation, and otologic surgical suites.
 
 ### 1. Prerequisites
-- [Node.js](https://nodejs.org/) (v18+ recommended)
+- [Node.js](https://nodejs.org/) (v22.6+ or Node with TypeScript type stripping for `npm test`; v18+ for `npm run dev` / `npm run build`)
 - `npm`
+- Python 3 (optional, for physics/canal spline tests and Blender video pipeline)
 
-### 2. Launch Development Server
+### 2. Install Dependencies & Launch Development Server
 
-Run directly from the repository root:
+On initial clone, install the web dependencies (this also syncs the tracked `assets/iemap/` runtime files into `web/public/assets/iemap/`):
 ```bash
-npm run dev
+cd web && npm install
 ```
 
-Or from the `web/` directory:
+Then run the dev server from the repository root (or inside `web/`):
 ```bash
-cd web
-npm install    # (only needed on initial clone)
 npm run dev
 ```
 
@@ -111,6 +110,9 @@ $$\text{3/4 Clinical Patient Pose \& Doctor Layer} \;\longleftrightarrow\; \text
 
 ### A. WebGL 3D Application (Interactive Atlas)
 ```bash
+# 0. Install web dependencies & sync IE-Map runtime assets (initial clone)
+cd web && npm install && cd ..
+
 # 1. Start local dev server (Vite @ http://127.0.0.1:5173/)
 npm run dev
 # (or: cd web && npm run dev)
@@ -123,32 +125,38 @@ npm run build
 npm run preview
 # (or: cd web && npm run preview)
 
-# 4. Run automated test suites (Hearing & Radiology engines)
-node scripts/test_hearing_engine.js
-node scripts/test_radiology_engine.js
+# 4. Run all 7 automated Node.js verification suites (Hearing, Radiology, Vestibular, Eye Avatar, Workbench, Diagnostic VOR, Surgical)
+npm test
+
+# 5. Run Python canal spline & BPPV physics checks
+python3 src/physics/epley_simulator.py
+python3 scripts/test_canal_paths.py
+
+# 6. Run multi-viewport Headless Chrome CDP verification (requires Google Chrome on macOS)
+node scripts/verify_mvp_cdp.js
 ```
 
 ### B. Headless Blender 5.2 LTS Editorial Video Pipeline
 ```bash
 # 1. Generate IE-Map meshes, fiducials, 3D canal centerline, and Gate 3 look-config.json
-/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 src/anatomy/prepare_iemap.py
+python3 src/anatomy/prepare_iemap.py
 
 # 2. Export combined glTF binary and render Gate 3 3D anatomical verification preview
 /Applications/Blender.app/Contents/MacOS/Blender -b -P src/anatomy/export_glb_and_preview.py
 
 # 3. Run 5-step vestibular kinematics & gravitational sedimentation self-test
-/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 src/physics/epley_simulator.py
+python3 src/physics/epley_simulator.py
 
 # 4. Synthesize 8-shot voiceover narration, sound design, SRT subtitles, and timeline_manifest.json
-/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 src/audio/build_audio.py
+python3 src/audio/build_audio.py
 
 # 5. Run headless Blender 5.2 LTS 3D render pass
 /Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/build_full_video.py
 
 # 6. Run parallel Gate 3 2D compositing, encode output/epley_maneuver_right_bppv.mp4, and generate QA sheets
-/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/build_full_video.py --composite-only
+python3 scripts/build_full_video.py --composite-only
 
 # 7. (Optional) Run focused Step 1 to Step 2 Gate proof verification
 /Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/render_proof_gate.py
-/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 scripts/render_proof_gate.py --composite-only
+python3 scripts/render_proof_gate.py --composite-only
 ```

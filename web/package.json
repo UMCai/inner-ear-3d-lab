@@ -4,8 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node ../scripts/sync_web_assets.mjs",
+    "predev": "node ../scripts/sync_web_assets.mjs",
     "dev": "vite --host 127.0.0.1 --port 5173",
+    "prebuild": "node ../scripts/sync_web_assets.mjs",
     "build": "tsc && vite build",
+    "prepreview": "node ../scripts/sync_web_assets.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4173"
   },
   "dependencies": {

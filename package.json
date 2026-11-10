@@ -5,9 +5,11 @@
   "type": "module",
   "description": "Inner Ear 3D Lab (Gate 3 Medaium) - WebGL 3D Anatomy & Clinical Simulation Platform",
   "scripts": {
+    "sync:assets": "node scripts/sync_web_assets.mjs",
     "dev": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
     "preview": "npm --prefix web run preview",
+    "pretest": "npm run build",
     "test:hearing": "node scripts/test_hearing_engine.js",
     "test:radiology": "node scripts/test_radiology_engine.js",
     "test:vestibular": "node scripts/test_vestibular_engine.js",

@@ -9,15 +9,18 @@ focusing on:
 3. The embedded authentic 3D right inner ear labyrinth (cochlea, canals, ampullae) within the temporal bone.
 """
 
+import os
 import sys
 import math
 from pathlib import Path
 import bpy
 import mathutils
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 def setup_inspection_render():
-    blend_path = Path("assets/iemap-realistic-head-context-candidate.blend").resolve()
-    out_dir = Path("/Users/umcai/.gemini/antigravity/brain/d156737f-2da3-42af-b07f-043fb00ab800").resolve()
+    blend_path = (REPO_ROOT / "assets" / "iemap-realistic-head-context-candidate.blend").resolve()
+    out_dir = Path(os.environ.get("INSPECTION_OUT_DIR", str(REPO_ROOT / "build" / "inspection"))).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Enable Cycles CPU

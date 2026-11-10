@@ -315,7 +315,6 @@ inner-ear-3d-lab/
 │   ├── CLINICAL_PILLARS.md # 4 expansion pillars (Hearing, Vestibular, CT, Surgery)
 │   ├── STAGE2_PLAN.md      # Stage 2 implementation blueprint & mathematical derivations
 │   ├── STAGE3_PLAN.md      # Stage 3 implementation blueprint & multi-canal VOR architecture
-│   ├── stage4_surgical_simulation_plan.md # Stage 4 otologic surgical simulation plan
 │   └── MEMORY.md           # This file: chronological memory & ADRs
 │
 ├── scripts/                # Verification, headless test & render scripts

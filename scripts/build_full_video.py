@@ -580,10 +580,12 @@ if __name__ == "__main__":
     elif "--blender-only" in sys.argv:
         run_blender_pass()
     else:
+        import os
+        import shutil
         run_blender_pass()
-        codex_py = Path("/Users/umcai/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3")
-        if codex_py.exists():
-            print(f"[build_full_video] Launching composite & encode pass with {codex_py}...")
-            subprocess.run([str(codex_py), str(Path(__file__).resolve()), "--composite-only"], check=True)
+        ext_py = os.environ.get("PYTHON_BIN") or shutil.which("python3")
+        if ext_py and Path(ext_py).resolve() != Path(sys.executable).resolve():
+            print(f"[build_full_video] Launching composite & encode pass with {ext_py}...")
+            subprocess.run([ext_py, str(Path(__file__).resolve()), "--composite-only"], check=True)
         else:
             run_composite_and_encode()

@@ -10,6 +10,7 @@ Generates visual proof renders for Stage 3 Step 1:
 """
 
 import json
+import os
 from pathlib import Path
 import bpy
 import mathutils
@@ -18,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 IEMAP_DIR = REPO_ROOT / "assets" / "iemap"
 OUT_DIR = REPO_ROOT / "build" / "proof"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-BRAIN_DIR = Path("/Users/umcai/.gemini/antigravity/brain/d156737f-2da3-42af-b07f-043fb00ab800")
+EXTRA_OUT_DIR = Path(os.environ["STEP1_PROOF_COPY_DIR"]) if os.environ.get("STEP1_PROOF_COPY_DIR") else None
 
 
 def render_multicanal_proof():
@@ -133,9 +134,9 @@ def render_multicanal_proof():
     scene.render.filepath = str(out_path)
     bpy.ops.render.render(write_still=True)
     print(f"Saved: {out_path}")
-    if BRAIN_DIR.exists():
+    if EXTRA_OUT_DIR and EXTRA_OUT_DIR.exists():
         import shutil
-        shutil.copy2(out_path, BRAIN_DIR / out_path.name)
+        shutil.copy2(out_path, EXTRA_OUT_DIR / out_path.name)
 
 
 def render_eye_proof():
@@ -199,9 +200,9 @@ def render_eye_proof():
     scene.render.filepath = str(out_path)
     bpy.ops.render.render(write_still=True)
     print(f"Saved: {out_path}")
-    if BRAIN_DIR.exists():
+    if EXTRA_OUT_DIR and EXTRA_OUT_DIR.exists():
         import shutil
-        shutil.copy2(out_path, BRAIN_DIR / out_path.name)
+        shutil.copy2(out_path, EXTRA_OUT_DIR / out_path.name)
 
 
 if __name__ == "__main__":
