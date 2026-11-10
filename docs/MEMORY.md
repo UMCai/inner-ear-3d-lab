@@ -191,11 +191,49 @@
     - Standalone Node.js ESM test suite `scripts/test_surgical_engine.js` passing 56/56 assertions (100%).
     - Root `npm test` running all 7 test suites passing 392/392 assertions (100%).
     - Headless Chrome CDP tests (`scripts/verify_mvp_cdp.js`) passing 100% across Desktop (1440×900), Desktop Standard (1280×800), Tablet (768×1024), and Mobile (390×844) viewports with zero console errors.
-    - Production build compile (`cd web && npm run build`) passing cleanly with 0 TypeScript/Vite errors.
+### 2026-10-26: Industrial-Grade Web App Hardening & Architecture Rigor Audit (Completed & Verified)
+- **Objective:** Audit and harden the entire web application to industrial grade, eliminating per-frame allocations, guaranteeing WebGL context loss/recovery, synchronizing touch orbit gestures across 3D pin overlays, enforcing sample-accurate Web Audio stopping with master gain ceilings, implementing mobile safe-area insets, WCAG AA contrast compliance, and enabling strict TypeScript compiler rules (`noUnusedLocals`, `noUnusedParameters`).
+- **Key Deliverables Achieved:**
+  - `web/src/ui/SurgicalDrawer.ts`: Replaced fixed simulation delta with true dynamic delta-time via `performance.now()` with non-negative jitter guards. Paused and resumed `requestAnimationFrame` loop automatically based on drawer open/closed state. Upgraded canvas axis tick labels and tonic resting text to `#94a3b8` (contrast ratio > 7:1) for WCAG AA compliance.
+  - `web/src/ui/AppHUD.ts`: Pre-allocated `activePinIdSet` eliminating per-frame `new Set()` and `.map()` heap allocations during 3D pin projections. Cached DOM elements for vestibular telemetry cards and updated `.textContent` and `.style.width` in-place, eliminating 60fps DOM destruction. Implemented complete pointer lifecycle forwarding (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`) with pointer capture on `.projected-pin`, preserving click-to-select while propagating drag gestures with `pageX`/`pageY` to canvas to allow smooth 3D camera orbiting without getting Three.js OrbitControls stuck.
+  - `web/src/render/DualStageScene.ts`: Registered `webglcontextlost` (with mandatory `event.preventDefault()`) and `webglcontextrestored` event listeners on canvas with render loop suspension/resumption, unbinding on disposal, and `isDisposed` safety checks. Decoupled direct imports of `VORDrawer` and `SurgicalDrawer` into `IVORDrawerTarget` and `ISurgicalDrawerTarget` interfaces with `onSurgicalStateUpdate` and `onVestibularTelemetry` subscriptions. Pre-allocated static pin sort comparator `DualStageScene.comparePinCandidates`.
+  - `web/src/audio/ToneSynthesizer.ts`: Converted surgical drill, facial EMG, and scalar rupture sound nodes to sample-accurate `osc.stop(now + 0.04)` and `osc.onended = () => { osc.disconnect(); gain.disconnect(); }`. Introduced dedicated `masterGainNode` (`setMasterVolume`, `getMasterVolume`, `toggleMute`, `setMuted`, `getIsMuted`, `getMasterGain`) and routed all procedural audio through `masterGain` -> `safetyLimiter` -> `audioCtx.destination` to prevent digital clipping across summed multi-source playback.
+  - `web/index.html` & `web/src/style.css`: Added `viewport-fit=cover` and iOS `env(safe-area-inset-top)` / `env(safe-area-inset-bottom)` rules across headers, docks, cards, and modal flyouts. Added `touch-action: none` and `user-select: none` to `.projected-pin`.
+  - `web/tsconfig.json`: Enabled `"noUnusedLocals": true` and `"noUnusedParameters": true`, resolved all unused symbol warnings/errors across the codebase.
+- **Verification:**
+  - `cd web && npm run build` completes cleanly with 0 TypeScript and 0 Vite errors.
+  - All 7 test suites (hearing, radiology, vestibular, eye-avatar, workbench, diagnostic, surgical) pass 100% (392/392 assertions).
+  - Headless Chrome CDP tests (`scripts/verify_mvp_cdp.js`) pass 100% across all 4 responsive viewports (Desktop High-Res, Desktop Standard, Tablet Portrait, Mobile Handset) with 0 console errors and 0 unhandled exceptions.
+
+---
+
+### 2026-10-27: VOR Eye Realism Overhaul & Multi-Viewport UI Anti-Crowding Hardening (Completed & Verified)
+- **Objective:** Eliminate the fake/doll-like appearance of the 3D VOR eye avatar and resolve UI layout crowding, horizontal/vertical overflow, and drawer overextension across Desktop (1440×900, 1280×800), Tablet Portrait (768×1024), and Mobile Handset (390×844).
+- **Key Deliverables Achieved:**
+  - `web/src/ui/VORDrawer.ts`: Implemented `renderOcularOverlay` with `evenodd` canvas cutouts.
+    - *Daylight Natural Mode:* Anatomical palpebral fissure (eyelid) contour framing with superior arch covering superior sclera and grazing top 15% of iris, inferior arch tangent to the inferior limbus, lateral/medial canthi, and upper eyelid lashline depth shadow gradient.
+    - *NIR VNG Mode:* Dual circular ocular ports ($r=48\text{ px}$) with 4 NIR illuminator LED glints at $45^\circ/135^\circ/225^\circ/315^\circ$, concentric calibration reticles ($\pm 10^\circ, \pm 20^\circ$), and yellow P-CR tracking vector line.
+    - Swapped inverted eyelid coordinates: Left Eye labeled "Left Eye (OS)" and Right Eye labeled "Right Eye (OD)" matching screen coordinates.
+    - Softened natural crosshairs to `rgba(56, 189, 248, 0.45)` with 1.0px width while keeping `#facc15` 1.5px in NIR mode.
+  - `web/src/render/eyeAvatar.ts`: Upgraded sclera materials to `THREE.MeshPhysicalMaterial` with clearcoat 0.7, roughness 0.28, resolving Three.js material warnings. DataTextures mapped for procedural iris (crypts of Fuchs, collarette, radial fibers) and microvascular sclera.
+  - `web/src/style.css`:
+    - Globally constrained `html, body, #app` to `max-width: 100vw; overflow-x: hidden;`.
+    - Expanded `.bottom-viz-bar` to `width: min(1340px, calc(100% - 32px))` on desktop to give comfortable horizontal breathing room.
+    - Caloric testing subview: set `.caloric-chip` to compact padding ($3\times 5\text{ px}$), set `.vestibular-protocol-group` to `flex-shrink: 1; min-width: 0; overflow-x: auto;`, locked `.vestibular-timeline-wrap` to `min-width: 260px; flex: 0 0 auto;`, and hid `.caloric-laterality-tag` on screens $\le 1360\text{ px}$ to eliminate horizontal collisions between Alexander Gaze and action buttons.
+    - Tablet Portrait ($\le 960\text{ px}$): Added complete responsive flex-wrapping for `.vestibular-dock-content`, `.vest-subnav-bar`, `.vest-subview`, `.vestibular-protocol-group`, `.vestibular-timeline-wrap`, and `.vestibular-actions-group`. Elevated `.vor-drawer` bottom offset to `calc(175px + env(safe-area-inset-bottom))` with `max-height: calc(100vh - 240px)` so it never collides with multi-row bottom docks.
+    - Mobile Handset ($\le 640\text{ px}$): Constrained `.lab-header`, `.brand-cluster`, `.search-container`, and `.mode-switcher` so mobile handset renders 100% within 390px bounds. Elevated `.vor-drawer` bottom offset to `calc(198px + env(safe-area-inset-bottom))` with `max-height: calc(100vh - 260px)` to float cleanly above bottom bars.
+- **Verification:**
+  - Production Web Build: `cd web && npm run build` completes cleanly with 0 TypeScript/Vite errors in 929ms.
+  - Unit/Integration Tests: `npm test` runs 7 test suites (hearing, radiology, vestibular, eye-avatar, workbench, diagnostic, surgical) — all 392 assertions pass 100%.
+  - Headless Chrome CDP Tests: `node scripts/verify_mvp_cdp.js` succeeds with 0 console errors and 0 unhandled exceptions across Desktop High-Res, Desktop Standard, Tablet Portrait, and Mobile Handset. Visual inspection of screenshots confirmed 0 overflow, 0 clipping, and realistic ocular framing.
 
 ---
 
 ## 2. Key Architecture & Engineering Decisions (ADRs)
+
+### ADR-013: Pointer Lifecycle Synchronization & Zero-Allocation 60fps HUD Pipelines
+- **Decision:** Implement complete pointer lifecycle forwarding (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`) on 3D projected pin overlays with explicit `pageX`/`pageY` population and pointer capture, synchronizing with Three.js `OrbitControls` on the underlying canvas while preserving stationary clicks for structure selection. Eliminate all per-frame heap allocations in projected pin sorting and DOM updates in vestibular telemetry using pre-allocated ID sets and in-place `.textContent` updates.
+- **Rationale:** Prevents touch orbit gestures on mobile/tablet devices from getting stuck in multi-touch dolly/pan mode due to orphaned pointer IDs in Three.js OrbitControls, while eliminating garbage collection pauses during continuous 60fps simulation.
 
 ### ADR-012: Cranial Nerve VIII (CN VIII) Neurotelemetry & Diagnostic Mode Telemetry Decoupling
 - **Decision:** Explicitly model CN VIII primary vestibular afferent spike rate arrays (`cn8FiringRateArray: Float32Array`, 350 samples) inside `VHITImpulseBuffer` across all clinical presets (normal 90–255 sp/s, acute neuritis blunted to 25–45 sp/s, vestibular schwannoma blunted to 40–70 sp/s, bilateral loss down to 10–15 sp/s). Decouple diagnostic submodes (`vestSubmode: 'bppv' | 'caloric' | 'vhit'`) inside `DualStageScene` so BPPV otolith sedimentation ODE is halted during Caloric irrigation and vHIT head thrusts, preventing gravity drift contamination of caloric convection and high-speed impulses. Enforce sticky header containment on `.inspector-header` and strict structure-scoped activation for SCDS third-window panels.

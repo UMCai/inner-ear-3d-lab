@@ -18,7 +18,6 @@ import {
   getLandmarkForDepth,
   RADIOLOGY_PLANES,
   RadiologyPlaneId,
-  SCDS_PARAMETERS,
 } from '../data/radiologyEngine';
 
 export class CTSliceDrawer {

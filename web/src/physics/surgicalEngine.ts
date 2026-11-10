@@ -18,9 +18,7 @@
 
 import {
   COCHLEA_SPLINE_KNOTS,
-  GREENWOOD_CONSTANTS,
   greenwoodFrequency,
-  greenwoodPosition,
 } from '../data/greenwoodEngine.ts';
 
 // =============================================================================

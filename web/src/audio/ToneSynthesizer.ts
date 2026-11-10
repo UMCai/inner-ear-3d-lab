@@ -18,6 +18,8 @@ export class ToneSynthesizer {
   private isPlaying = false;
   private currentFrequency = 1000.0; // Default 1 kHz reference tone
   private currentVolume = 0.8;
+  private masterVolume = 1.0;
+  private isMuted = false;
   private initialized = false;
 
   // Surgical procedural audio nodes
@@ -74,7 +76,8 @@ export class ToneSynthesizer {
 
       // 2. Master Gain Ceiling
       this.masterGain = this.audioCtx.createGain();
-      this.masterGain.gain.setValueAtTime(ToneSynthesizer.MAX_SAFE_GAIN, this.audioCtx.currentTime);
+      const initialMasterGain = this.isMuted ? 0.0 : ToneSynthesizer.MAX_SAFE_GAIN * this.masterVolume;
+      this.masterGain.gain.setValueAtTime(initialMasterGain, this.audioCtx.currentTime);
 
       // 3. Persistent Envelope Gate
       this.envelopeGain = this.audioCtx.createGain();
@@ -86,11 +89,11 @@ export class ToneSynthesizer {
       this.oscillator.frequency.setValueAtTime(this.currentFrequency, this.audioCtx.currentTime);
 
       // Audio Graph Routing:
-      // Oscillator -> Envelope Gain -> Safety Limiter -> Master Gain -> Audio Destination
+      // Oscillator -> Envelope Gain -> Master Gain -> Safety Limiter -> Audio Destination
       this.oscillator.connect(this.envelopeGain);
-      this.envelopeGain.connect(this.safetyLimiter);
-      this.safetyLimiter.connect(this.masterGain);
-      this.masterGain.connect(this.audioCtx.destination);
+      this.envelopeGain.connect(this.masterGain);
+      this.masterGain.connect(this.safetyLimiter);
+      this.safetyLimiter.connect(this.audioCtx.destination);
 
       this.oscillator.start();
       this.initialized = true;
@@ -225,6 +228,48 @@ export class ToneSynthesizer {
     }
   }
 
+  /**
+   * Sets master audio output volume in [0.0, 1.0].
+   */
+  public setMasterVolume(volume: number): void {
+    this.masterVolume = Math.max(0.0, Math.min(1.0, volume));
+    if (this.masterGain && this.audioCtx) {
+      const now = this.audioCtx.currentTime;
+      const effectiveGain = this.isMuted ? 0.0 : ToneSynthesizer.MAX_SAFE_GAIN * this.masterVolume;
+      this.masterGain.gain.cancelScheduledValues(now);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+      this.masterGain.gain.linearRampToValueAtTime(effectiveGain, now + 0.03);
+    }
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  public toggleMute(): boolean {
+    this.setMuted(!this.isMuted);
+    return this.isMuted;
+  }
+
+  public setMuted(muted: boolean): void {
+    this.isMuted = muted;
+    if (this.masterGain && this.audioCtx) {
+      const now = this.audioCtx.currentTime;
+      const effectiveGain = this.isMuted ? 0.0 : ToneSynthesizer.MAX_SAFE_GAIN * this.masterVolume;
+      this.masterGain.gain.cancelScheduledValues(now);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+      this.masterGain.gain.linearRampToValueAtTime(effectiveGain, now + 0.03);
+    }
+  }
+
+  public getIsMuted(): boolean {
+    return this.isMuted;
+  }
+
+  public getMasterGain(): GainNode | null {
+    return this.masterGain;
+  }
+
   public getFrequency(): number {
     return this.currentFrequency;
   }
@@ -279,14 +324,16 @@ export class ToneSynthesizer {
       this.drillGain.gain.exponentialRampToValueAtTime(ToneSynthesizer.GAIN_FLOOR, now + 0.04);
 
       const osc = this.drillOsc;
-      setTimeout(() => {
+      const gain = this.drillGain;
+      osc.stop(now + 0.04);
+      osc.onended = () => {
         try {
-          osc.stop();
           osc.disconnect();
+          gain.disconnect();
         } catch {
           // ignore
         }
-      }, 50);
+      };
     } catch {
       // ignore
     }
@@ -344,14 +391,16 @@ export class ToneSynthesizer {
       this.emgGain.gain.exponentialRampToValueAtTime(ToneSynthesizer.GAIN_FLOOR, now + 0.04);
 
       const osc = this.emgOsc;
-      setTimeout(() => {
+      const gain = this.emgGain;
+      osc.stop(now + 0.04);
+      osc.onended = () => {
         try {
-          osc.stop();
           osc.disconnect();
+          gain.disconnect();
         } catch {
           // ignore
         }
-      }, 50);
+      };
     } catch {
       // ignore
     }
@@ -389,6 +438,14 @@ export class ToneSynthesizer {
 
       snapOsc.start(now);
       snapOsc.stop(now + 0.07);
+      snapOsc.onended = () => {
+        try {
+          snapOsc.disconnect();
+          snapGain.disconnect();
+        } catch {
+          // ignore
+        }
+      };
     } catch (err) {
       console.warn('[ToneSynthesizer] triggerRuptureSnap error:', err);
     }

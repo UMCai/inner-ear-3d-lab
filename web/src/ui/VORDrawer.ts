@@ -180,8 +180,8 @@ export class VORDrawer {
             style="width: ${VORDrawer.AVATAR_LOGICAL_W}px; height: ${VORDrawer.AVATAR_LOGICAL_H}px;"
           ></canvas>
           <div class="vor-eye-labels">
-            <span class="vor-eye-tag right">Right Eye (OD)</span>
-            <span class="vor-eye-tag left">Left Eye (OS)</span>
+            <span class="vor-eye-tag left">Right Eye (OD)</span>
+            <span class="vor-eye-tag right">Left Eye (OS)</span>
           </div>
         </div>
 
@@ -448,7 +448,7 @@ export class VORDrawer {
   }
 
   public updateVHITPlayback(
-    elapsedSec: number,
+    _elapsedSec: number,
     msIndex: number,
     pair: 'horizontal' | 'ralp' | 'larp' = 'horizontal',
     direction: 1 | -1 = 1
@@ -712,24 +712,215 @@ export class VORDrawer {
     ctx.scale(dpr, dpr);
 
     const isNIR = this.visualMode === 'infrared_vng';
-    const crosshairColor = isNIR ? '#facc15' : '#38bdf8';
+    const crosshairColor = isNIR ? '#facc15' : 'rgba(56, 189, 248, 0.45)';
 
-    // Right Eye Pupil Crosshair ⊕
+    // 1. Render Anatomical Eyelid / Clinical VNG Ocular Viewport Overlay
+    this.renderOcularOverlay(ctx, isNIR, telem);
+
+    // 2. Right Eye Pupil Crosshair ⊕
     if (telem.pupilScreenR && telem.pupilScreenR.visible) {
       this.drawCrosshair(ctx, telem.pupilScreenR.x, telem.pupilScreenR.y, crosshairColor, 7);
     }
-    // Left Eye Pupil Crosshair ⊕
+    // 3. Left Eye Pupil Crosshair ⊕
     if (telem.pupilScreenL && telem.pupilScreenL.visible) {
       this.drawCrosshair(ctx, telem.pupilScreenL.x, telem.pupilScreenL.y, crosshairColor, 7);
     }
 
-    // Right Eye Purkinje Glint ✱
+    // 4. Right Eye Purkinje Glint ✱
     if (telem.glintScreenR && telem.glintScreenR.visible) {
       this.drawPurkinjeGlint(ctx, telem.glintScreenR.x, telem.glintScreenR.y);
     }
-    // Left Eye Purkinje Glint ✱
+    // 5. Left Eye Purkinje Glint ✱
     if (telem.glintScreenL && telem.glintScreenL.visible) {
       this.drawPurkinjeGlint(ctx, telem.glintScreenL.x, telem.glintScreenL.y);
+    }
+
+    ctx.restore();
+  }
+
+  private renderOcularOverlay(
+    ctx: CanvasRenderingContext2D,
+    isNIR: boolean,
+    telem: EyeTelemetry
+  ): void {
+    // In headless test environments with incomplete mock contexts, safely return
+    if (
+      typeof ctx.rect !== 'function' ||
+      typeof ctx.bezierCurveTo !== 'function' ||
+      typeof ctx.clip !== 'function'
+    ) {
+      return;
+    }
+
+    const W = VORDrawer.AVATAR_LOGICAL_W;
+    const H = VORDrawer.AVATAR_LOGICAL_H;
+    // Patient's Right Eye (OD) is on observer left (cxR ~ 116)
+    // Patient's Left Eye (OS) is on observer right (cxL ~ 244)
+    const cxR = telem.pupilScreenR && telem.pupilScreenR.visible ? telem.pupilScreenR.x : 116;
+    const cyR = telem.pupilScreenR && telem.pupilScreenR.visible ? telem.pupilScreenR.y : 110;
+    const cxL = telem.pupilScreenL && telem.pupilScreenL.visible ? telem.pupilScreenL.x : 244;
+    const cyL = telem.pupilScreenL && telem.pupilScreenL.visible ? telem.pupilScreenL.y : 110;
+
+    if (isNIR) {
+      // -----------------------------------------------------------------------
+      // Infrared VNG Goggles Mode: Dual Precision Ocular Lens Ports
+      // -----------------------------------------------------------------------
+      const portR = 52;
+      ctx.save();
+
+      // Matte dark infrared goggle chassis with cutouts
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      // Cutout Right Eye (Observer Left)
+      ctx.moveTo(cxR + portR, cyR);
+      ctx.arc(cxR, cyR, portR, 0, Math.PI * 2, true);
+      // Cutout Left Eye (Observer Right)
+      ctx.moveTo(cxL + portR, cyL);
+      ctx.arc(cxL, cyL, portR, 0, Math.PI * 2, true);
+      ctx.fillStyle = '#050a0e';
+      ctx.fill('evenodd');
+
+      // VNG Goggle Lens Bezel Rings
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(82, 220, 242, 0.45)';
+      ctx.beginPath();
+      ctx.arc(cxR, cyR, portR, 0, Math.PI * 2);
+      ctx.arc(cxL, cyL, portR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Concentric Calibration Rings (±10°, ±20°)
+      ctx.setLineDash([2, 4]);
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.22)';
+      ctx.beginPath();
+      ctx.arc(cxR, cyR, 22, 0, Math.PI * 2);
+      ctx.arc(cxR, cyR, 42, 0, Math.PI * 2);
+      ctx.arc(cxL, cyL, 22, 0, Math.PI * 2);
+      ctx.arc(cxL, cyL, 42, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 4 NIR LED Illuminators per ocular port
+      const angles = [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75];
+      for (const cx of [cxR, cxL]) {
+        for (const a of angles) {
+          const lx = cx + Math.cos(a) * (portR - 4);
+          const ly = cyR + Math.sin(a) * (portR - 4);
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.88)';
+          ctx.beginPath();
+          ctx.arc(lx, ly, 2.0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // P-CR Vector Line (Pupil-to-Corneal-Reflection)
+      if (telem.pupilScreenR && telem.glintScreenR && telem.pupilScreenR.visible && telem.glintScreenR.visible) {
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.65)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(telem.pupilScreenR.x, telem.pupilScreenR.y);
+        ctx.lineTo(telem.glintScreenR.x, telem.glintScreenR.y);
+        ctx.stroke();
+      }
+      if (telem.pupilScreenL && telem.glintScreenL && telem.pupilScreenL.visible && telem.glintScreenL.visible) {
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.65)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(telem.pupilScreenL.x, telem.pupilScreenL.y);
+        ctx.lineTo(telem.glintScreenL.x, telem.glintScreenL.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    } else {
+      // -----------------------------------------------------------------------
+      // Natural Mode: Anatomical Palpebral Fissure (Eyelid) Framing
+      // -----------------------------------------------------------------------
+      ctx.save();
+
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      this.drawPalpebralPath(ctx, cxR, cyR, true);
+      this.drawPalpebralPath(ctx, cxL, cyL, false);
+
+      if (typeof ctx.createLinearGradient === 'function') {
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#0a141b');
+        grad.addColorStop(0.25, '#0e1d27');
+        grad.addColorStop(0.5, '#122330');
+        grad.addColorStop(0.75, '#0e1d27');
+        grad.addColorStop(1, '#081219');
+        ctx.fillStyle = grad;
+      } else {
+        ctx.fillStyle = '#0e1d27';
+      }
+      ctx.fill('evenodd');
+
+      // Subtle Palpebral Lid Margins
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = 'rgba(82, 220, 242, 0.32)';
+      ctx.beginPath();
+      this.drawPalpebralPath(ctx, cxR, cyR, true);
+      this.drawPalpebralPath(ctx, cxL, cyL, false);
+      ctx.stroke();
+
+      // Upper Eyelid Lashline Depth Shadow
+      this.renderLashlineShadow(ctx, cxR, cyR, true);
+      this.renderLashlineShadow(ctx, cxL, cyL, false);
+
+      ctx.restore();
+    }
+  }
+
+  private drawPalpebralPath(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    isRightEye: boolean
+  ): void {
+    const halfW = 54;
+    const xLat = isRightEye ? cx - halfW : cx + halfW;
+    const xMed = isRightEye ? cx + halfW : cx - halfW;
+    const yLat = cy - 2; // subtle positive canthal tilt (lateral canthus 2px higher)
+    const yMed = cy + 1; // medial canthus with lacrimal caruncle dip
+
+    const upPeakX = isRightEye ? cx + 5 : cx - 5;
+    const upPeakY = cy - 26;
+    const lowPeakX = isRightEye ? cx - 3 : cx + 3;
+    const lowPeakY = cy + 24;
+
+    ctx.moveTo(xLat, yLat);
+    // Upper eyelid margin arch
+    ctx.bezierCurveTo(
+      isRightEye ? cx - 24 : cx + 24, cy - 25,
+      upPeakX, upPeakY,
+      xMed, yMed
+    );
+    // Lower eyelid margin curve
+    ctx.bezierCurveTo(
+      isRightEye ? cx + 24 : cx - 24, cy + 23,
+      lowPeakX, lowPeakY,
+      xLat, yLat
+    );
+  }
+
+  private renderLashlineShadow(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    isRightEye: boolean
+  ): void {
+    ctx.save();
+    ctx.beginPath();
+    this.drawPalpebralPath(ctx, cx, cy, isRightEye);
+    ctx.clip();
+
+    if (typeof ctx.createLinearGradient === 'function') {
+      const shadowGrad = ctx.createLinearGradient(0, cy - 27, 0, cy - 4);
+      shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+      shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
+      shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.fillRect(cx - 60, cy - 28, 120, 25);
     }
 
     ctx.restore();
@@ -743,7 +934,7 @@ export class VORDrawer {
     size: number
   ): void {
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = this.visualMode === 'infrared_vng' ? 1.5 : 1.0;
 
     // Small reticle circle
     ctx.beginPath();
@@ -835,7 +1026,7 @@ export class VORDrawer {
     ctx.stroke();
 
     // Degree axis tick labels
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#94a3b8';
     ctx.font = '18px monospace';
     ctx.fillText('+20°', 6, yMid - 20 * scaleY + 6);
     ctx.fillText('  0°', 6, yMid + 6);
@@ -955,7 +1146,7 @@ export class VORDrawer {
     ctx.stroke();
 
     // Axis labels
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#94a3b8';
     ctx.font = '16px monospace';
     ctx.fillText('200°/s', 6, y200 - 4);
     ctx.fillText('100°/s', 6, y100 - 4);
@@ -1123,7 +1314,7 @@ export class VORDrawer {
     ctx.setLineDash([]);
 
     // 3. Axis Labels
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = '#94a3b8';
     ctx.font = '14px monospace';
     ctx.fillText('◀ Left-Beating', 10, cy - 6);
     ctx.fillText('Right-Beating ▶', w - 130, cy - 6);

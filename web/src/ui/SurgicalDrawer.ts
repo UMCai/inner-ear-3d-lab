@@ -33,6 +33,7 @@ export class SurgicalDrawer {
   // Cached Telemetry State
   private currentLabState: SurgicalLabState | null = null;
   private animationFrameId: number | null = null;
+  private lastFrameTime = 0;
   private simTime = 0.0;
 
   // Header & Badges DOM references
@@ -62,7 +63,6 @@ export class SurgicalDrawer {
     this.renderDOM();
     this.initCanvases();
     this.attachEvents();
-    this.startRenderLoop();
   }
 
   private renderDOM(): void {
@@ -161,12 +161,18 @@ export class SurgicalDrawer {
     this.isOpen = true;
     this.rootEl.classList.add('open');
     this.rootEl.style.display = 'flex';
+    this.startRenderLoop();
     this.renderFrame();
   }
 
   public close(): void {
     if (!this.isOpen) return;
     this.isOpen = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+    this.lastFrameTime = 0;
     this.rootEl.classList.remove('open');
     this.rootEl.style.display = 'none';
     this.onCloseCallbacks.forEach((cb) => cb());
@@ -274,13 +280,21 @@ export class SurgicalDrawer {
   }
 
   private startRenderLoop(): void {
-    const loop = () => {
-      this.simTime += 0.033;
-      if (this.isOpen) {
-        this.renderFrame();
+    if (this.animationFrameId !== null) return;
+    const loop = (timestamp: number) => {
+      if (!this.isOpen) {
+        this.animationFrameId = null;
+        this.lastFrameTime = 0;
+        return;
       }
+      const rawDt = (timestamp - this.lastFrameTime) * 0.001;
+      const dt = this.lastFrameTime > 0 && rawDt > 0 ? Math.min(rawDt, 0.1) : 0.016;
+      this.lastFrameTime = timestamp;
+      this.simTime += dt;
+      this.renderFrame();
       this.animationFrameId = requestAnimationFrame(loop);
     };
+    this.lastFrameTime = performance.now();
     this.animationFrameId = requestAnimationFrame(loop);
   }
 
@@ -661,7 +675,7 @@ export class SurgicalDrawer {
       ctx.stroke();
 
       ctx.font = '8px monospace';
-      ctx.fillStyle = '#64748b';
+      ctx.fillStyle = '#94a3b8';
       ctx.fillText(`${f}mN`, 6, y + 3);
     }
 
@@ -692,7 +706,6 @@ export class SurgicalDrawer {
     for (let s = 0; s <= curDepth; s += 0.5) {
       const x = padL + (s / maxDepth) * plotW;
       // Recompute normalized historical force
-      const sFrac = s / maxDepth;
       const fBase = 1.5 + 0.32 * s + 0.0075 * s * s;
       const totalF = Math.min(35, fBase * (ciState.insertionForceMilliNewtons / (1.5 + 0.32 * curDepth + 0.0075 * curDepth * curDepth || 1)));
       const y = padT + plotH - (totalF / 35) * plotH;
@@ -774,7 +787,7 @@ export class SurgicalDrawer {
       ctx.fillText(`SPV = ${spv.toFixed(1)}°/s (${labyState.nystagmusBeatDirection})`, 14, 18);
     } else {
       ctx.font = '10px monospace';
-      ctx.fillStyle = '#64748b';
+      ctx.fillStyle = '#94a3b8';
       ctx.fillText('Resting Tonic Equilibrium (SPV = 0.0°/s)', 30, midY + 4);
     }
 
@@ -784,7 +797,7 @@ export class SurgicalDrawer {
   private renderNeurectomyPlot(
     ctx: CanvasRenderingContext2D,
     w: number,
-    h: number,
+    _h: number,
     neurectomyState: NonNullable<SurgicalLabState['neurectomyState']>
   ): void {
     ctx.save();
@@ -834,6 +847,8 @@ export class SurgicalDrawer {
   }
 
   public dispose(): void {
+    this.isOpen = false;
+    this.lastFrameTime = 0;
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;

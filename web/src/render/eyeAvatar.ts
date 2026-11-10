@@ -175,7 +175,329 @@ const _vLightDir = new THREE.Vector3();
 const _vCamDir = new THREE.Vector3();
 const _vHalf = new THREE.Vector3();
 const _vScreenPos = new THREE.Vector3();
-const _vTemp = new THREE.Vector3();
+
+// -----------------------------------------------------------------------------
+// High-Fidelity Procedural Ocular Textures (Zero external image dependencies)
+// -----------------------------------------------------------------------------
+let _cachedIrisTexture: THREE.DataTexture | null = null;
+let _cachedIrisNormalTexture: THREE.DataTexture | null = null;
+let _cachedScleraTexture: THREE.DataTexture | null = null;
+
+function generateProceduralIrisData(size = 512): Uint8Array {
+  const data = new Uint8Array(size * size * 4);
+  const cx = (size - 1) * 0.5;
+  const cy = (size - 1) * 0.5;
+  const half = size * 0.5;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const nx = (x - cx) / half;
+      const ny = (y - cy) / half;
+      const r = Math.hypot(nx, ny);
+
+      if (r > 1.0) {
+        data[idx] = 0;
+        data[idx + 1] = 0;
+        data[idx + 2] = 0;
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const theta = Math.atan2(ny, nx);
+
+      // Multi-octave fibrous radial architecture with slight angular tortuosity
+      const thetaWarp =
+        theta +
+        0.040 * Math.sin(6 * theta) +
+        0.020 * Math.sin(14 * theta) +
+        0.010 * Math.sin(28 * theta);
+      const s32 = 0.5 + 0.5 * Math.cos(32 * thetaWarp);
+      const s64 = 0.5 + 0.5 * Math.cos(64 * thetaWarp + 0.6);
+      const s128 = 0.5 + 0.5 * Math.cos(128 * thetaWarp + 1.3);
+      const s256 = 0.5 + 0.5 * Math.cos(256 * thetaWarp + 2.1);
+      const fibers = 0.38 * s32 + 0.30 * s64 + 0.20 * s128 + 0.12 * s256;
+
+      // Collarette zigzag ring at r ~ 0.48
+      const rCollarette =
+        0.48 +
+        0.035 * Math.cos(16 * theta) +
+        0.018 * Math.sin(32 * theta) +
+        0.008 * Math.cos(48 * theta);
+      const collarette = Math.exp(-((r - rCollarette) ** 2) / 0.0035);
+
+      // Crypts of Fuchs: diamond/oval recesses along collarette
+      const cryptMod = Math.pow(0.5 + 0.5 * Math.cos(16 * theta + 0.3 * Math.sin(32 * theta)), 3.0);
+      const crypts = Math.exp(-((r - 0.52) ** 2) / 0.006) * cryptMod;
+
+      // Pupillary zone & peripupillary ring
+      const pupilRuff = Math.exp(-((r - 0.245) ** 2) / 0.0015);
+
+      // Ciliary contraction furrows
+      const furrow1 = 0.14 * Math.exp(-((r - 0.68) ** 2) / 0.0012);
+      const furrow2 = 0.11 * Math.exp(-((r - 0.77) ** 2) / 0.0012);
+      const furrow3 = 0.08 * Math.exp(-((r - 0.86) ** 2) / 0.0012);
+      const furrows = furrow1 + furrow2 + furrow3;
+
+      // Dark Limbal Ring (annulus at r ~ 0.86 to 0.98)
+      const limbalRing = Math.max(0.0, Math.min(1.0, (r - 0.85) / 0.11));
+      const limbusFade = Math.max(0.0, Math.min(1.0, (0.98 - r) / 0.035));
+      const isPupilHole = r < 0.22;
+
+      // Outer ciliary tone: rich ocean slate-blue with subtle green/grey stroma
+      const ciliaryR = 0.14 + 0.26 * fibers - 0.14 * furrows - 0.12 * crypts;
+      const ciliaryG = 0.38 + 0.28 * fibers - 0.10 * furrows - 0.10 * crypts;
+      const ciliaryB = 0.58 + 0.30 * fibers - 0.06 * furrows - 0.06 * crypts;
+
+      // Warm golden/amber peripupillary tone & collarette starburst
+      const amberR = 0.68 + 0.24 * fibers + 0.20 * collarette;
+      const amberG = 0.48 + 0.18 * fibers + 0.14 * collarette;
+      const amberB = 0.22 + 0.10 * fibers + 0.06 * collarette;
+
+      // Melanin gradient: amber blends into ciliary blue
+      let tAmber = Math.max(0.0, Math.min(1.0, 1.0 - (r - 0.25) / 0.26)) * 0.85 + 0.45 * collarette;
+      tAmber = Math.max(0.0, Math.min(1.0, tAmber));
+
+      let R = ciliaryR * (1.0 - tAmber) + amberR * tAmber;
+      let G = ciliaryG * (1.0 - tAmber) + amberG * tAmber;
+      let B = ciliaryB * (1.0 - tAmber) + amberB * tAmber;
+
+      // Darken pupillary ruff
+      R *= (1.0 - 0.60 * pupilRuff);
+      G *= (1.0 - 0.65 * pupilRuff);
+      B *= (1.0 - 0.70 * pupilRuff);
+
+      // Apply dark limbal ring
+      R *= (1.0 - 0.80 * limbalRing);
+      G *= (1.0 - 0.80 * limbalRing);
+      B *= (1.0 - 0.76 * limbalRing);
+
+      if (isPupilHole) {
+        data[idx] = 4;
+        data[idx + 1] = 4;
+        data[idx + 2] = 4;
+        data[idx + 3] = 0; // transparent pupil aperture
+      } else {
+        data[idx] = Math.round(Math.max(0, Math.min(255, R * 255 * limbusFade)));
+        data[idx + 1] = Math.round(Math.max(0, Math.min(255, G * 255 * limbusFade)));
+        data[idx + 2] = Math.round(Math.max(0, Math.min(255, B * 255 * limbusFade)));
+        data[idx + 3] = Math.round(limbusFade * 255);
+      }
+    }
+  }
+  return data;
+}
+
+function generateProceduralIrisNormalData(size = 512): Uint8Array {
+  const data = new Uint8Array(size * size * 4);
+  const cx = (size - 1) * 0.5;
+  const cy = (size - 1) * 0.5;
+  const half = size * 0.5;
+
+  const getHeight = (x: number, y: number) => {
+    const nx = (x - cx) / half;
+    const ny = (y - cy) / half;
+    const r = Math.hypot(nx, ny);
+    if (r > 0.98 || r < 0.23) return 0;
+    const theta = Math.atan2(ny, nx);
+    const thetaWarp = theta + 0.04 * Math.sin(6 * theta) + 0.02 * Math.sin(14 * theta);
+    const fibers =
+      0.4 * (0.5 + 0.5 * Math.cos(32 * thetaWarp)) +
+      0.3 * (0.5 + 0.5 * Math.cos(64 * thetaWarp)) +
+      0.3 * (0.5 + 0.5 * Math.cos(128 * thetaWarp));
+    const collarette = Math.exp(-((r - 0.48) ** 2) / 0.004);
+    return fibers * 0.7 + collarette * 0.3;
+  };
+
+  const bumpScale = 4.0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const xL = Math.max(0, x - 1);
+      const xR = Math.min(size - 1, x + 1);
+      const yD = Math.max(0, y - 1);
+      const yU = Math.min(size - 1, y + 1);
+
+      const dx = (getHeight(xR, y) - getHeight(xL, y)) * bumpScale;
+      const dy = (getHeight(x, yU) - getHeight(x, yD)) * bumpScale;
+      const dz = 1.0;
+      const len = Math.hypot(dx, dy, dz);
+
+      data[idx] = Math.round(((-dx / len) * 0.5 + 0.5) * 255);
+      data[idx + 1] = Math.round(((-dy / len) * 0.5 + 0.5) * 255);
+      data[idx + 2] = Math.round(((dz / len) * 0.5 + 0.5) * 255);
+      data[idx + 3] = 255;
+    }
+  }
+  return data;
+}
+
+function generateProceduralScleraData(size = 512): Uint8Array {
+  const data = new Uint8Array(size * size * 4);
+  const cx = (size - 1) * 0.5;
+  const cy = (size - 1) * 0.5;
+  const half = size * 0.5;
+
+  const vesselsDeep = new Float32Array(size * size);
+  const vesselsSup = new Float32Array(size * size);
+
+  const trunkAngles = [
+    0.05, 0.20, 0.38, 1.25, 1.55, 2.80, 3.08, -0.12, -0.32, -1.28, -1.62, -2.78, -3.02, 3.14,
+  ];
+
+  for (let tIdx = 0; tIdx < trunkAngles.length; tIdx++) {
+    const th0 = trunkAngles[tIdx];
+    const nPts = 60;
+    const phase1 = ((tIdx * 1.618) % 1) * Math.PI * 2;
+    const phase2 = ((tIdx * 2.718) % 1) * Math.PI * 2;
+
+    for (let i = 0; i < nPts; i++) {
+      const tVal = i / (nPts - 1);
+      const rCurve = 0.96 * (1.0 - tVal) + 0.44 * tVal;
+      const thCurve =
+        th0 +
+        0.08 * Math.sin(Math.PI * 3.0 * tVal + phase1) +
+        0.03 * Math.cos(Math.PI * 8.0 * tVal + phase2);
+      const px = Math.round(cx + rCurve * half * Math.cos(thCurve));
+      const py = Math.round(cy + rCurve * half * Math.sin(thCurve));
+      const radPx = 2.2 * (1.0 - 0.55 * tVal);
+      const iRad = Math.ceil(radPx) + 2;
+
+      const x0 = Math.max(0, px - iRad);
+      const x1 = Math.min(size, px + iRad + 1);
+      const y0 = Math.max(0, py - iRad);
+      const y1 = Math.min(size, py + iRad + 1);
+
+      for (let sy = y0; sy < y1; sy++) {
+        for (let sx = x0; sx < x1; sx++) {
+          const d2 = (sx - px) ** 2 + (sy - py) ** 2;
+          const splat = Math.exp(-d2 / (2.0 * (radPx * 0.7) ** 2));
+          const vIdx = sy * size + sx;
+          if (splat > vesselsSup[vIdx]) vesselsSup[vIdx] = splat;
+        }
+      }
+
+      if (i === 21 || i === 39) {
+        const sideSign = (tIdx + i) % 2 === 0 ? 1.0 : -1.0;
+        const branchPts = 30;
+        for (let b = 0; b < branchPts; b++) {
+          const tb = b / (branchPts - 1);
+          const rb = rCurve * (1.0 - tb) + (rCurve - 0.18) * tb;
+          const thb = thCurve + sideSign * 0.16 * tb + 0.04 * Math.sin(Math.PI * 4.0 * tb);
+          const bpx = Math.round(cx + rb * half * Math.cos(thb));
+          const bpy = Math.round(cy + rb * half * Math.sin(thb));
+          const bradPx = 1.4 * (1.0 - 0.5 * tb);
+          const biRad = Math.ceil(bradPx) + 1;
+
+          const bx0 = Math.max(0, bpx - biRad);
+          const bx1 = Math.min(size, bpx + biRad + 1);
+          const by0 = Math.max(0, bpy - biRad);
+          const by1 = Math.min(size, bpy + biRad + 1);
+
+          for (let bsy = by0; bsy < by1; bsy++) {
+            for (let bsx = bx0; bsx < bx1; bsx++) {
+              const bd2 = (bsx - bpx) ** 2 + (bsy - bpy) ** 2;
+              const bsplat = Math.exp(-bd2 / (2.0 * (bradPx * 0.6) ** 2));
+              const bvIdx = bsy * size + bsx;
+              if (bsplat * 0.85 > vesselsDeep[bvIdx]) vesselsDeep[bvIdx] = bsplat * 0.85;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const vIdx = y * size + x;
+      const nx = (x - cx) / half;
+      const ny = (y - cy) / half;
+      const r = Math.hypot(nx, ny);
+      const theta = Math.atan2(ny, nx);
+
+      const ao = Math.max(0.72, Math.min(1.0, 1.0 - 0.24 * (r ** 2.2)));
+      const horizBlush = 0.035 * (Math.cos(theta) ** 2) * Math.max(0, Math.min(1, (r - 0.35) / 0.55));
+
+      const baseR = (0.95 + horizBlush) * ao;
+      const baseG = (0.93 + 0.5 * horizBlush) * ao;
+      const baseB = (0.91 - 0.5 * horizBlush) * ao;
+
+      const arcade =
+        Math.exp(-((r - 0.45) ** 2) / 0.001) *
+        (0.5 + 0.5 * Math.cos(36 * theta + 0.5 * Math.sin(72 * theta)));
+      const deepVal = Math.max(vesselsDeep[vIdx], arcade * 0.60);
+
+      const corneaMask = Math.max(0.0, Math.min(1.0, (r - 0.42) / 0.04));
+      const supVal = vesselsSup[vIdx] * corneaMask;
+      const deepMasked = deepVal * corneaMask;
+
+      const deepR = 0.72,
+        deepG = 0.34,
+        deepB = 0.34;
+      const supR = 0.76,
+        supG = 0.16,
+        supB = 0.16;
+
+      let R = baseR * (1.0 - deepMasked * 0.75) + deepR * (deepMasked * 0.75);
+      let G = baseG * (1.0 - deepMasked * 0.75) + deepG * (deepMasked * 0.75);
+      let B = baseB * (1.0 - deepMasked * 0.75) + deepB * (deepMasked * 0.75);
+
+      R = R * (1.0 - supVal * 0.85) + supR * (supVal * 0.85);
+      G = G * (1.0 - supVal * 0.85) + supG * (supVal * 0.85);
+      B = B * (1.0 - supVal * 0.85) + supB * (supVal * 0.85);
+
+      const limbusTransition = Math.exp(-((r - 0.43) ** 2) / 0.0015);
+      R = R * (1.0 - 0.14 * limbusTransition) + 0.78 * (0.14 * limbusTransition);
+      G = G * (1.0 - 0.12 * limbusTransition) + 0.82 * (0.12 * limbusTransition);
+      B = B * (1.0 - 0.06 * limbusTransition) + 0.88 * (0.06 * limbusTransition);
+
+      data[idx] = Math.round(Math.max(0, Math.min(255, R * 255)));
+      data[idx + 1] = Math.round(Math.max(0, Math.min(255, G * 255)));
+      data[idx + 2] = Math.round(Math.max(0, Math.min(255, B * 255)));
+      data[idx + 3] = 255;
+    }
+  }
+  return data;
+}
+
+export function getOrCreateIrisTexture(): THREE.DataTexture {
+  if (!_cachedIrisTexture) {
+    const data = generateProceduralIrisData(512);
+    _cachedIrisTexture = new THREE.DataTexture(data as unknown as BufferSource, 512, 512, THREE.RGBAFormat);
+    _cachedIrisTexture.needsUpdate = true;
+    _cachedIrisTexture.colorSpace = THREE.SRGBColorSpace;
+    _cachedIrisTexture.generateMipmaps = true;
+    _cachedIrisTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    _cachedIrisTexture.magFilter = THREE.LinearFilter;
+  }
+  return _cachedIrisTexture;
+}
+
+export function getOrCreateIrisNormalTexture(): THREE.DataTexture {
+  if (!_cachedIrisNormalTexture) {
+    const data = generateProceduralIrisNormalData(512);
+    _cachedIrisNormalTexture = new THREE.DataTexture(data as unknown as BufferSource, 512, 512, THREE.RGBAFormat);
+    _cachedIrisNormalTexture.needsUpdate = true;
+    _cachedIrisNormalTexture.generateMipmaps = true;
+    _cachedIrisNormalTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    _cachedIrisNormalTexture.magFilter = THREE.LinearFilter;
+  }
+  return _cachedIrisNormalTexture;
+}
+
+export function getOrCreateScleraTexture(): THREE.DataTexture {
+  if (!_cachedScleraTexture) {
+    const data = generateProceduralScleraData(512);
+    _cachedScleraTexture = new THREE.DataTexture(data as unknown as BufferSource, 512, 512, THREE.RGBAFormat);
+    _cachedScleraTexture.needsUpdate = true;
+    _cachedScleraTexture.colorSpace = THREE.SRGBColorSpace;
+    _cachedScleraTexture.generateMipmaps = true;
+    _cachedScleraTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    _cachedScleraTexture.magFilter = THREE.LinearFilter;
+  }
+  return _cachedScleraTexture;
+}
 
 /**
  * EyeAvatarEngine
@@ -238,6 +560,10 @@ export class EyeAvatarEngine {
   private lastSpv = 0;
   private fastPhaseBeatDirection = 'None (Resting)';
 
+  // Pupil responsiveness state
+  private currentPupilScale = 1.0;
+  private targetPupilScale = 1.0;
+
   // Telemetry caching
   private readonly ringBuffer = new NystagmogramRingBuffer(600);
   private readonly screenPupilR: ScreenCoord = { x: 0, y: 0, visible: false };
@@ -280,17 +606,28 @@ export class EyeAvatarEngine {
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld(true);
 
-    // Illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Realistic Balanced Illumination
+    // Ambient fill prevents pitch shadows while preserving 3D form
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.48);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(0.05, 0.15, -0.25);
+    // Warm key directional light produces crisp corneal specular glints
+    const dirLight = new THREE.DirectionalLight(0xfffaf2, 1.05);
+    dirLight.position.set(0.08, 0.18, -0.22);
     this.scene.add(dirLight);
 
-    const irPointLight = new THREE.PointLight(0xffffff, 0.8, 1.0);
+    // Cool fill light balances medial/nasal sclera shading
+    const rimLight = new THREE.DirectionalLight(0xdbeafe, 0.40);
+    rimLight.position.set(-0.12, -0.06, -0.20);
+    this.scene.add(rimLight);
+
+    // Paraxial Purkinje glint point light
+    const irPointLight = new THREE.PointLight(0xffffff, 0.85, 1.0);
     irPointLight.position.copy(EyeAvatarEngine.IR_LIGHT_POS);
     this.scene.add(irPointLight);
+
+    // Initialize immediate procedural photorealistic eye avatar
+    this.createProceduralEyeAvatar();
 
     if (config?.canvas) {
       this.attachCanvas(config.canvas);
@@ -507,16 +844,273 @@ export class EyeAvatarEngine {
   }
 
   /**
+   * Applies photorealistic ocular shaders and textures
+   */
+  private applyRealisticEyeMaterials(): void {
+    const irisTexture = getOrCreateIrisTexture();
+    const irisNormal = getOrCreateIrisNormalTexture();
+    const scleraTexture = getOrCreateScleraTexture();
+
+    // 1. Crystal-clear corneal dome with high-gloss specular highlight glint
+    const corneaMatR = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.18,
+      roughness: 0.02,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.01,
+      ior: 1.336,
+      depthWrite: false,
+    });
+    corneaMatR.name = 'Mat_EyeCornea_Realistic_R';
+
+    const corneaMatL = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.18,
+      roughness: 0.02,
+      metalness: 0.0,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.01,
+      ior: 1.336,
+      depthWrite: false,
+    });
+    corneaMatL.name = 'Mat_EyeCornea_Realistic_L';
+
+    if (this.corneaR) {
+      this.corneaR.material = corneaMatR;
+      this.corneaR.renderOrder = 10;
+    }
+    if (this.corneaL) {
+      this.corneaL.material = corneaMatL;
+      this.corneaL.renderOrder = 10;
+    }
+
+    // 2. High-fidelity radial stroma iris with Crypts of Fuchs, Collarette & Limbal Ring
+    if (this.irisR) {
+      this.irisR.material = new THREE.MeshStandardMaterial({
+        map: irisTexture,
+        normalMap: irisNormal,
+        roughness: 0.35,
+        metalness: 0.02,
+        transparent: true,
+        side: THREE.DoubleSide,
+      });
+      this.irisR.material.name = 'Mat_EyeIris_Realistic_R';
+    }
+    if (this.irisL) {
+      this.irisL.material = new THREE.MeshStandardMaterial({
+        map: irisTexture,
+        normalMap: irisNormal,
+        roughness: 0.35,
+        metalness: 0.02,
+        transparent: true,
+        side: THREE.DoubleSide,
+      });
+      this.irisL.material.name = 'Mat_EyeIris_Realistic_L';
+    }
+
+    // 3. Warm ivory sclera with branching microvasculature & perilimbal arcade
+    if (this.scleraR) {
+      this.scleraR.material = new THREE.MeshPhysicalMaterial({
+        map: scleraTexture,
+        roughness: 0.25,
+        metalness: 0.0,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.12,
+        side: THREE.FrontSide,
+      });
+      this.scleraR.material.name = 'Mat_EyeSclera_Realistic_R';
+    }
+    if (this.scleraL) {
+      this.scleraL.material = new THREE.MeshPhysicalMaterial({
+        map: scleraTexture,
+        roughness: 0.25,
+        metalness: 0.0,
+        clearcoat: 0.8,
+        clearcoatRoughness: 0.12,
+        side: THREE.FrontSide,
+      });
+      this.scleraL.material.name = 'Mat_EyeSclera_Realistic_L';
+    }
+
+    // 4. Black pupil cavity
+    if (this.pupilR) {
+      this.pupilR.material = new THREE.MeshBasicMaterial({
+        color: 0x010101,
+        side: THREE.DoubleSide,
+      });
+      this.pupilR.material.name = 'Mat_EyePupil_Realistic_R';
+    }
+    if (this.pupilL) {
+      this.pupilL.material = new THREE.MeshBasicMaterial({
+        color: 0x010101,
+        side: THREE.DoubleSide,
+      });
+      this.pupilL.material.name = 'Mat_EyePupil_Realistic_L';
+    }
+  }
+
+  /**
+   * Registers all meshes in this.materials and injects monochromatic NIR shader uniform
+   */
+  private registerMaterials(): void {
+    if (!this.root) return;
+    this.materials = [];
+    this.root.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
+        const mesh = child as THREE.Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const mat of mats) {
+          if (this.materials.includes(mat)) {
+            continue;
+          }
+          this.materials.push(mat);
+          mat.userData.uInfraredMode = { value: this.visualMode === 'infrared_vng' ? 1.0 : 0.0 };
+
+          if (!mat.userData.__nirInjected) {
+            mat.userData.__nirInjected = true;
+            const origCompile = mat.onBeforeCompile;
+            mat.onBeforeCompile = (
+              shader: THREE.WebGLProgramParametersWithUniforms,
+              rend: THREE.WebGLRenderer
+            ) => {
+              if (origCompile) origCompile(shader, rend);
+              shader.uniforms.uInfraredMode = mat.userData.uInfraredMode;
+              shader.fragmentShader = `
+                uniform float uInfraredMode;
+                ${shader.fragmentShader}
+              `;
+              shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                `
+                #include <dithering_fragment>
+                if (uInfraredMode > 0.5) {
+                  float iNir = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
+                  float iHigh = smoothstep(0.12, 0.88, iNir);
+                  gl_FragColor = vec4(vec3(iHigh * 0.88, iHigh * 0.96, iHigh * 0.88), gl_FragColor.a);
+                }
+                `
+              );
+            };
+            mat.needsUpdate = true;
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Immediate procedural fallback eye avatar (guarantees non-blank, realistic 3D eyes)
+   */
+  private createProceduralEyeAvatar(): void {
+    if (this.root) return;
+
+    this.eyeAvatarRoot = new THREE.Object3D();
+    this.eyeAvatarRoot.name = 'EyeAvatarRoot';
+    this.root = this.eyeAvatarRoot;
+    this.scene.add(this.root);
+
+    const makeEye = (side: 'R' | 'L', xPos: number) => {
+      const pivot = new THREE.Object3D();
+      pivot.name = `EyePivot_${side}`;
+      pivot.position.set(xPos, 0, 0);
+      this.eyeAvatarRoot!.add(pivot);
+
+      // Sclera mesh: 24.0 mm diameter sphere (R = 12.0 mm)
+      const scleraGeom = new THREE.SphereGeometry(0.012, 32, 24);
+      // Map polar UV coordinates from anterior pole (0, 0, -0.012)
+      const sPos = scleraGeom.getAttribute('position');
+      const sUvs = scleraGeom.getAttribute('uv');
+      for (let i = 0; i < sPos.count; i++) {
+        const x = sPos.getX(i);
+        const y = sPos.getY(i);
+        const u = 0.5 + x / (2.05 * 0.012);
+        const v = 0.5 + y / (2.05 * 0.012);
+        sUvs.setXY(i, u, v);
+      }
+      sUvs.needsUpdate = true;
+      const scleraMesh = new THREE.Mesh(scleraGeom);
+      scleraMesh.name = `GEO-head_sculpting_realisticsclera${side}001`;
+      pivot.add(scleraMesh);
+
+      // Cornea mesh: anterior dome extending to z = -0.0120 m (-12.0 mm) facing camera (-Z)
+      const R_c = EyeAvatarEngine.CORNEA_RADIUS;
+      const thetaLen = Math.PI * 0.38;
+      const corneaGeom = new THREE.SphereGeometry(
+        R_c,
+        32,
+        16,
+        0,
+        Math.PI * 2,
+        0,
+        thetaLen
+      );
+      corneaGeom.rotateX(-Math.PI / 2);
+      corneaGeom.translate(0, 0, -0.0042);
+      const corneaMesh = new THREE.Mesh(corneaGeom);
+      corneaMesh.name = `GEO-head_sculpting_realisticsclera${side}001_1`;
+      pivot.add(corneaMesh);
+
+      // Iris mesh: disk located at z = -0.0092 mm with normal facing camera (-Z)
+      const irisGeom = new THREE.RingGeometry(0.0018, 0.0060, 32);
+      irisGeom.rotateY(Math.PI);
+      irisGeom.translate(0, 0, -0.0092);
+      const irisMesh = new THREE.Mesh(irisGeom);
+      irisMesh.name = `Iris_${side}`;
+      pivot.add(irisMesh);
+
+      // Pupil backing: circular aperture disk at z = -0.0091 mm with normal facing camera (-Z)
+      const pupilGeom = new THREE.CircleGeometry(0.0022, 32);
+      pupilGeom.rotateY(Math.PI);
+      pupilGeom.translate(0, 0, -0.0091);
+      const pupilMesh = new THREE.Mesh(pupilGeom);
+      pupilMesh.name = `PupilBacking_${side}`;
+      pivot.add(pupilMesh);
+
+      if (side === 'R') {
+        this.pivotR = pivot;
+        this.initialPivotPosR.copy(pivot.position);
+        this.scleraR = scleraMesh;
+        this.corneaR = corneaMesh;
+        this.irisR = irisMesh;
+        this.pupilR = pupilMesh;
+      } else {
+        this.pivotL = pivot;
+        this.initialPivotPosL.copy(pivot.position);
+        this.scleraL = scleraMesh;
+        this.corneaL = corneaMesh;
+        this.irisL = irisMesh;
+        this.pupilL = pupilMesh;
+      }
+    };
+
+    makeEye('R', 0.031);
+    makeEye('L', -0.031);
+
+    this.applyRealisticEyeMaterials();
+    this.registerMaterials();
+
+    this.scene.updateMatrixWorld(true);
+    this.updateScreenCoordinates();
+  }
+
+  /**
    * Traverses and binds GLTF node hierarchy
    */
   public setupSceneGraph(gltf: GLTF): void {
     if (this.root && this.root.parent) {
       this.scene.remove(this.root);
+      this.root.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).geometry?.dispose();
+        }
+      });
     }
 
     this.root = gltf.scene;
     this.scene.add(this.root);
-    this.materials = [];
 
     this.root.traverse((child) => {
       const name = child.name;
@@ -550,45 +1144,10 @@ export class EyeAvatarEngine {
       } else if (name === 'GEO-head_sculpting_realisticscleraL001') {
         this.scleraL = child as THREE.Mesh;
       }
-
-      // Configure materials for NIR shader uniform updates (strictly deduplicated)
-      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).material) {
-        const mesh = child as THREE.Mesh;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const mat of mats) {
-          if (this.materials.includes(mat)) {
-            continue;
-          }
-          this.materials.push(mat);
-          mat.userData.uInfraredMode = { value: this.visualMode === 'infrared_vng' ? 1.0 : 0.0 };
-
-          if (!mat.userData.__nirInjected) {
-            mat.userData.__nirInjected = true;
-            const origCompile = mat.onBeforeCompile;
-            mat.onBeforeCompile = (shader: THREE.WebGLProgramParametersWithUniforms, rend: THREE.WebGLRenderer) => {
-              if (origCompile) origCompile(shader, rend);
-              shader.uniforms.uInfraredMode = mat.userData.uInfraredMode;
-              shader.fragmentShader = `
-                uniform float uInfraredMode;
-                ${shader.fragmentShader}
-              `;
-              shader.fragmentShader = shader.fragmentShader.replace(
-                '#include <dithering_fragment>',
-                `
-                #include <dithering_fragment>
-                if (uInfraredMode > 0.5) {
-                  float iNir = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
-                  float iHigh = smoothstep(0.12, 0.88, iNir);
-                  gl_FragColor = vec4(vec3(iHigh * 0.88, iHigh * 0.96, iHigh * 0.88), gl_FragColor.a);
-                }
-                `
-              );
-            };
-            mat.needsUpdate = true;
-          }
-        }
-      }
     });
+
+    this.applyRealisticEyeMaterials();
+    this.registerMaterials();
 
     this.scene.updateMatrixWorld(true);
     this.updateScreenCoordinates();
@@ -730,6 +1289,20 @@ export class EyeAvatarEngine {
         this.pivotL.quaternion.identity();
       }
       this.pivotL.position.copy(this.initialPivotPosL);
+    }
+
+    // Dynamic Pupil Responsiveness: Hippus, light adaptation & sympathetic dilation
+    const basePupilTarget = this.visualMode === 'infrared_vng' ? 1.35 : 1.0;
+    const hippus = 1.0 + 0.028 * Math.sin(this.currentTime * 1.7) + 0.014 * Math.sin(this.currentTime * 3.4);
+    const saccadeDilation = this.isFastPhase ? 1.08 : 1.0;
+    this.targetPupilScale = basePupilTarget * hippus * saccadeDilation;
+    this.currentPupilScale += (this.targetPupilScale - this.currentPupilScale) * (1.0 - Math.exp(-safeDt * 7.0));
+
+    if (this.pupilR) {
+      this.pupilR.scale.set(this.currentPupilScale, this.currentPupilScale, 1.0);
+    }
+    if (this.pupilL) {
+      this.pupilL.scale.set(this.currentPupilScale, this.currentPupilScale, 1.0);
     }
 
     // Update screen coordinates & telemetry
@@ -875,11 +1448,19 @@ export class EyeAvatarEngine {
       this.pivotL.position.copy(this.initialPivotPosL);
     }
 
+    if (this.pupilR) {
+      this.pupilR.scale.set(this.currentPupilScale, this.currentPupilScale, 1.0);
+    }
+    if (this.pupilL) {
+      this.pupilL.scale.set(this.currentPupilScale, this.currentPupilScale, 1.0);
+    }
+
     this.updateScreenCoordinates();
   }
 
   public setVisualMode(mode: VisualMode): void {
     this.visualMode = mode;
+    this.targetPupilScale = mode === 'infrared_vng' ? 1.35 : 1.0;
     this.scene.background = new THREE.Color(
       mode === 'infrared_vng' ? 0x050805 : 0x0e1117
     );

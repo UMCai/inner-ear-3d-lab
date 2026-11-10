@@ -1,7 +1,5 @@
 import {
-  DISSECTION_PRESETS,
   IEMAP_STRUCTURES,
-  LAB_PRESETS,
   STRUCTURE_BY_MESH,
   SYSTEM_GROUPS,
   SystemGroupId,
@@ -26,14 +24,10 @@ import {
   type CIArrayType,
   type CIApproach,
   type KoosStage,
-  type CIInsertionState,
-  type LabyrinthectomyState,
-  type NeurectomyState,
 } from '../physics/surgicalEngine';
 import {
   MANEUVER_PRESETS,
   type ManeuverId,
-  type VestibularStepPreset,
   type VestibularTelemetryState,
 } from '../physics/vestibularEngine';
 import {
@@ -49,9 +43,7 @@ import {
 import { getAcousticLandmark, getDistanceApexMm, greenwoodPosition } from '../data/greenwoodEngine';
 import {
   RadiologyPlaneId,
-  CTWindowMode,
   RADIOLOGY_PLANES,
-  RADIOLOGY_LANDMARKS,
   SCDS_PARAMETERS,
   getLandmarkForDepth,
 } from '../data/radiologyEngine';
@@ -62,6 +54,15 @@ export class AppHUD {
   private canvasHost!: HTMLElement;
   private pinsLayer!: HTMLElement;
   private pinElements = new Map<string, HTMLElement>();
+  private activePinIdSet = new Set<string>();
+
+  // Cached Vestibular Telemetry Elements (Eliminates per-frame querySelector & innerHTML)
+  private cachedCn8Val: HTMLElement | null = null;
+  private cachedCn8BarFill: HTMLElement | null = null;
+  private cachedEwaldText: HTMLElement | null = null;
+  private cachedVestClearancePrefix: HTMLElement | null = null;
+  private cachedVestClearanceVal: HTMLElement | null = null;
+  private cachedVestStatusBadge: HTMLElement | null = null;
 
   // Mode Switcher Elements
   private modeAnatomyBtn!: HTMLButtonElement;
@@ -1402,7 +1403,10 @@ export class AppHUD {
 
     // Diagnostic Vestibular Submodes
     this.vestSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.vest-subnav-tab'));
-    this.vestSubviews = Array.from(this.root.querySelectorAll<HTMLElement>('.vest-subview'));
+    this.vestBppvSubview = this.root.querySelector('#vest-bppv-subview') as HTMLElement;
+    this.vestCaloricSubview = this.root.querySelector('#vest-caloric-subview') as HTMLElement;
+    this.vestVhitSubview = this.root.querySelector('#vest-vhit-subview') as HTMLElement;
+    this.vestSubviews = [this.vestBppvSubview, this.vestCaloricSubview, this.vestVhitSubview].filter(Boolean);
 
     // Caloric Testing Controls
     this.caloricTempChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.caloric-chip'));
@@ -2443,7 +2447,7 @@ export class AppHUD {
     this.updateMobileDrawerExclusivity();
   }
 
-  private openCTDrawer(): void {
+  public openCTDrawer(): void {
     if (this.partsDrawerOpen) {
       this.closePartsDrawer();
     }
@@ -3306,13 +3310,9 @@ export class AppHUD {
     });
 
     // Show/hide subviews
-    const bppvView = this.root.querySelector('#vest-bppv-subview') as HTMLElement;
-    const caloricView = this.root.querySelector('#vest-caloric-subview') as HTMLElement;
-    const vhitView = this.root.querySelector('#vest-vhit-subview') as HTMLElement;
-
-    if (bppvView) bppvView.style.display = submode === 'bppv' ? 'flex' : 'none';
-    if (caloricView) caloricView.style.display = submode === 'caloric' ? 'flex' : 'none';
-    if (vhitView) vhitView.style.display = submode === 'vhit' ? 'flex' : 'none';
+    if (this.vestBppvSubview) this.vestBppvSubview.style.display = submode === 'bppv' ? 'flex' : 'none';
+    if (this.vestCaloricSubview) this.vestCaloricSubview.style.display = submode === 'caloric' ? 'flex' : 'none';
+    if (this.vestVhitSubview) this.vestVhitSubview.style.display = submode === 'vhit' ? 'flex' : 'none';
 
     if (submode !== 'vhit') {
       this.scene.cancelVHITThrust();
@@ -3802,13 +3802,7 @@ export class AppHUD {
     }
 
     // 2. If Floating Inspector Card is displaying a vestibular structure, update CN VIII gauge & status
-    const cn8Val = this.inspectorCard.querySelector('.cn8-val');
-    const cn8BarFill = this.inspectorCard.querySelector('.cn8-bar-fill') as HTMLElement | null;
-    const ewaldText = this.inspectorCard.querySelector('.ewald-text');
-    const vestClearancePill = this.inspectorCard.querySelector('.vest-clearance-pill strong');
-    const vestStatusBadge = this.inspectorCard.querySelector('.vest-status-badge');
-
-    if (cn8Val && cn8BarFill) {
+    if (this.cachedCn8Val && this.cachedCn8BarFill) {
       const firingRate = typeof telem.afferentSpikesPerSec === 'number' ? telem.afferentSpikesPerSec : 90;
       const clampedRate = Math.max(10, Math.min(310, firingRate));
       const firingPercent = ((clampedRate - 10) / (310 - 10)) * 100;
@@ -3823,48 +3817,51 @@ export class AppHUD {
         fillClass = 'fill-inhibition';
       }
 
-      cn8Val.textContent = `${firingRate.toFixed(0)} sp/s`;
-      cn8Val.className = `cn8-val ${firingClass}`;
+      this.cachedCn8Val.textContent = `${firingRate.toFixed(0)} sp/s`;
+      this.cachedCn8Val.className = `cn8-val ${firingClass}`;
 
-      cn8BarFill.style.width = `${firingPercent.toFixed(1)}%`;
-      cn8BarFill.className = `cn8-bar-fill ${fillClass}`;
+      this.cachedCn8BarFill.style.width = `${firingPercent.toFixed(1)}%`;
+      this.cachedCn8BarFill.className = `cn8-bar-fill ${fillClass}`;
 
-      if (ewaldText && telem.ewaldLawActive) {
-        ewaldText.textContent = telem.ewaldLawActive;
+      if (this.cachedEwaldText && telem.ewaldLawActive) {
+        this.cachedEwaldText.textContent = telem.ewaldLawActive;
       }
-      if (vestClearancePill) {
+      if (this.cachedVestClearancePrefix && this.cachedVestClearanceVal) {
         if (this.vestSubmode === 'bppv') {
           const cp = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
-          vestClearancePill.parentElement!.innerHTML = `Clearance: <strong>${cp.toFixed(0)}%</strong>`;
+          this.cachedVestClearancePrefix.textContent = 'Clearance: ';
+          this.cachedVestClearanceVal.textContent = `${cp.toFixed(0)}%`;
         } else if (this.vestSubmode === 'caloric') {
-          vestClearancePill.parentElement!.innerHTML = `Modality: <strong>COWS Caloric</strong>`;
+          this.cachedVestClearancePrefix.textContent = 'Modality: ';
+          this.cachedVestClearanceVal.textContent = 'COWS Caloric';
         } else {
-          vestClearancePill.parentElement!.innerHTML = `Modality: <strong>vHIT (CN VIII)</strong>`;
+          this.cachedVestClearancePrefix.textContent = 'Modality: ';
+          this.cachedVestClearanceVal.textContent = 'vHIT (CN VIII)';
         }
       }
-      if (vestStatusBadge) {
+      if (this.cachedVestStatusBadge) {
         if (this.vestSubmode === 'bppv') {
           const cp = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
           if (cp >= 99) {
-            vestStatusBadge.textContent = 'Cleared (Crystals in Utricle)';
-            vestStatusBadge.className = 'vest-status-badge sensation-cleared';
+            this.cachedVestStatusBadge.textContent = 'Cleared (Crystals in Utricle)';
+            this.cachedVestStatusBadge.className = 'vest-status-badge sensation-cleared';
           } else if (telem.patientSensation && telem.patientSensation.includes('Spinning')) {
-            vestStatusBadge.textContent = 'Spinning Vertigo (Crystals Moving)';
-            vestStatusBadge.className = 'vest-status-badge sensation-spinning';
+            this.cachedVestStatusBadge.textContent = 'Spinning Vertigo (Crystals Moving)';
+            this.cachedVestStatusBadge.className = 'vest-status-badge sensation-spinning';
           } else {
-            vestStatusBadge.textContent = 'Calm (No Spinning)';
-            vestStatusBadge.className = 'vest-status-badge sensation-calm';
+            this.cachedVestStatusBadge.textContent = 'Calm (No Spinning)';
+            this.cachedVestStatusBadge.className = 'vest-status-badge sensation-calm';
           }
         } else if (this.vestSubmode === 'caloric') {
-          vestStatusBadge.textContent = telem.patientSensation || 'Caloric Convection Active';
+          this.cachedVestStatusBadge.textContent = telem.patientSensation || 'Caloric Convection Active';
           const horizSpv = telem.slowPhaseVelocityDegPerSec?.horizontal ?? 0;
-          vestStatusBadge.className = horizSpv !== 0
+          this.cachedVestStatusBadge.className = horizSpv !== 0
             ? 'vest-status-badge sensation-spinning'
             : 'vest-status-badge sensation-calm';
         } else {
           // vHIT
-          vestStatusBadge.textContent = telem.patientSensation || 'Target Fixed (Visual Fixation)';
-          vestStatusBadge.className = telem.fastPhaseBeatDirection.includes('Saccade')
+          this.cachedVestStatusBadge.textContent = telem.patientSensation || 'Target Fixed (Visual Fixation)';
+          this.cachedVestStatusBadge.className = telem.fastPhaseBeatDirection.includes('Saccade')
             ? 'vest-status-badge sensation-spinning'
             : 'vest-status-badge sensation-calm';
         }
@@ -3877,6 +3874,12 @@ export class AppHUD {
   // ===========================================================================
   private renderInspectorCard(selectedMesh: string | null): void {
     if (!selectedMesh) {
+      this.cachedCn8Val = null;
+      this.cachedCn8BarFill = null;
+      this.cachedEwaldText = null;
+      this.cachedVestClearancePrefix = null;
+      this.cachedVestClearanceVal = null;
+      this.cachedVestStatusBadge = null;
       this.inspectorCard.classList.remove('visible');
       this.inspectorCard.innerHTML = `
         <div class="inspector-hint">
@@ -3889,6 +3892,12 @@ export class AppHUD {
 
     const item = STRUCTURE_BY_MESH[selectedMesh];
     if (!item) {
+      this.cachedCn8Val = null;
+      this.cachedCn8BarFill = null;
+      this.cachedEwaldText = null;
+      this.cachedVestClearancePrefix = null;
+      this.cachedVestClearanceVal = null;
+      this.cachedVestStatusBadge = null;
       this.inspectorCard.classList.remove('visible');
       return;
     }
@@ -4102,7 +4111,7 @@ export class AppHUD {
                 ${sensationText}
               </div>
               <div class="vest-clearance-pill">
-                ${this.vestSubmode === 'bppv' ? `Clearance: <strong>${clearancePercent.toFixed(0)}%</strong>` : this.vestSubmode === 'caloric' ? `Modality: <strong>COWS Caloric</strong>` : `Modality: <strong>vHIT (CN VIII)</strong>`}
+                ${this.vestSubmode === 'bppv' ? `<span class="vest-clearance-prefix">Clearance: </span><strong class="vest-clearance-val">${clearancePercent.toFixed(0)}%</strong>` : this.vestSubmode === 'caloric' ? `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">COWS Caloric</strong>` : `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">vHIT (CN VIII)</strong>`}
               </div>
             </div>
 
@@ -4359,6 +4368,13 @@ export class AppHUD {
         // ignore
       }
     });
+
+    this.cachedCn8Val = this.inspectorCard.querySelector('.cn8-val');
+    this.cachedCn8BarFill = this.inspectorCard.querySelector('.cn8-bar-fill');
+    this.cachedEwaldText = this.inspectorCard.querySelector('.ewald-text');
+    this.cachedVestClearancePrefix = this.inspectorCard.querySelector('.vest-clearance-prefix');
+    this.cachedVestClearanceVal = this.inspectorCard.querySelector('.vest-clearance-val');
+    this.cachedVestStatusBadge = this.inspectorCard.querySelector('.vest-status-badge');
   }
 
   // ===========================================================================
@@ -4459,37 +4475,120 @@ export class AppHUD {
   // 3D PROJECTED PINS RENDER (Full-Screen Overlay)
   // ===========================================================================
   private renderProjectedPins(pins: ProjectedPin2D[]): void {
-    const currentIds = new Set(pins.map((p) => p.id));
+    const activeIds = this.activePinIdSet;
+    activeIds.clear();
+    for (let i = 0; i < pins.length; i++) {
+      activeIds.add(pins[i].id);
+    }
     const selectedMesh = this.scene.getSelectedMesh();
 
     // Remove pins that disappeared
     for (const [id, el] of this.pinElements.entries()) {
-      if (!currentIds.has(id)) {
+      if (!activeIds.has(id)) {
         el.remove();
         this.pinElements.delete(id);
       }
     }
 
     // Update or create pins
-    for (const pin of pins) {
+    for (let i = 0; i < pins.length; i++) {
+      const pin = pins[i];
       let el = this.pinElements.get(pin.id);
       if (!el) {
-        el = document.createElement('div');
-        el.className = 'projected-pin';
-        el.id = `pin-${pin.id}`;
-        el.innerHTML = `
+        const pinEl = document.createElement('div');
+        el = pinEl;
+        pinEl.className = 'projected-pin';
+        pinEl.id = `pin-${pin.id}`;
+        pinEl.innerHTML = `
           <span class="pin-dot" style="background: ${pin.colorHex};"></span>
           <span class="pin-text">${pin.label}</span>
         `;
-        el.addEventListener('click', (ev) => {
+        let pointerDownX = 0;
+        let pointerDownY = 0;
+        let pointerMoved = false;
+        let activePointerId: number | null = null;
+
+        const forwardEvent = (type: string, ev: PointerEvent) => {
+          const canvas = this.scene.getDomElement();
+          if (!canvas) return;
+          const synth = new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            pointerId: ev.pointerId,
+            pointerType: ev.pointerType,
+            clientX: ev.clientX,
+            clientY: ev.clientY,
+            screenX: ev.screenX,
+            screenY: ev.screenY,
+            button: ev.button,
+            buttons: ev.buttons,
+            ctrlKey: ev.ctrlKey,
+            shiftKey: ev.shiftKey,
+            altKey: ev.altKey,
+            metaKey: ev.metaKey,
+            isPrimary: ev.isPrimary,
+          });
+          Object.defineProperty(synth, 'pageX', { value: ev.pageX ?? ev.clientX });
+          Object.defineProperty(synth, 'pageY', { value: ev.pageY ?? ev.clientY });
+          canvas.dispatchEvent(synth);
+        };
+
+        pinEl.addEventListener('pointerdown', (ev) => {
+          pointerDownX = ev.clientX;
+          pointerDownY = ev.clientY;
+          pointerMoved = false;
+          activePointerId = ev.pointerId;
+          try {
+            pinEl.setPointerCapture(ev.pointerId);
+          } catch {
+            // ignore if pointer capture not supported
+          }
+          if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+            forwardEvent('pointerdown', ev);
+          }
+        });
+
+        pinEl.addEventListener('pointermove', (ev) => {
+          if (activePointerId === ev.pointerId) {
+            if (Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY) > 6) {
+              pointerMoved = true;
+            }
+            if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+              forwardEvent('pointermove', ev);
+            }
+          }
+        });
+
+        const handlePointerEnd = (ev: PointerEvent) => {
+          if (activePointerId === ev.pointerId) {
+            activePointerId = null;
+            try {
+              if (pinEl.hasPointerCapture(ev.pointerId)) {
+                pinEl.releasePointerCapture(ev.pointerId);
+              }
+            } catch {
+              // ignore
+            }
+            if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+              forwardEvent(ev.type === 'pointercancel' ? 'pointercancel' : 'pointerup', ev);
+            }
+          }
+        };
+
+        pinEl.addEventListener('pointerup', handlePointerEnd);
+        pinEl.addEventListener('pointercancel', handlePointerEnd);
+
+        pinEl.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          if (pointerMoved) return;
           this.scene.selectStructure(pin.meshName, true);
         });
-        this.pinsLayer.appendChild(el);
-        this.pinElements.set(pin.id, el);
+        this.pinsLayer.appendChild(pinEl);
+        this.pinElements.set(pin.id, pinEl);
       }
 
-      el.style.transform = `translate(${Math.round(pin.screenX)}px, ${Math.round(pin.screenY)}px)`;
+      el.style.transform = `translate(${Math.round(pin.screenX)}px, ${Math.round(pin.screenY)}px) translate(-50%, -50%)`;
       el.style.display = pin.visible ? 'flex' : 'none';
       el.classList.toggle('selected-pin', selectedMesh === pin.meshName);
     }
@@ -4591,5 +4690,17 @@ export class AppHUD {
       this.updateTonePlayButton(snap.hearingState.isPlaying);
       this.audiogramDrawer.setActiveFrequency(snap.hearingState.activeFrequency);
     }
+  }
+
+  public getActiveSurgicalProcedure(): SurgicalProcedure {
+    return this.activeSurgProcedure;
+  }
+
+  public getIsAboutModalOpen(): boolean {
+    return this.aboutModalOpen;
+  }
+
+  public getVestSubviews(): HTMLElement[] {
+    return this.vestSubviews;
   }
 }

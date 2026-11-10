@@ -877,23 +877,6 @@ function matVecMul(M: number[][], v: [number, number, number]): [number, number,
   ];
 }
 
-function cross3(
-  a: [number, number, number],
-  b: [number, number, number]
-): [number, number, number] {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
-}
-
-function normalize3(v: [number, number, number]): [number, number, number] {
-  const len = Math.hypot(v[0], v[1], v[2]);
-  if (len < 1e-8) return [1, 0, 0];
-  return [v[0] / len, v[1] / len, v[2] / len];
-}
-
 /**
  * Hydrodynamic lumen-narrowing factor chi_lumen(phi) along the canal.
  */

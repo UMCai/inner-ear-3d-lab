@@ -267,8 +267,11 @@ def export_eye_avatar():
     bsdf_c = mat_cornea.node_tree.nodes.get("Principled BSDF")
     bsdf_c.inputs["Base Color"].default_value = (1.0, 1.0, 1.0, 1.0)
     bsdf_c.inputs["Transmission Weight"].default_value = 1.0
-    bsdf_c.inputs["Roughness"].default_value = 0.02
+    bsdf_c.inputs["Roughness"].default_value = 0.03
     bsdf_c.inputs["IOR"].default_value = 1.336
+    if "Alpha" in bsdf_c.inputs:
+        bsdf_c.inputs["Alpha"].default_value = 0.16
+    mat_cornea.blend_method = 'BLEND'
 
     # 4. Black Pupil Backing Material
     mat_pupil_black = bpy.data.materials.new(name="Mat_EyePupilBlack")

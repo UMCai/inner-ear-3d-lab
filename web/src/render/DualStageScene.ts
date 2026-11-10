@@ -25,20 +25,16 @@ import {
   RadiologyPlaneId,
   CTWindowMode,
   RADIOLOGY_PLANES,
-  RADIOLOGY_LANDMARKS,
   SCDS_PARAMETERS,
   getShaderClipUniforms,
-  SlicingPlaneDefinition,
 } from '../data/radiologyEngine';
 import {
   loadAllCanalPaths,
   type CanalId,
-  type CanalPathData,
 } from '../data/canalPaths';
 import {
   VestibularDynamicsEngine,
   type VestibularTelemetryState,
-  type ManeuverId,
 } from '../physics/vestibularEngine';
 import {
   computeVHITHeadQuaternion,
@@ -49,8 +45,6 @@ import {
   type Gate3ShaderUniforms,
   getGreenwoodColor,
 } from './gate3Materials';
-import type { VORDrawer } from '../ui/VORDrawer';
-import type { SurgicalDrawer } from '../ui/SurgicalDrawer';
 import {
   type SurgicalProcedure,
   type CIArrayType,
@@ -65,6 +59,32 @@ import {
   computeNeurectomyElectrophysiology,
   evaluateScalaTympaniSpline,
 } from '../physics/surgicalEngine';
+
+export interface IVORDrawerTarget {
+  getIsOpen(): boolean;
+  updateTelemetry(telem: VestibularTelemetryState, simDt: number): void;
+  clearVHITPlayback(): void;
+  updateVHITPlayback(elapsed: number, ms: number, pair?: 'horizontal' | 'ralp' | 'larp', direction?: 1 | -1): void;
+  getVHITBuffer(): {
+    headVelArray: Float32Array;
+    invertedEyeVelArray: Float32Array;
+    saccadeFlags: Uint8Array;
+    cn8FiringRateArray: Float32Array;
+  } | null;
+}
+
+export interface ISurgicalDrawerTarget {
+  updateTelemetry(state: SurgicalLabState): void;
+}
+
+export type SurgicalStateCallback = (state: SurgicalLabState) => void;
+
+interface PinCandidate {
+  pin: ProjectedPin2D;
+  priority: number;
+  maxDist: number;
+  depth: number;
+}
 
 export type LabelDensityMode = 'off' | 'key' | 'all';
 export type ReadingDepth = 'simple' | 'detailed';
@@ -184,18 +204,12 @@ export class DualStageScene {
   private scratchPinVector = new THREE.Vector3();
 
   // Pin projection pre-allocated buffers
-  private pinCandidates: Array<{
-    pin: ProjectedPin2D;
-    priority: number;
-    maxDist: number;
-    depth: number;
-  }> = [];
-  private activeCandidates: Array<{
-    pin: ProjectedPin2D;
-    priority: number;
-    maxDist: number;
-    depth: number;
-  }> = [];
+  private pinCandidates: PinCandidate[] = [];
+  private activeCandidates: PinCandidate[] = [];
+  private static readonly comparePinCandidates = (
+    a: PinCandidate,
+    b: PinCandidate
+  ): number => (a.priority - b.priority) || (a.depth - b.depth);
   private acceptedBoxes: Array<{ x: number; y: number; w: number; h: number }> = Array.from(
     { length: 32 },
     () => ({ x: 0, y: 0, w: 0, h: 0 })
@@ -204,6 +218,9 @@ export class DualStageScene {
   private projectedPinResults: ProjectedPin2D[] = [];
 
   // DOM Event Listener references for complete disposal
+  private isDisposed = false;
+  private handleContextLostBound?: (event: Event) => void;
+  private handleContextRestoredBound?: () => void;
   private onPointerDownBound?: (ev: PointerEvent) => void;
   private onPointerMoveBound?: (ev: PointerEvent) => void;
   private onPointerUpBound?: (ev: PointerEvent) => void;
@@ -221,7 +238,7 @@ export class DualStageScene {
   private vestibularEngine: VestibularDynamicsEngine | null = null;
   private otoconiaGroup: THREE.Group | null = null;
   private otoconiaMeshes: THREE.Mesh[] = [];
-  private vorDrawer: VORDrawer | null = null;
+  private vorDrawer: IVORDrawerTarget | null = null;
   private currentYaw = 0;
   private currentPitch = 0;
   private currentRoll = 0;
@@ -250,7 +267,8 @@ export class DualStageScene {
   } | null = null;
 
   // Surgical Simulation Suite
-  private surgicalDrawer: SurgicalDrawer | null = null;
+  private surgicalDrawer: ISurgicalDrawerTarget | null = null;
+  private onSurgicalStateCallbacks: Array<SurgicalStateCallback> = [];
   private ciElectrodeGroup: THREE.Group | null = null;
   private ciCarrierMesh: THREE.Line | null = null;
   private ciCarrierTubeMesh: THREE.Mesh | null = null;
@@ -315,6 +333,10 @@ export class DualStageScene {
     return this.state.selectedMesh;
   }
 
+  public getDomElement(): HTMLCanvasElement {
+    return this.renderer.domElement;
+  }
+
   constructor(container: HTMLElement) {
     this.container = container;
 
@@ -351,6 +373,15 @@ export class DualStageScene {
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
     this.renderer.domElement.style.touchAction = 'none';
+    this.handleContextLostBound = (event: Event) => {
+      event.preventDefault(); // Required by WebGL specification
+      this.handleContextLost();
+    };
+    this.handleContextRestoredBound = () => {
+      this.handleContextRestored();
+    };
+    this.renderer.domElement.addEventListener('webglcontextlost', this.handleContextLostBound, false);
+    this.renderer.domElement.addEventListener('webglcontextrestored', this.handleContextRestoredBound, false);
     this.container.appendChild(this.renderer.domElement);
 
     // Single-Stage High-Magnification 27-Mesh IE-Map Labyrinth Scene (RAS space)
@@ -1703,7 +1734,7 @@ export class DualStageScene {
     }
 
     // Filter distance & avoid collisions
-    this.activeCandidates.sort((a, b) => a.priority - b.priority || a.depth - b.depth);
+    this.activeCandidates.sort(DualStageScene.comparePinCandidates);
 
     for (let i = 0; i < this.activeCandidates.length; i++) {
       const cand = this.activeCandidates[i];
@@ -1713,8 +1744,22 @@ export class DualStageScene {
 
       const boxW = Math.max(90, cand.pin.label.length * 7 + 22);
       const boxH = 26;
+
+      // Strictly clamp pin center so that pin box always remains within screen bounds
+      if (width > boxW + 16) {
+        cand.pin.screenX = Math.max(boxW / 2 + 8, Math.min(width - boxW / 2 - 8, cand.pin.screenX));
+      }
+      if (height > boxH + 16) {
+        cand.pin.screenY = Math.max(14 + 8, Math.min(height - 14 - 8, cand.pin.screenY));
+      }
+
       const bx = cand.pin.screenX - boxW / 2;
       const by = cand.pin.screenY - 14;
+
+      // Ensure pin box is fully within canvas viewport margins
+      if (bx < 8 || bx + boxW > width - 8 || by < 8 || by + boxH > height - 8) {
+        continue;
+      }
 
       let collides = false;
       for (let j = 0; j < this.acceptedBoxCount; j++) {
@@ -1754,6 +1799,8 @@ export class DualStageScene {
   // 60FPS RENDER LOOP
   // ===========================================================================
   public startRenderLoop(): void {
+    if (this.animationFrameId !== 0) return;
+    this.lastFrameTime = performance.now();
     const renderFrame = (now: number) => {
       this.animationFrameId = requestAnimationFrame(renderFrame);
       const dt = Math.min(0.1, (now - this.lastFrameTime) * 0.001);
@@ -2041,6 +2088,40 @@ export class DualStageScene {
     this.onVestibularTelemetryCallbacks.push(cb);
   }
 
+  public onSurgicalStateUpdate(cb: SurgicalStateCallback): () => void {
+    this.onSurgicalStateCallbacks.push(cb);
+    return () => {
+      const idx = this.onSurgicalStateCallbacks.indexOf(cb);
+      if (idx !== -1) {
+        this.onSurgicalStateCallbacks.splice(idx, 1);
+      }
+    };
+  }
+
+  private notifySurgicalState(): void {
+    for (let i = 0; i < this.onSurgicalStateCallbacks.length; i++) {
+      this.onSurgicalStateCallbacks[i](this.state.surgicalState);
+    }
+    if (this.surgicalDrawer) {
+      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
+    }
+  }
+
+  private handleContextLost(): void {
+    console.warn('[DualStageScene] WebGL context lost.');
+    if (this.animationFrameId !== 0) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = 0;
+    }
+  }
+
+  private handleContextRestored(): void {
+    if (this.isDisposed) return;
+    console.info('[DualStageScene] WebGL context restored. Resuming render loop...');
+    this.lastFrameTime = performance.now();
+    this.startRenderLoop();
+  }
+
   private createDefaultVestibularTelemetry(canal: CanalId = 'posterior'): VestibularTelemetryState {
     return {
       canalId: canal,
@@ -2120,11 +2201,11 @@ export class DualStageScene {
     return { yaw: this.currentYaw, pitch: this.currentPitch, roll: this.currentRoll };
   }
 
-  public setVORDrawer(drawer: VORDrawer | null): void {
+  public setVORDrawer(drawer: IVORDrawerTarget | null): void {
     this.vorDrawer = drawer;
   }
 
-  public getVORDrawer(): VORDrawer | null {
+  public getVORDrawer(): IVORDrawerTarget | null {
     return this.vorDrawer;
   }
 
@@ -2287,14 +2368,14 @@ export class DualStageScene {
   // Stage 4: Surgical Simulation API (CI, Labyrinthectomy, Neurectomy)
   // ---------------------------------------------------------------------------
 
-  public setSurgicalDrawer(drawer: SurgicalDrawer | null): void {
+  public setSurgicalDrawer(drawer: ISurgicalDrawerTarget | null): void {
     this.surgicalDrawer = drawer;
     if (this.surgicalDrawer) {
       this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
     }
   }
 
-  public getSurgicalDrawer(): SurgicalDrawer | null {
+  public getSurgicalDrawer(): ISurgicalDrawerTarget | null {
     return this.surgicalDrawer;
   }
 
@@ -2311,9 +2392,7 @@ export class DualStageScene {
       this.ciElectrodeGroup.visible =
         this.state.labMode === 'surgical' && procedure === 'cochlear_implant';
     }
-    if (this.surgicalDrawer) {
-      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
-    }
+    this.notifySurgicalState();
     this.emitState();
   }
 
@@ -2446,10 +2525,7 @@ export class DualStageScene {
       entrySV.material.uniforms.uTranslocationBreach.value = ciState.isRuptured ? 1.0 : 0.0;
     }
 
-    if (this.surgicalDrawer) {
-      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
-    }
-
+    this.notifySurgicalState();
     this.emitState();
     return ciState;
   }
@@ -2524,10 +2600,7 @@ export class DualStageScene {
       }
     }
 
-    if (this.surgicalDrawer) {
-      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
-    }
-
+    this.notifySurgicalState();
     this.emitState();
     return labyState;
   }
@@ -2576,16 +2649,15 @@ export class DualStageScene {
       }
     }
 
-    if (this.surgicalDrawer) {
-      this.surgicalDrawer.updateTelemetry(this.state.surgicalState);
-    }
-
+    this.notifySurgicalState();
     this.emitState();
     return neurectomyState;
   }
 
   public dispose(): void {
+    this.isDisposed = true;
     cancelAnimationFrame(this.animationFrameId);
+    this.animationFrameId = 0;
     this.cancelVHITThrust();
     this.setCaloricUniforms(false, 0, 0, 0);
     this.setCaloricSimulationState(false, null);
@@ -2596,6 +2668,12 @@ export class DualStageScene {
 
     const dom = this.renderer?.domElement;
     if (dom) {
+      if (this.handleContextLostBound) {
+        dom.removeEventListener('webglcontextlost', this.handleContextLostBound);
+      }
+      if (this.handleContextRestoredBound) {
+        dom.removeEventListener('webglcontextrestored', this.handleContextRestoredBound);
+      }
       if (this.onPointerDownBound) {
         dom.removeEventListener('pointerdown', this.onPointerDownBound, { capture: true });
       }
