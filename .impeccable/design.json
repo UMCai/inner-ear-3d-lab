@@ -1,0 +1,532 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T17:08:00.000Z",
+  "title": "Design System: Inner Ear 3D Lab",
+  "extensions": {
+    "colorMeta": {
+      "mineral-teal": {
+        "role": "primary",
+        "displayName": "Mineral Teal",
+        "canonical": "oklch(74.2% 0.121 185.4)",
+        "tonalRamp": [
+          "oklch(16% 0.051 185.4)",
+          "oklch(27% 0.083 185.4)",
+          "oklch(39% 0.112 185.4)",
+          "oklch(51% 0.121 185.4)",
+          "oklch(63% 0.117 185.4)",
+          "oklch(75% 0.100 185.4)",
+          "oklch(86% 0.063 185.4)",
+          "oklch(94% 0.029 185.4)"
+        ]
+      },
+      "deep-cyan-teal": {
+        "role": "primary",
+        "displayName": "Deep Cyan-Teal",
+        "canonical": "oklch(47.4% 0.084 222.3)",
+        "tonalRamp": [
+          "oklch(16% 0.035 222.3)",
+          "oklch(27% 0.057 222.3)",
+          "oklch(39% 0.077 222.3)",
+          "oklch(51% 0.084 222.3)",
+          "oklch(63% 0.080 222.3)",
+          "oklch(75% 0.068 222.3)",
+          "oklch(86% 0.044 222.3)",
+          "oklch(94% 0.020 222.3)"
+        ]
+      },
+      "otolith-amber-dark": {
+        "role": "secondary",
+        "displayName": "Otolith Amber (Dark)",
+        "canonical": "oklch(77.3% 0.139 78.4)",
+        "tonalRamp": [
+          "oklch(16% 0.059 78.4)",
+          "oklch(27% 0.095 78.4)",
+          "oklch(39% 0.128 78.4)",
+          "oklch(51% 0.139 78.4)",
+          "oklch(63% 0.134 78.4)",
+          "oklch(75% 0.114 78.4)",
+          "oklch(86% 0.073 78.4)",
+          "oklch(94% 0.033 78.4)"
+        ]
+      },
+      "otolith-amber-light": {
+        "role": "secondary",
+        "displayName": "Otolith Amber (Light)",
+        "canonical": "oklch(55.5% 0.146 49.0)",
+        "tonalRamp": [
+          "oklch(16% 0.061 49.0)",
+          "oklch(27% 0.099 49.0)",
+          "oklch(39% 0.134 49.0)",
+          "oklch(51% 0.146 49.0)",
+          "oklch(63% 0.140 49.0)",
+          "oklch(75% 0.119 49.0)",
+          "oklch(86% 0.076 49.0)",
+          "oklch(94% 0.035 49.0)"
+        ]
+      },
+      "cochlear-crimson-dark": {
+        "role": "tertiary",
+        "displayName": "Cochlear Crimson (Dark)",
+        "canonical": "oklch(69.8% 0.168 16.8)",
+        "tonalRamp": [
+          "oklch(16% 0.071 16.8)",
+          "oklch(27% 0.115 16.8)",
+          "oklch(39% 0.155 16.8)",
+          "oklch(51% 0.168 16.8)",
+          "oklch(63% 0.162 16.8)",
+          "oklch(75% 0.138 16.8)",
+          "oklch(86% 0.088 16.8)",
+          "oklch(94% 0.040 16.8)"
+        ]
+      },
+      "cochlear-crimson-light": {
+        "role": "tertiary",
+        "displayName": "Cochlear Crimson (Light)",
+        "canonical": "oklch(51.4% 0.198 16.9)",
+        "tonalRamp": [
+          "oklch(16% 0.083 16.9)",
+          "oklch(27% 0.135 16.9)",
+          "oklch(39% 0.182 16.9)",
+          "oklch(51% 0.198 16.9)",
+          "oklch(63% 0.190 16.9)",
+          "oklch(75% 0.162 16.9)",
+          "oklch(86% 0.103 16.9)",
+          "oklch(94% 0.047 16.9)"
+        ]
+      },
+      "vestibular-emerald-dark": {
+        "role": "tertiary",
+        "displayName": "Vestibular Emerald (Dark)",
+        "canonical": "oklch(80.0% 0.182 151.7)",
+        "tonalRamp": [
+          "oklch(16% 0.076 151.7)",
+          "oklch(27% 0.124 151.7)",
+          "oklch(39% 0.167 151.7)",
+          "oklch(51% 0.182 151.7)",
+          "oklch(63% 0.175 151.7)",
+          "oklch(75% 0.149 151.7)",
+          "oklch(86% 0.095 151.7)",
+          "oklch(94% 0.044 151.7)"
+        ]
+      },
+      "vestibular-emerald-light": {
+        "role": "tertiary",
+        "displayName": "Vestibular Emerald (Light)",
+        "canonical": "oklch(52.7% 0.137 150.1)",
+        "tonalRamp": [
+          "oklch(16% 0.058 150.1)",
+          "oklch(27% 0.093 150.1)",
+          "oklch(39% 0.126 150.1)",
+          "oklch(51% 0.137 150.1)",
+          "oklch(63% 0.132 150.1)",
+          "oklch(75% 0.112 150.1)",
+          "oklch(86% 0.071 150.1)",
+          "oklch(94% 0.033 150.1)"
+        ]
+      },
+      "obsidian-depth": {
+        "role": "neutral",
+        "displayName": "Obsidian Depth",
+        "canonical": "oklch(17.0% 0.016 248.8)",
+        "tonalRamp": [
+          "oklch(16% 0.007 248.8)",
+          "oklch(27% 0.011 248.8)",
+          "oklch(39% 0.014 248.8)",
+          "oklch(51% 0.016 248.8)",
+          "oklch(63% 0.015 248.8)",
+          "oklch(75% 0.013 248.8)",
+          "oklch(86% 0.008 248.8)",
+          "oklch(94% 0.004 248.8)"
+        ]
+      },
+      "obsidian-panel": {
+        "role": "neutral",
+        "displayName": "Obsidian Panel",
+        "canonical": "oklch(19.7% 0.018 248.7 / 0.82)",
+        "tonalRamp": [
+          "oklch(16% 0.007 248.7)",
+          "oklch(27% 0.012 248.7)",
+          "oklch(39% 0.016 248.7)",
+          "oklch(51% 0.018 248.7)",
+          "oklch(63% 0.017 248.7)",
+          "oklch(75% 0.015 248.7)",
+          "oklch(86% 0.009 248.7)",
+          "oklch(94% 0.004 248.7)"
+        ]
+      },
+      "obsidian-solid": {
+        "role": "neutral",
+        "displayName": "Obsidian Solid",
+        "canonical": "oklch(21.0% 0.022 251.8)",
+        "tonalRamp": [
+          "oklch(16% 0.009 251.8)",
+          "oklch(27% 0.015 251.8)",
+          "oklch(39% 0.020 251.8)",
+          "oklch(51% 0.022 251.8)",
+          "oklch(63% 0.021 251.8)",
+          "oklch(75% 0.018 251.8)",
+          "oklch(86% 0.011 251.8)",
+          "oklch(94% 0.005 251.8)"
+        ]
+      },
+      "obsidian-trough": {
+        "role": "neutral",
+        "displayName": "Obsidian Trough",
+        "canonical": "oklch(18.3% 0.018 248.8)",
+        "tonalRamp": [
+          "oklch(16% 0.008 248.8)",
+          "oklch(27% 0.012 248.8)",
+          "oklch(39% 0.017 248.8)",
+          "oklch(51% 0.018 248.8)",
+          "oklch(63% 0.017 248.8)",
+          "oklch(75% 0.015 248.8)",
+          "oklch(86% 0.009 248.8)",
+          "oklch(94% 0.004 248.8)"
+        ]
+      },
+      "paper-drafting": {
+        "role": "neutral",
+        "displayName": "Paper Drafting",
+        "canonical": "oklch(97.0% 0.003 106.4)",
+        "tonalRamp": [
+          "oklch(16% 0.001 106.4)",
+          "oklch(27% 0.002 106.4)",
+          "oklch(39% 0.002 106.4)",
+          "oklch(51% 0.003 106.4)",
+          "oklch(63% 0.003 106.4)",
+          "oklch(75% 0.002 106.4)",
+          "oklch(86% 0.001 106.4)",
+          "oklch(94% 0.001 106.4)"
+        ]
+      },
+      "paper-sheet": {
+        "role": "neutral",
+        "displayName": "Paper Sheet",
+        "canonical": "oklch(100.0% 0.000 0.0 / 0.90)",
+        "tonalRamp": [
+          "oklch(16% 0.000 0.0)",
+          "oklch(27% 0.000 0.0)",
+          "oklch(39% 0.000 0.0)",
+          "oklch(51% 0.000 0.0)",
+          "oklch(63% 0.000 0.0)",
+          "oklch(75% 0.000 0.0)",
+          "oklch(86% 0.000 0.0)",
+          "oklch(94% 0.000 0.0)"
+        ]
+      },
+      "paper-solid": {
+        "role": "neutral",
+        "displayName": "Paper Solid",
+        "canonical": "oklch(100.0% 0.000 0.0)",
+        "tonalRamp": [
+          "oklch(16% 0.000 0.0)",
+          "oklch(27% 0.000 0.0)",
+          "oklch(39% 0.000 0.0)",
+          "oklch(51% 0.000 0.0)",
+          "oklch(63% 0.000 0.0)",
+          "oklch(75% 0.000 0.0)",
+          "oklch(86% 0.000 0.0)",
+          "oklch(94% 0.000 0.0)"
+        ]
+      },
+      "paper-trough": {
+        "role": "neutral",
+        "displayName": "Paper Trough",
+        "canonical": "oklch(94.1% 0.005 134.9)",
+        "tonalRamp": [
+          "oklch(16% 0.002 134.9)",
+          "oklch(27% 0.003 134.9)",
+          "oklch(39% 0.004 134.9)",
+          "oklch(51% 0.005 134.9)",
+          "oklch(63% 0.004 134.9)",
+          "oklch(75% 0.004 134.9)",
+          "oklch(86% 0.002 134.9)",
+          "oklch(94% 0.001 134.9)"
+        ]
+      },
+      "chalk-ink": {
+        "role": "neutral",
+        "displayName": "Chalk Ink",
+        "canonical": "oklch(96.8% 0.007 247.9)",
+        "tonalRamp": [
+          "oklch(16% 0.003 247.9)",
+          "oklch(27% 0.005 247.9)",
+          "oklch(39% 0.006 247.9)",
+          "oklch(51% 0.007 247.9)",
+          "oklch(63% 0.007 247.9)",
+          "oklch(75% 0.006 247.9)",
+          "oklch(86% 0.004 247.9)",
+          "oklch(94% 0.002 247.9)"
+        ]
+      },
+      "graphite-ink": {
+        "role": "neutral",
+        "displayName": "Graphite Ink",
+        "canonical": "oklch(20.7% 0.010 248.3)",
+        "tonalRamp": [
+          "oklch(16% 0.004 248.3)",
+          "oklch(27% 0.007 248.3)",
+          "oklch(39% 0.009 248.3)",
+          "oklch(51% 0.010 248.3)",
+          "oklch(63% 0.010 248.3)",
+          "oklch(75% 0.008 248.3)",
+          "oklch(86% 0.005 248.3)",
+          "oklch(94% 0.002 248.3)"
+        ]
+      },
+      "pewter-secondary": {
+        "role": "neutral",
+        "displayName": "Pewter Secondary",
+        "canonical": "oklch(72.5% 0.026 248.2)",
+        "tonalRamp": [
+          "oklch(16% 0.011 248.2)",
+          "oklch(27% 0.018 248.2)",
+          "oklch(39% 0.024 248.2)",
+          "oklch(51% 0.026 248.2)",
+          "oklch(63% 0.025 248.2)",
+          "oklch(75% 0.021 248.2)",
+          "oklch(86% 0.013 248.2)",
+          "oklch(94% 0.006 248.2)"
+        ]
+      },
+      "slate-secondary": {
+        "role": "neutral",
+        "displayName": "Slate Secondary",
+        "canonical": "oklch(43.8% 0.019 248.3)",
+        "tonalRamp": [
+          "oklch(16% 0.008 248.3)",
+          "oklch(27% 0.013 248.3)",
+          "oklch(39% 0.017 248.3)",
+          "oklch(51% 0.019 248.3)",
+          "oklch(63% 0.018 248.3)",
+          "oklch(75% 0.015 248.3)",
+          "oklch(86% 0.010 248.3)",
+          "oklch(94% 0.005 248.3)"
+        ]
+      },
+      "on-teal-dark": {
+        "role": "neutral",
+        "displayName": "On-Teal Dark Ink",
+        "canonical": "oklch(23.1% 0.033 191.7)",
+        "tonalRamp": [
+          "oklch(16% 0.014 191.7)",
+          "oklch(27% 0.022 191.7)",
+          "oklch(39% 0.030 191.7)",
+          "oklch(51% 0.033 191.7)",
+          "oklch(63% 0.031 191.7)",
+          "oklch(75% 0.027 191.7)",
+          "oklch(86% 0.017 191.7)",
+          "oklch(94% 0.008 191.7)"
+        ]
+      },
+      "on-cyan-light": {
+        "role": "neutral",
+        "displayName": "On-Cyan White Ink",
+        "canonical": "oklch(100.0% 0.000 0.0)",
+        "tonalRamp": [
+          "oklch(16% 0.000 0.0)",
+          "oklch(27% 0.000 0.0)",
+          "oklch(39% 0.000 0.0)",
+          "oklch(51% 0.000 0.0)",
+          "oklch(63% 0.000 0.0)",
+          "oklch(75% 0.000 0.0)",
+          "oklch(86% 0.000 0.0)",
+          "oklch(94% 0.000 0.0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Expanded #note-title specimen heading (clamp 1.375rem..1.625rem / 22px-26px)." },
+      "headline": { "displayName": "Headline", "purpose": "Compact card title (clamp 1.1875rem..1.375rem) and modal headers." },
+      "title": { "displayName": "Title", "purpose": "Inline lab subheads (17px), settings popover title (19px), and top-bar identity." },
+      "body": { "displayName": "Body", "purpose": "Expanded 16px (1rem) note body prose and 15px Further Read deep clinical copy." },
+      "label": { "displayName": "Label", "purpose": "Mode tabs, dock actions, 3D pins, filter chips, and telemetry keys (13px UI floor; 12px plot axes)." },
+      "mono": { "displayName": "Mono", "purpose": "Tabular RAS millimeter coordinates, frequencies, depths, and badge marks." }
+    },
+    "shadows": [
+      {
+        "name": "floating-light",
+        "value": "0 1px 2px rgba(20, 24, 28, 0.06), 0 6px 14px rgba(20, 24, 28, 0.06), 0 16px 32px rgba(20, 24, 28, 0.08)",
+        "purpose": "Three-stop neutral floating elevation for cards, tool rails, and workbench drawers in light paper mode."
+      },
+      {
+        "name": "floating-dark",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.36), 0 8px 20px rgba(0, 0, 0, 0.34), 0 20px 40px rgba(0, 0, 0, 0.38)",
+        "purpose": "Three-stop neutral floating elevation anchoring frosted obsidian surfaces in dark mode."
+      },
+      {
+        "name": "modal-light",
+        "value": "0 2px 6px rgba(20, 24, 28, 0.08), 0 14px 32px rgba(20, 24, 28, 0.12), 0 28px 56px rgba(20, 24, 28, 0.14)",
+        "purpose": "Deep top-layer separation for settings popovers and modal clinical dialogs in light mode."
+      },
+      {
+        "name": "modal-dark",
+        "value": "0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 32px rgba(0, 0, 0, 0.48), 0 28px 56px rgba(0, 0, 0, 0.54)",
+        "purpose": "Deep top-layer separation for settings popovers and modal clinical dialogs in dark mode."
+      },
+      {
+        "name": "active-pill",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.12)",
+        "purpose": "Crisp contact shadow lifting active mode and segmented pills above trough tracks."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-control",
+        "value": "140ms ease",
+        "purpose": "Mode pill and hover state shifts on header tabs."
+      },
+      {
+        "name": "transition-popover",
+        "value": "180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Discrete top-layer @starting-style entry/exit for display settings popover."
+      },
+      {
+        "name": "transition-dialog",
+        "value": "210ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Discrete top-layer @starting-style modal reveal for the clinical summary sheet."
+      }
+    ],
+    "breakpoints": [
+      { "name": "tablet", "value": "1080px" },
+      { "name": "tablet-compact-actions", "value": "900px" },
+      { "name": "mobile", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Flat primary call-to-action for reading note expansion and specimen isolation.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">Read Note →</button>",
+      "css": ".ds-btn-primary { appearance: none; border: 1px solid transparent; border-radius: var(--radius-sm, 8px); height: 36px; padding: 0 14px; background: var(--accent-primary, #0c667e); color: var(--on-accent, #ffffff); font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.875rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: filter 140ms ease; } .ds-btn-primary:hover { filter: brightness(1.06); } .ds-btn-primary:active { filter: brightness(0.95); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Action Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Trough-backed secondary button for view resets, inline lab shortcuts, and modal actions.",
+      "html": "<button type=\"button\" class=\"ds-btn-secondary\">Center View</button>",
+      "css": ".ds-btn-secondary { appearance: none; border: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); border-radius: var(--radius-sm, 8px); height: 36px; padding: 0 14px; background: var(--bg-trough, #eaece9); color: var(--text-primary, #14181c); font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.875rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; transition: background-color 140ms ease, border-color 140ms ease; } .ds-btn-secondary:hover { border-color: var(--border-accent, rgba(12, 102, 126, 0.48)); background: var(--bg-active, rgba(12, 102, 126, 0.12)); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; }"
+    },
+    {
+      "name": "Clinical Mode Pill",
+      "kind": "nav",
+      "refersTo": "mode-pill-active",
+      "description": "Single-row ARIA tab pill switching across the 5 clinical modalities.",
+      "html": "<div class=\"ds-mode-trough\" role=\"tablist\"><button type=\"button\" class=\"ds-mode-pill active\" role=\"tab\" aria-selected=\"true\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 6.5a5.5 5.5 0 1 1-4.7 8.3\"/><circle cx=\"12\" cy=\"12\" r=\"2.2\"/></svg><span>Anatomy Atlas</span></button><button type=\"button\" class=\"ds-mode-pill\" role=\"tab\" aria-selected=\"false\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 13h2.5l2-5 3 9 3-11 2.5 7H21\"/></svg><span>Hearing &amp; Tonotopy</span></button></div>",
+      "css": ".ds-mode-trough { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: var(--bg-trough, #eaece9); border: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); } .ds-mode-pill { position: relative; appearance: none; border: 0; background: transparent; color: var(--text-secondary, #434c56); font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.8125rem; font-weight: 500; padding: 0 11px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; } .ds-mode-pill:hover { color: var(--text-primary, #14181c); background: var(--bg-hover, rgba(20, 24, 28, 0.06)); } .ds-mode-pill[aria-selected=\"true\"] { background: var(--bg-surface-solid, #ffffff); color: var(--text-primary, #14181c); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); } .ds-mode-pill[aria-selected=\"true\"]::after { content: \"\"; position: absolute; inset-inline: 11px; inset-block-end: 2px; border-block-end: 2px solid var(--accent-primary, #0c667e); border-radius: 999px; } .ds-mode-pill:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; } .ds-icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "System Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Rounded filter pill used inside inline sidebar Lab subpanels (Parts, Audiogram, Radiology).",
+      "html": "<div class=\"ds-chip-group\"><button type=\"button\" class=\"ds-chip active\">All (27)</button><button type=\"button\" class=\"ds-chip\">Cochlea</button></div>",
+      "css": ".ds-chip-group { display: inline-flex; gap: 6px; } .ds-chip { appearance: none; border: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); background: var(--bg-trough, #eaece9); color: var(--text-secondary, #434c56); font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.8125rem; font-weight: 500; padding: 0 11px; height: 30px; border-radius: 999px; cursor: pointer; } .ds-chip:hover { color: var(--text-primary, #14181c); border-color: var(--border-accent, rgba(12, 102, 126, 0.48)); } .ds-chip.active { background: var(--bg-active, rgba(12, 102, 126, 0.12)); border-color: var(--border-accent, rgba(12, 102, 126, 0.48)); color: var(--text-primary, #14181c); font-weight: 600; } .ds-chip:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; }"
+    },
+    {
+      "name": "One-Side Expandable Note Card",
+      "kind": "card",
+      "refersTo": "card-glass-dark",
+      "description": "Unified left-hand frosted glass/paper Note & Lab sidebar expanding cleanly from 280px compact to 388px reader and 476px wide-read.",
+      "html": "<section class=\"ds-card-glass\"><div class=\"ds-card-head\"><span class=\"ds-badge\">Hearing Snail</span><span class=\"ds-tabs\">Note · 27 Parts</span></div><h3 class=\"ds-card-title\">Membranous Cochlear Spiral</h3><p class=\"ds-card-lead\">Performs real-time mechanical Fourier frequency analysis via the Greenwood tonotopic map.</p><div class=\"ds-telemetry\"><div><span class=\"ds-tkey\">Fluid Space</span><span class=\"ds-tval\">Endolymph +80 mV</span></div><div><span class=\"ds-tkey\">Tonotopy</span><span class=\"ds-tval\">20 Hz – 20,678 Hz</span></div></div></section>",
+      "css": ".ds-card-glass { position: relative; width: 388px; padding: 15px 18px; border-radius: 16px; background: var(--bg-surface, rgba(255, 255, 255, 0.91)); color: var(--text-primary, #14181c); backdrop-filter: blur(18px) saturate(135%); box-shadow: var(--shadow-floating, 0 1px 2px rgba(20, 24, 28, 0.06), 0 6px 14px rgba(20, 24, 28, 0.06), 0 16px 32px rgba(20, 24, 28, 0.08)); font-family: var(--font-sans, 'Avenir Next', sans-serif); display: flex; flex-direction: column; gap: 10px; } .ds-card-glass::before { content: \"\"; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--glass-border-grad, linear-gradient(155deg, rgba(20, 24, 28, 0.22), rgba(20, 24, 28, 0.06) 55%, rgba(20, 24, 28, 0.14))); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; pointer-events: none; } .ds-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .ds-badge { font-size: 0.8125rem; font-weight: 600; color: var(--accent-primary, #0c667e); } .ds-tabs { font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary, #434c56); } .ds-card-title { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.16; letter-spacing: -0.02em; } .ds-card-lead { margin: 0; font-size: 1rem; line-height: 1.62; color: var(--text-primary, #14181c); } .ds-telemetry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 12px; padding: 9px 0; border-block: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); } .ds-tkey { display: block; font-size: 0.8125rem; color: var(--text-secondary, #434c56); } .ds-tval { display: block; font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.875rem; font-weight: 600; }"
+    },
+    {
+      "name": "Anatomical Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Header combobox input pairing a trough capsule with accent-tinted caret.",
+      "html": "<div class=\"ds-input-search\"><svg class=\"ds-search-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"m16 16 4.5 4.5\"/></svg><input type=\"text\" placeholder=\"Find an ear part...\" aria-label=\"Find an anatomical ear structure\" /></div>",
+      "css": ".ds-input-search { width: 192px; height: 34px; padding: 0 6px 0 11px; border-radius: 999px; background: var(--bg-trough, #eaece9); border: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); display: flex; align-items: center; gap: 7px; } .ds-input-search input { width: 100%; border: 0; background: transparent; color: var(--text-primary, #14181c); caret-color: var(--accent-primary, #0c667e); font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.8125rem; } .ds-input-search input::placeholder { color: var(--text-secondary, #434c56); } .ds-input-search input:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; border-radius: 6px; } .ds-search-icon { width: 17px; height: 17px; color: var(--text-secondary, #434c56); fill: none; stroke: currentColor; stroke-width: 1.8; flex-shrink: 0; }"
+    },
+    {
+      "name": "3D Stereotaxic Pin Chip",
+      "kind": "custom",
+      "refersTo": "pin-chip",
+      "description": "World-projected anatomical callout pill occluded against foreground bone and keep-out zones.",
+      "html": "<button type=\"button\" class=\"ds-pin-chip selected\"><span class=\"ds-pin-dot\"></span><span>Anterior Semicircular Duct</span></button>",
+      "css": ".ds-pin-chip { appearance: none; border: 1px solid var(--border-subtle, rgba(20, 24, 28, 0.14)); background: var(--bg-surface, rgba(255, 255, 255, 0.91)); color: var(--text-primary, #14181c); padding: 5px 11px; border-radius: 999px; font-family: var(--font-sans, 'Avenir Next', sans-serif); font-size: 0.8125rem; font-weight: 500; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; backdrop-filter: blur(10px); } .ds-pin-chip.selected { border-color: var(--border-accent, rgba(12, 102, 126, 0.48)); background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.97)); font-weight: 600; } .ds-pin-chip:focus-visible { outline: 2px solid var(--accent-primary, #0c667e); outline-offset: 2px; } .ds-pin-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent-primary, #0c667e); flex-shrink: 0; }"
+    },
+    {
+      "name": "Architectural Stage Frame",
+      "kind": "custom",
+      "description": "1px perimeter viewport hairline punctuated by 7px stereotaxic corner L-brackets.",
+      "html": "<div class=\"ds-stage-frame\"><span class=\"ds-br tl\"></span><span class=\"ds-br tr\"></span><span class=\"ds-br bl\"></span><span class=\"ds-br br\"></span></div>",
+      "css": ".ds-stage-frame { position: relative; width: 240px; height: 140px; border: 1px solid var(--frame-line, rgba(20, 24, 28, 0.18)); background: var(--bg-canvas, #f5f5f3); } .ds-br { position: absolute; width: 7px; height: 7px; border-color: var(--bracket-color, rgba(20, 24, 28, 0.58)); border-style: solid; border-width: 0; } .ds-br.tl { top: -1px; left: -1px; border-top-width: 1.5px; border-left-width: 1.5px; } .ds-br.tr { top: -1px; right: -1px; border-top-width: 1.5px; border-right-width: 1.5px; } .ds-br.bl { bottom: -1px; left: -1px; border-bottom-width: 1.5px; border-left-width: 1.5px; } .ds-br.br { bottom: -1px; right: -1px; border-bottom-width: 1.5px; border-right-width: 1.5px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "One-Side Expandable Stereotaxic Notebook",
+    "overview": "Inner Ear 3D Lab rejects crowded multi-pane surgical cockpits and fragmented corner popups in favor of an architectural full-bleed WebGL2 specimen stage paired with a single unified left-hand Note & Lab Sidebar (#note-sidebar). Whether rendered in obsidian studio darkroom mode or warm drafting-paper light mode, the 27-part Right-Anterior-Superior (RAS) labyrinth occupies center stage (>= 85% unobstructed area at rest across desktop, tablet, and mobile), while deep reading and clinical lab charts expand cleanly inside that single left column and dynamically shift 3D camera framing (setViewOffset) rightward into open space.\n\nBoth themes share identical spatial geometry, typographic hierarchy, and stereotaxic truth, switching polarity through native CSS color-scheme and light-dark() tokens with manual persistence and @supports fallbacks. Every surface—from AgX tone-mapped WebGL2 translucency to custom geometric stroke icons, occluded 3D label pins, and canvas-rendered CT/VNG/surgical plots—maintains generous typography (16px note prose, >= 13px controls) without visual noise.",
+    "keyCharacteristics": [
+      "Anti-Cockpit >= 85% clear WebGL2 stage invariant enforced in resting compact state across 1440×900, 1280×800, 768×1024, and 390×844 viewports in both themes.",
+      "Native OS + manual dual polarity pairing frosted dark glassroom surfaces with light technical drafting paper and 7px corner L-brackets.",
+      "One-Side Progressive Disclosure (collapsed pill -> compact 280px preview -> expanded 388px Note/Lab reader -> 476px Further Read <details>; mobile bottom reader sheet above #bottom-bar) paired with dynamic setViewOffset 3D camera panning and shifted --dock-shift-x clearance.",
+      "Zero-GC WebGL2 loop synced in real time to resolved theme polarity so both bone shells and fluid membranes remain crisp against dark studio depth and warm daylight paper."
+    ],
+    "rules": [
+      {
+        "name": "The Polarity-Paired Canvas Rule",
+        "body": "Every surface, border, and WebGL2 material parameter resolves synchronously across light and dark via light-dark() and meta[name=\"color-scheme\"], never leaving dark chrome stranded over light paper or bright pastel membranes washed out on #f5f5f3.",
+        "section": "colors"
+      },
+      {
+        "name": "The Signal Rarity Rule",
+        "body": "Semantic hues (amber otoliths, crimson breach alerts and Right Ear audiogram markers, emerald clearance bands) appear strictly on anatomical markers, physiological thresholds, and active accents so surrounding chrome remains neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The Minimum Legible Floor Rule",
+        "body": "Interactive controls, pills, 3D pins, and sidebar telemetry stay at or above 13px (0.8125rem) while expanded note body copy sets at 16px (1rem)—paired with a 12px minimum floor for dense SVG/Canvas scientific axes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Metric Rule",
+        "body": "Stereotaxic coordinates, Greenwood millimeter distances, Hounsfield/depth readouts, and angular slider values always render in ui-monospace with font-variant-numeric: tabular-nums so scrubbing sliders never jitters adjacent layout.",
+        "section": "typography"
+      },
+      {
+        "name": "The Anti-Cockpit 85% Stage Rule",
+        "body": "Combined foreground chrome must leave at least 85% of the viewport clear to the WebGL2 specimen in initial compact resting states across 1440×900, 1280×800, 768×1024, and 390×844 viewports.",
+        "section": "layout"
+      },
+      {
+        "name": "The Single-Sidebar Consolidation Rule",
+        "body": "All reading levels, <details> accordions, and mode-specific lab visualizations consolidate inside the single expandable #note-sidebar, eliminating right-edge strips and multi-corner overlapping drawers.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-Action Rule",
+        "body": "Action buttons, filter chips, and dock controls stay shadow-free inside already elevated cards and docks, communicating hover and selection solely through 1px border and fill shifts instead of stacking redundant drop shadows.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Masked Glass Edge Rule",
+        "body": "Frosted floating containers render a 1px directional top-left sheen border via mask-composite: exclude pseudo-elements while falling back cleanly to system canvas high-contrast outlines under forced-colors: active.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Hairline Divider Rule",
+        "body": "Internal card sections, telemetry metrics, and 27-part lists separate purely with 1px horizontal rules rather than nesting shadowed sub-cards inside floating drawers.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do protect at least 85% clear WebGL2 canvas area in resting states across desktop, tablet, and mobile in both light and dark states (The Anti-Cockpit 85% Stage Rule).",
+      "Do resolve every CSS surface, shadow, and WebGL2 shader pigment synchronously via color-scheme: light dark and light-dark() with explicit @supports not fallbacks.",
+      "Do maintain 16px expanded note body prose and keep interactive controls/pins at >= 13px (12px minimum for SVG/Canvas plot axes) with tabular numerals on millimeter/frequency metrics.",
+      "Do consolidate Note reading, Further Read <details>, and clinical Lab charts inside #note-sidebar while shifting 3D camera setViewOffset and dock clearance dynamically.",
+      "Do terminate custom linear-space GLSL shaders with Three.js #include <tonemapping_fragment> and #include <colorspace_fragment> under AgXToneMapping."
+    ],
+    "donts": [
+      "Don't place eyebrows, uppercase category kickers, or badge ribbons above <h1> hero lockups.",
+      "Don't stack persistent sidebars, duplicate drop shadows on buttons inside cards, or boxed sub-cards inside floating drawers.",
+      "Don't replace custom geometric vector SVGs with Unicode emojis or external icon font dependencies in header/tool chrome.",
+      "Don't allocate DOM pin nodes, Three.js vectors, geometries, or materials inside requestAnimationFrame.",
+      "Don't ship global * CSS resets that leak into WebGL/canvas or third-party primitives."
+    ]
+  }
+}

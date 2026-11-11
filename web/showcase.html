@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      (function () {
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (!meta) return;
+        var KEY = 'ie3d-color-scheme';
+        function apply() {
+          try {
+            var stored = localStorage.getItem(KEY);
+            meta.content = stored === 'light' || stored === 'dark' ? stored : 'light dark';
+          } catch (_err) {
+            meta.content = 'light dark';
+          }
+        }
+        apply();
+        window.addEventListener('storage', function (e) {
+          if (e.key === KEY) apply();
+        });
+      })();
+    </script>
+    <title>Inner Ear 3D Lab — Stereotaxic 27-Part RAS Anatomy Showcase</title>
+    <link rel="stylesheet" href="/src/showcase/showcase.css" />
+  </head>
+  <body>
+    <div id="app-shell" class="app-shell" data-mode="anatomy" data-note-state="compact" data-wide-read="false">
+      <!-- ZONE 1: STREAMLINED SINGLE-ROW HEADER -->
+      <header class="lab-header">
+        <div class="brand-cluster">
+          <span class="brand-badge">IE-MAP 3D</span>
+          <span class="brand-title">Inner Ear 3D Lab</span>
+        </div>
+
+        <nav class="mode-switcher-shell" aria-label="Clinical Modes">
+          <div class="mode-switcher" role="tablist">
+            <button
+              type="button"
+              class="mode-pill active"
+              id="mode-anatomy-btn"
+              data-mode="anatomy"
+              role="tab"
+              aria-selected="true"
+              aria-label="Anatomy Atlas"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 6.5a5.5 5.5 0 1 1-4.7 8.3" />
+                <circle cx="12" cy="12" r="2.2" />
+              </svg>
+              <span class="mode-label">Anatomy<span class="mode-label-ext"> Atlas</span></span>
+            </button>
+
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-hearing-btn"
+              data-mode="hearing"
+              role="tab"
+              aria-selected="false"
+              aria-label="Hearing &amp; Tonotopy"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 13h2.5l2-5 3 9 3-11 2.5 7H21" />
+              </svg>
+              <span class="mode-label">Hearing<span class="mode-label-ext"> &amp; Tonotopy</span></span>
+            </button>
+
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-radiology-btn"
+              data-mode="radiology"
+              role="tab"
+              aria-selected="false"
+              aria-label="Virtual Radiology"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <path d="M4 12h16M12 4v16" />
+                <circle cx="12" cy="12" r="3.5" />
+              </svg>
+              <span class="mode-label"><span class="mode-label-ext">Virtual </span>Radiology</span>
+            </button>
+
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-vestibular-btn"
+              data-mode="vestibular"
+              role="tab"
+              aria-selected="false"
+              aria-label="Vestibular &amp; VOR"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4a8 8 0 1 0 7.4 11" />
+                <path d="M15.5 3.8 19.5 4.8 18.5 8.8" />
+                <circle cx="12" cy="12" r="2.3" />
+              </svg>
+              <span class="mode-label">Vestibular<span class="mode-label-ext"> &amp; VOR</span></span>
+            </button>
+
+            <button
+              type="button"
+              class="mode-pill"
+              id="mode-surgical-btn"
+              data-mode="surgical"
+              role="tab"
+              aria-selected="false"
+              aria-label="Surgical Suites"
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4.5 19.5 13 11m0 0 4.5-4.5a2.1 2.1 0 1 1 3 3L16 14l-3-3Z" />
+                <circle cx="7" cy="7" r="2.2" />
+              </svg>
+              <span class="mode-label">Surgical<span class="mode-label-ext"> Suites</span></span>
+            </button>
+          </div>
+        </nav>
+
+        <search class="search-container">
+          <div class="search-input-shell">
+            <svg class="search-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4.5 4.5" />
+            </svg>
+            <input
+              type="text"
+              class="search-input"
+              id="search-input"
+              placeholder="Find an ear part..."
+              aria-label="Find an anatomical ear structure"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="search-dropdown"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button
+              type="button"
+              class="search-clear-btn"
+              id="search-clear-btn"
+              aria-label="Clear search"
+              hidden
+            >
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+          <div class="search-dropdown glass-surface" id="search-dropdown" role="listbox" aria-label="Structure matches"></div>
+        </search>
+
+        <div class="header-actions">
+          <button
+            type="button"
+            class="header-icon-btn header-search-trigger"
+            id="header-search-btn"
+            aria-label="Search 27 anatomical parts"
+          >
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4.5 4.5" />
+            </svg>
+          </button>
+
+          <button type="button" class="header-report-btn" id="report-open-btn" aria-label="Open clinical summary report">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4h7l4 4v12H7z" />
+              <path d="M14 4v4h4M10 12h5M10 16h5" />
+            </svg>
+            <span class="header-btn-text">Report</span>
+          </button>
+
+          <button type="button" class="header-icon-btn" id="theme-toggle-btn">
+            <svg class="ui-icon icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.5v2.3M12 19.2v2.3M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.3M19.2 12h2.3M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7" />
+            </svg>
+            <svg class="ui-icon icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10Z" />
+            </svg>
+            <span class="visually-hidden theme-text-to-light">Switch to light theme</span>
+            <span class="visually-hidden theme-text-to-dark">Switch to dark theme</span>
+          </button>
+
+          <button
+            type="button"
+            class="header-icon-btn"
+            id="settings-btn"
+            popovertarget="settings-popover"
+            aria-label="Lab settings and appearance"
+            aria-expanded="false"
+            aria-controls="settings-popover"
+          >
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+              <circle cx="9" cy="7" r="2" fill="var(--bg-surface-solid)" />
+              <circle cx="15" cy="12" r="2" fill="var(--bg-surface-solid)" />
+              <circle cx="10" cy="17" r="2" fill="var(--bg-surface-solid)" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- SETTINGS TOP-LAYER POPOVER -->
+      <div id="settings-popover" popover="auto" class="settings-popover" aria-label="Display Settings">
+        <div class="popover-header">
+          <h2 class="popover-title">Display &amp; Atlas Options</h2>
+          <button
+            type="button"
+            class="icon-close-btn"
+            id="settings-close-btn"
+            popovertarget="settings-popover"
+            popovertargetaction="hide"
+            aria-label="Close settings"
+          >
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="popover-section">
+          <span class="popover-label" id="appearance-heading">Appearance</span>
+          <div class="segmented-control" role="group" aria-labelledby="appearance-heading">
+            <button type="button" class="segment-btn active" data-theme-pref="system">System</button>
+            <button type="button" class="segment-btn" data-theme-pref="light">Light</button>
+            <button type="button" class="segment-btn" data-theme-pref="dark">Dark</button>
+          </div>
+          <p class="popover-hint" id="appearance-hint">Following system preference</p>
+        </div>
+
+        <div class="popover-section">
+          <span class="popover-label" id="label-density-heading">3D Part Labels</span>
+          <div class="segmented-control" role="group" aria-labelledby="label-density-heading">
+            <button type="button" class="segment-btn" data-label-mode="off">Off</button>
+            <button type="button" class="segment-btn active" data-label-mode="key">Key</button>
+            <button type="button" class="segment-btn" data-label-mode="all">All</button>
+          </div>
+        </div>
+
+        <div class="popover-section">
+          <span class="popover-label" id="reading-depth-heading">Reading Style</span>
+          <div class="segmented-control" role="group" aria-labelledby="reading-depth-heading">
+            <button type="button" class="segment-btn active" data-reading-depth="simple">Patient</button>
+            <button type="button" class="segment-btn" data-reading-depth="detailed">Clinical</button>
+          </div>
+        </div>
+
+        <div class="popover-section popover-footer-action">
+          <button type="button" class="secondary-action-btn" id="popover-report-btn">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 4h7l4 4v12H7z" />
+              <path d="M14 4v4h4" />
+            </svg>
+            <span>Clinical Summary &amp; Citations</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ZONE 2: FULL-BLEED WEBGL2 STAGE -->
+      <main class="specimen-stage" id="specimen-stage">
+        <div class="stage-frame" aria-hidden="true">
+          <span class="corner-bracket tl"></span>
+          <span class="corner-bracket tr"></span>
+          <span class="corner-bracket bl"></span>
+          <span class="corner-bracket br"></span>
+        </div>
+
+        <div class="hero-canvas-host" id="hero-canvas-host" aria-label="Interactive 3D Inner Ear Labyrinth Viewport"></div>
+        <div class="pins-layer" id="pins-layer" aria-hidden="true"></div>
+
+        <!-- ZONE 3: ONE UNIFIED EXPANDABLE LEFT NOTE SIDEBAR -->
+        <aside
+          class="note-sidebar"
+          id="note-sidebar"
+          data-note-state="compact"
+          data-sidebar-tab="note"
+          data-wide-read="false"
+          aria-label="Specimen Note and Clinical Lab Sidebar"
+        >
+          <!-- Collapsed Minimal Corner Pill -->
+          <button type="button" class="note-collapsed-pill glass-surface" id="note-collapsed-pill" hidden>
+            <span class="pill-dot" id="note-pill-dot"></span>
+            <span id="note-pill-label">Cochlea · Open Note</span>
+          </button>
+
+          <!-- Unified Compact / Expanded Sidebar Card -->
+          <section class="note-card glass-surface" id="note-card" aria-labelledby="note-title">
+            <div class="note-card-header">
+              <div class="note-system-tag">
+                <span class="pill-dot" id="note-system-dot"></span>
+                <span id="note-system-label">Hearing Snail</span>
+              </div>
+
+              <div class="note-header-controls">
+                <div class="note-tab-switch" id="note-tab-switch" role="tablist" aria-label="Sidebar View">
+                  <button
+                    type="button"
+                    class="note-tab-btn active"
+                    id="tab-note-btn"
+                    data-sidebar-tab="note"
+                    role="tab"
+                    aria-selected="true"
+                  >
+                    Note
+                  </button>
+                  <button
+                    type="button"
+                    class="note-tab-btn"
+                    id="tab-lab-btn"
+                    data-sidebar-tab="lab"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    27 Parts
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  class="icon-close-btn note-size-btn"
+                  id="note-expand-toggle-btn"
+                  aria-label="Expand sidebar note"
+                  aria-expanded="false"
+                >
+                  <svg class="ui-icon icon-expand" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15 4h5v5M20 4l-6 6M9 20H4v-5M4 20l6-6" />
+                  </svg>
+                  <svg class="ui-icon icon-shrink" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 9h-5V4M15 9l5-5M4 15h5v5M9 15l-5 5" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="icon-close-btn note-min-btn"
+                  id="note-collapse-btn"
+                  aria-label="Minimize note to corner pill"
+                >
+                  <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <h1 class="note-title" id="note-title">Membranous Cochlear Spiral</h1>
+
+            <!-- Resting Compact View (Clean 1-sentence preview + Expand CTA) -->
+            <div class="note-compact-body" id="note-compact-body">
+              <p class="note-compact-lead" id="note-compact-lead"></p>
+              <div class="note-compact-actions">
+                <button type="button" class="primary-action-btn" id="note-read-btn">Read Note →</button>
+                <button type="button" class="secondary-action-btn" id="note-lab-shortcut-btn">27 Parts</button>
+              </div>
+            </div>
+
+            <!-- Expanded Editorial Reader & Integrated Mode Lab -->
+            <div class="note-scroll-body" id="note-scroll-body" hidden>
+              <!-- Pane A: Clinical Note + Smooth "Further Read" -->
+              <div class="sidebar-pane" id="sidebar-pane-note">
+                <p class="note-lead-prose" id="insp-summary"></p>
+
+                <div class="note-metrics-strip" id="insp-telemetry">
+                  <div class="telemetry-cell">
+                    <span class="telemetry-key">Fluid Space</span>
+                    <span class="telemetry-val" id="insp-fluid">Endolymph +80 mV</span>
+                  </div>
+                  <div class="telemetry-cell">
+                    <span class="telemetry-key" id="insp-metric-key">Tonotopy</span>
+                    <span class="telemetry-val" id="insp-metric-val">20 Hz – 20,678 Hz</span>
+                  </div>
+                </div>
+
+                <div class="note-action-row">
+                  <button type="button" class="primary-action-btn" id="btn-isolate">Isolate Part</button>
+                  <button type="button" class="secondary-action-btn" id="btn-reset-view">Center View</button>
+                </div>
+
+                <!-- Progressive Disclosure Accordion (animate-to-intrinsic-sizes + accordion guide) -->
+                <details class="further-read-details" id="further-read-details">
+                  <summary class="further-read-summary">
+                    <span class="further-read-label">Further Read</span>
+                    <span class="further-read-hint">Nerves, morphometry &amp; pearls</span>
+                  </summary>
+                  <div class="further-read-content">
+                    <div class="depth-inline-row">
+                      <span class="depth-inline-label">Tone</span>
+                      <div class="segmented-control compact-seg" role="group" aria-label="Reading style">
+                        <button type="button" class="segment-btn active" data-reading-depth="simple">Patient</button>
+                        <button type="button" class="segment-btn" data-reading-depth="detailed">Clinical</button>
+                      </div>
+                    </div>
+
+                    <p class="note-deep-prose" id="insp-deep-prose"></p>
+
+                    <dl class="further-read-dl" id="insp-details-dl">
+                      <div class="dl-pair">
+                        <dt>Latin Name</dt>
+                        <dd id="insp-latin">Ductus cochlearis</dd>
+                      </div>
+                      <div class="dl-pair">
+                        <dt>Innervation</dt>
+                        <dd id="insp-innervation">Cochlear Nerve (CN VIII)</dd>
+                      </div>
+                      <div class="dl-pair">
+                        <dt>Morphometry</dt>
+                        <dd id="insp-morphometry">28.79 mm geodesic spiral</dd>
+                      </div>
+                      <div class="dl-pair">
+                        <dt>RAS Centroid</dt>
+                        <dd class="mono-dd" id="insp-ras-chip">[2.2, 5.2, -2.2] mm · mesh_david_cochlea</dd>
+                      </div>
+                      <div class="dl-pair">
+                        <dt>Clinical Pearl</dt>
+                        <dd id="insp-pearl"></dd>
+                      </div>
+                    </dl>
+                  </div>
+                </details>
+              </div>
+
+              <!-- Pane B: Mode-Specific Lab Chart / 27-Parts Browser (Inside SAME Sidebar) -->
+              <div class="sidebar-pane" id="sidebar-pane-lab" hidden>
+                <!-- 1. 27-Parts Ontology -->
+                <section class="lab-subpanel" id="lab-panel-parts" aria-label="27 Anatomical Structures">
+                  <div class="lab-filter-row" id="parts-filter-row" role="group" aria-label="Filter anatomical systems">
+                    <button type="button" class="chip-btn active" data-sys-filter="all">All (27)</button>
+                    <button type="button" class="chip-btn" data-sys-filter="cochlear_system">Cochlea</button>
+                    <button type="button" class="chip-btn" data-sys-filter="semicircular_ducts">Canals</button>
+                    <button type="button" class="chip-btn" data-sys-filter="ampullae_cupulae">Ampullae</button>
+                    <button type="button" class="chip-btn" data-sys-filter="otolith_vestibule">Vestibule</button>
+                    <button type="button" class="chip-btn" data-sys-filter="bony_capsule">Bone</button>
+                  </div>
+
+                  <div class="lab-search-shell">
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="11" cy="11" r="6.5" />
+                      <path d="m16 16 4.5 4.5" />
+                    </svg>
+                    <input
+                      type="search"
+                      id="parts-filter-input"
+                      class="lab-search-input"
+                      placeholder="Filter 27 structures..."
+                      aria-label="Filter anatomical structures"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </div>
+
+                  <div class="mobile-parts-sliders" id="mobile-parts-sliders">
+                    <div class="slider-control">
+                      <div class="slider-label-row">
+                        <label for="mobile-bone-peel-slider">Outer Bone Shell</label>
+                        <span class="slider-value" id="mobile-bone-peel-val">80%</span>
+                      </div>
+                      <input type="range" id="mobile-bone-peel-slider" min="0" max="100" value="80" aria-valuetext="80 percent opacity" />
+                    </div>
+                    <div class="slider-control">
+                      <div class="slider-label-row">
+                        <label for="mobile-explode-slider">Exploded View</label>
+                        <span class="slider-value" id="mobile-explode-val">0%</span>
+                      </div>
+                      <input type="range" id="mobile-explode-slider" min="0" max="100" value="0" aria-valuetext="0 percent radial separation" />
+                    </div>
+                  </div>
+
+                  <div class="parts-list-body" id="parts-list"></div>
+                </section>
+
+                <!-- 2. Audiogram & Tonotopy -->
+                <section class="lab-subpanel" id="lab-panel-audiogram" aria-label="Right Ear Pure-Tone Audiogram" hidden>
+                  <div class="lab-subhead">
+                    <h2 class="lab-subhead-title">Pure-Tone Audiogram (Right Ear)</h2>
+                    <p class="lab-subhead-desc">Illustrative clinical profiles linked along Greenwood’s spiral map.</p>
+                  </div>
+                  <div class="lab-filter-row" id="audiogram-preset-row" role="group" aria-label="Illustrative audiogram presets">
+                    <button type="button" class="chip-btn active" data-audio-preset="normal">Normal</button>
+                    <button type="button" class="chip-btn" data-audio-preset="presbycusis">Presbycusis</button>
+                    <button type="button" class="chip-btn" data-audio-preset="noise_notch">4 kHz Notch</button>
+                    <button type="button" class="chip-btn" data-audio-preset="meniere">Ménière</button>
+                    <button type="button" class="chip-btn" data-audio-preset="scds">SSCD</button>
+                  </div>
+                  <div class="plot-trough">
+                    <svg id="audiogram-svg" class="clinical-svg" viewBox="0 0 360 225" role="img" aria-label="Right ear air-conduction audiogram from 125 Hz to 8000 Hz"></svg>
+                  </div>
+                  <p class="lab-caption" id="audiogram-caption">
+                    Right Ear convention (red circles). Cursors track F(x) = 165.4(10^2.1x − 0.88).
+                  </p>
+                </section>
+
+                <!-- 3. Virtual Radiology 2D MPR -->
+                <section class="lab-subpanel" id="lab-panel-ct" aria-label="Temporal Bone CT MPR Viewer" hidden>
+                  <div class="lab-subhead">
+                    <h2 class="lab-subhead-title" id="ct-drawer-title">Pöschl's Plane MPR</h2>
+                    <p class="lab-subhead-desc" id="ct-drawer-sub">Bone Window W:4000 / L:+700 HU · Illustrative slice</p>
+                  </div>
+                  <div class="lab-filter-row" role="group" aria-label="Imaging window mode">
+                    <button type="button" class="chip-btn active" data-ct-window="bone">CT Bone</button>
+                    <button type="button" class="chip-btn" data-ct-window="mri_t2">T2 CISS MRI</button>
+                    <span class="lab-metric-inline" id="ct-depth-badge">+1.2 mm</span>
+                  </div>
+                  <div class="plot-trough">
+                    <canvas id="ct-slice-canvas" class="clinical-canvas" width="640" height="400"></canvas>
+                  </div>
+                  <p class="lab-caption" id="ct-landmark-caption">Superior Canal Osseous Halo (SSCD Gold Standard)</p>
+                </section>
+
+                <!-- 4. Vestibular & VOR Monitor + Inline 3-Axis Head Gyro -->
+                <section class="lab-subpanel" id="lab-panel-vor" aria-label="3D VOR and Nystagmogram Monitor" hidden>
+                  <div class="lab-subhead">
+                    <h2 class="lab-subhead-title" id="vor-drawer-title">Bilateral VOR &amp; Nystagmogram</h2>
+                    <p class="lab-subhead-desc" id="vor-drawer-sub">Illustrative Ewald response · Curthoys 40–80 ms</p>
+                  </div>
+                  <div class="vor-metrics-bar">
+                    <span class="metric-tag" id="vor-spv-tag">SPV: 24.0 °/s</span>
+                    <span class="metric-tag" id="vor-gain-tag">vHIT Gain: 0.94</span>
+                    <span class="metric-tag" id="vor-uw-tag">UW: 8% (Symmetric)</span>
+                  </div>
+                  <div class="plot-trough">
+                    <canvas id="vor-strip-canvas" class="clinical-canvas" width="640" height="360"></canvas>
+                  </div>
+                  <p class="lab-caption" id="vor-caption">
+                    Horizontal, Vertical, and Torsional slow-phase drift with corrective fast beats.
+                  </p>
+
+                  <details class="further-read-details gyro-details" id="gyro-details">
+                    <summary class="further-read-summary">
+                      <span class="further-read-label">3-Axis Head Gyro</span>
+                      <span class="further-read-hint">Dix-Hallpike &amp; Epley angles</span>
+                    </summary>
+                    <div class="gyro-sliders">
+                      <div class="slider-control">
+                        <div class="slider-label-row">
+                          <label for="gyro-yaw-slider">Yaw (Left/Right)</label>
+                          <span class="slider-value" id="gyro-yaw-val">+45°</span>
+                        </div>
+                        <input type="range" id="gyro-yaw-slider" min="-90" max="90" value="45" aria-valuetext="+45 degrees" />
+                      </div>
+                      <div class="slider-control">
+                        <div class="slider-label-row">
+                          <label for="gyro-pitch-slider">Pitch (Supine/Tilt)</label>
+                          <span class="slider-value" id="gyro-pitch-val">-30°</span>
+                        </div>
+                        <input type="range" id="gyro-pitch-slider" min="-90" max="90" value="-30" aria-valuetext="-30 degrees" />
+                      </div>
+                      <div class="slider-control">
+                        <div class="slider-label-row">
+                          <label for="gyro-roll-slider">Roll (Lateral)</label>
+                          <span class="slider-value" id="gyro-roll-val">0°</span>
+                        </div>
+                        <input type="range" id="gyro-roll-slider" min="-90" max="90" value="0" aria-valuetext="0 degrees" />
+                      </div>
+                    </div>
+                  </details>
+                </section>
+
+                <!-- 5. Surgical Suites Telemetry -->
+                <section class="lab-subpanel" id="lab-panel-surgical" aria-label="Surgical Endoscopy and Force Telemetry" hidden>
+                  <div class="lab-subhead">
+                    <h2 class="lab-subhead-title" id="surg-drawer-title">Scala Tympani Lumen &amp; Force</h2>
+                    <p class="lab-subhead-desc" id="surg-drawer-sub">30 mN translocation guard · Illustrative trace</p>
+                  </div>
+                  <div class="vor-metrics-bar">
+                    <span class="metric-tag" id="surg-force-tag">Force: 8.2 mN</span>
+                    <span class="metric-tag" id="surg-dbm-tag">d_BM: 0.45 mm</span>
+                    <span class="metric-tag" id="surg-risk-tag">Status: OPTIMAL</span>
+                  </div>
+                  <div class="plot-trough">
+                    <canvas id="surgical-canvas" class="clinical-canvas" width="640" height="360"></canvas>
+                  </div>
+                  <p class="lab-caption" id="surg-caption">
+                    Basilar membrane clearance and axial insertion force along 28.0 mm Scala Tympani spline.
+                  </p>
+                </section>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <!-- ZONE 4: CONTEXTUAL BOTTOM WORKBENCH DOCK + TRAILING STAGE TOOLS -->
+      <nav class="bottom-viz-bar glass-surface" id="bottom-bar" aria-label="Clinical Workbench Controls">
+        <!-- 4A. Anatomy Dock -->
+        <div class="dock-panel active" id="anatomy-dock-content">
+          <div class="dock-chip-group" role="group" aria-label="Guided Anatomy Views">
+            <button type="button" class="dock-btn active" data-preset="overview">Overview</button>
+            <button type="button" class="dock-btn" data-preset="balance_system">Balance</button>
+            <button type="button" class="dock-btn" data-preset="hearing_snail">Cochlea</button>
+            <button type="button" class="dock-btn" data-preset="exploded_view">Explode</button>
+          </div>
+          <div class="dock-sliders">
+            <div class="slider-control compact">
+              <div class="slider-label-row">
+                <label for="bone-peel-slider">Bone Shell</label>
+                <span class="slider-value" id="bone-peel-val">80%</span>
+              </div>
+              <input type="range" id="bone-peel-slider" min="0" max="100" value="80" aria-valuetext="80 percent opacity" />
+            </div>
+            <div class="slider-control compact">
+              <div class="slider-label-row">
+                <label for="explode-slider">Explode</label>
+                <span class="slider-value" id="explode-val">0%</span>
+              </div>
+              <input type="range" id="explode-slider" min="0" max="100" value="0" aria-valuetext="0 percent radial separation" />
+            </div>
+          </div>
+          <button type="button" class="drawer-trigger-btn" id="parts-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">
+            <span>27 Parts</span>
+          </button>
+        </div>
+
+        <!-- 4B. Hearing & Tonotopy Dock -->
+        <div class="dock-panel" id="hearing-dock-content" hidden>
+          <div class="slider-control dock-wide-slider">
+            <div class="slider-label-row">
+              <label for="hearing-freq-slider">Greenwood</label>
+              <span class="slider-value" id="hearing-freq-readout">1 kHz · 11.5 mm</span>
+            </div>
+            <input type="range" id="hearing-freq-slider" min="0" max="1000" value="566" aria-valuetext="1000 Hz" />
+          </div>
+          <div class="dock-chip-group" role="group" aria-label="Octave markers">
+            <button type="button" class="dock-btn" data-octave="250">250</button>
+            <button type="button" class="dock-btn" data-octave="500">500</button>
+            <button type="button" class="dock-btn active" data-octave="1000">1k</button>
+            <button type="button" class="dock-btn" data-octave="4000">4k</button>
+            <button type="button" class="dock-btn" data-octave="8000">8k</button>
+          </div>
+          <button type="button" class="drawer-trigger-btn" id="audiogram-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">
+            <span>Audiogram</span>
+          </button>
+        </div>
+
+        <!-- 4C. Virtual Radiology Dock -->
+        <div class="dock-panel" id="radiology-dock-content" hidden>
+          <div class="dock-chip-group" role="group" aria-label="Temporal bone MPR planes">
+            <button type="button" class="dock-btn active" data-plane="poschl">Pöschl</button>
+            <button type="button" class="dock-btn" data-plane="stenvers">Stenvers</button>
+            <button type="button" class="dock-btn" data-plane="axial">Axial</button>
+            <button type="button" class="dock-btn" data-plane="coronal">Coronal</button>
+          </div>
+          <div class="slider-control dock-wide-slider">
+            <div class="slider-label-row">
+              <label for="radiology-depth-slider">Slice Depth</label>
+              <span class="slider-value" id="radiology-depth-readout">+1.2 mm</span>
+            </div>
+            <input type="range" id="radiology-depth-slider" min="-90" max="90" value="12" aria-valuetext="+1.2 millimeters" />
+          </div>
+          <div class="dock-chip-group">
+            <button type="button" class="dock-btn" id="rad-scds-btn" aria-pressed="false">SCDS 1.5mm</button>
+            <button type="button" class="drawer-trigger-btn" id="ct-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">
+              <span>2D CT MPR</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4D. Vestibular & VOR Dock -->
+        <div class="dock-panel" id="vestibular-dock-content" hidden>
+          <div class="dock-chip-group" role="group" aria-label="Vestibular protocols">
+            <button type="button" class="dock-btn active" data-vest-sub="bppv">BPPV Epley</button>
+            <button type="button" class="dock-btn" data-vest-sub="caloric">Caloric COWS</button>
+            <button type="button" class="dock-btn" data-vest-sub="vhit">vHIT 40–80ms</button>
+          </div>
+          <div class="slider-control dock-wide-slider">
+            <div class="slider-label-row">
+              <label for="vest-step-slider">Phase</label>
+              <span class="slider-value" id="vest-step-readout">2/5 · Lie Back</span>
+            </div>
+            <input type="range" id="vest-step-slider" min="0" max="4" value="1" step="1" aria-valuetext="Step 2 of 5" />
+          </div>
+          <div class="dock-chip-group">
+            <button type="button" class="dock-btn" id="gyro-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">Gyro</button>
+            <button type="button" class="drawer-trigger-btn" id="vor-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">
+              <span>VOR &amp; VNG</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4E. Surgical Suites Dock -->
+        <div class="dock-panel" id="surgical-dock-content" hidden>
+          <div class="dock-chip-group" role="group" aria-label="Surgical procedures">
+            <button type="button" class="dock-btn active" data-surg-proc="cochlear_implant">CI Array</button>
+            <button type="button" class="dock-btn" data-surg-proc="labyrinthectomy">Labyrinthectomy</button>
+            <button type="button" class="dock-btn" data-surg-proc="neurectomy">IAC Neurectomy</button>
+          </div>
+          <div class="slider-control dock-wide-slider">
+            <div class="slider-label-row">
+              <label for="surg-param-slider" id="surg-param-label">CI Depth</label>
+              <span class="slider-value" id="surg-param-readout">18.0 mm · 429°</span>
+            </div>
+            <input type="range" id="surg-param-slider" min="0" max="28" value="18" step="0.5" aria-valuetext="18.0 millimeters" />
+          </div>
+          <button type="button" class="drawer-trigger-btn" id="surg-toggle-btn" aria-expanded="false" aria-controls="note-sidebar">
+            <span>Telemetry</span>
+          </button>
+        </div>
+
+        <span class="dock-divider" aria-hidden="true"></span>
+        <div class="dock-stage-utils" role="group" aria-label="Stage Utilities">
+          <button
+            type="button"
+            class="dock-icon-btn active"
+            id="tool-labels-btn"
+            aria-label="Cycle 3D anatomical pins"
+            aria-pressed="true"
+          >
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h10l5 5-5 5H4z" />
+              <circle cx="8.5" cy="12" r="1.2" />
+            </svg>
+          </button>
+          <button type="button" class="dock-icon-btn" id="tool-reset-btn" aria-label="Reset 3D camera">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 12a8 8 0 1 1 2.3 5.7" />
+              <path d="M4 17.5V12h5.5" />
+            </svg>
+          </button>
+        </div>
+      </nav>
+
+      <!-- MODAL CLINICAL SUMMARY & PRINTABLE REPORT DIALOG -->
+      <dialog id="report-dialog" class="report-dialog" closedby="any" aria-labelledby="report-dialog-title">
+        <div class="dialog-header">
+          <h2 class="dialog-title" id="report-dialog-title">Inner Ear 3D Lab — Specimen &amp; Clinical Brief</h2>
+          <button type="button" class="icon-close-btn" id="report-close-btn" aria-label="Close clinical summary">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div class="dialog-body">
+          <p class="dialog-lead">
+            Stereotaxic Right-Anterior-Superior (RAS) teaching showcase anchored on authentic IE-Map v1.0.0 anatomy (27 meshes, centroid [4.5, 1.4, 0.5] mm).
+          </p>
+          <div class="report-summary-grid">
+            <div class="report-metric">
+              <span class="telemetry-key">Active Specimen Focus</span>
+              <span class="telemetry-val" id="rep-active-part">Cochlea (28.79 mm spiral)</span>
+            </div>
+            <div class="report-metric">
+              <span class="telemetry-key">Active Modality</span>
+              <span class="telemetry-val" id="rep-active-mode">Anatomy Atlas</span>
+            </div>
+            <div class="report-metric">
+              <span class="telemetry-key">Tonotopy / CI Limits</span>
+              <span class="telemetry-val">20 Hz–20.7 kHz · 28.0 mm / 30 mN guard</span>
+            </div>
+            <div class="report-metric">
+              <span class="telemetry-key">Vestibular &amp; MPR Reference</span>
+              <span class="telemetry-val">vHIT 40–80 ms · Pöschl +1.2 mm SSCD</span>
+            </div>
+          </div>
+          <p class="report-note">
+            Note: Illustrative patient profiles (4 kHz acoustic trauma notch, SSCD 1.5 mm defect, BPPV canalith clearing) are modeled from deterministic textbook equations implemented in the repository; no external clinical endorsements or live patient records are implied.
+          </p>
+        </div>
+        <div class="dialog-footer">
+          <button type="button" class="secondary-action-btn" id="report-print-btn">Print Sheet</button>
+          <button type="button" class="primary-action-btn" id="report-done-btn" autofocus>Close</button>
+        </div>
+      </dialog>
+    </div>
+
+    <script type="module" src="/src/showcase/main.ts"></script>
+  </body>
+</html>

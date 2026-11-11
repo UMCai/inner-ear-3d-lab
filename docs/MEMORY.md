@@ -8,6 +8,13 @@
 
 ## 1. Chronological Timeline & Milestones
 
+### 2026-11-11: Phase 1 Static Showcase — Dual-Theme One-Side Expandable Note Sidebar (`web/showcase.html`)
+- **Objective:** Prototype a social-media-worthy dual-polarity (Dark Glassroom + Light Paper-Technical) static frontend showcase before wiring Phase 2 production changes (`web/index.html`, `AppHUD.ts`, `DualStageScene.ts`), specifically replacing crowded small multi-corner overlays with a calm **One-Side Expandable Note Sidebar**.
+- **Key Deliverables Achieved:**
+  - `web/showcase.html`, `web/src/showcase/showcase.css`, `web/src/showcase/main.ts`, `web/src/showcase/showcaseData.ts`: Unified `#note-sidebar` (`collapsed` pill → `compact` `280px`/`256px`/`198px` preview → `expanded` `388px` `[Note | <Lab>]` reader → `476px` `Further Read` `<details>` with inline `Patient | Clinical` tone switch; bottom reader sheet on `<= 720px`), dynamic `--stage-left-gutter` / `--dock-shift-x` bottom-dock clearance, trailing `.dock-stage-utils`, `16px` note prose, and `>= 13px` interactive UI controls.
+  - `web/src/showcase/HeroSpecimen3D.ts`: `THREE.AgXToneMapping`, `RoomEnvironment` IBL, alpha-transparent WebGL2 stage synced to resolved light/dark polarity via GLSL `#include <tonemapping_fragment>` + `#include <colorspace_fragment>`, and dynamic `camera.setViewOffset` framing rightward/upward as `#note-sidebar` expands.
+  - `DESIGN.md`, `.impeccable/design.json`, `.impeccable/surfaces/web-showcase-html.md`: Synchronized dual-polarity design system documentation; `impeccable detect --json` returns zero findings and multi-viewport Chrome CDP checks pass across `1440×900`, `1280×800`, `768×1024`, and `390×844` in both themes with `0` console/network errors.
+
 ### 2026-10-08 to 2026-10-10: Gate 3 BPPV 3D Video & Headless Pipeline
 - **Objective:** Build a reproducible, code-driven 1080p (`1920x1080`, `30 fps`, `110.20s`) clinical animation demonstrating the Epley Maneuver for right-ear posterior-canal BPPV.
 - **Key Milestones Achieved:**
