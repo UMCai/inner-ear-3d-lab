@@ -9,6 +9,7 @@
     "dev": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
     "preview": "npm --prefix web run preview",
+    "typecheck": "./web/node_modules/.bin/tsc -p web/tsconfig.json --noEmit",
     "pretest": "npm run build",
     "test:hearing": "node scripts/test_hearing_engine.js",
     "test:radiology": "node scripts/test_radiology_engine.js",
@@ -17,7 +18,11 @@
     "test:workbench": "node scripts/test_vor_workbench.js",
     "test:diagnostic": "node scripts/test_diagnostic_vestibular.js",
     "test:surgical": "node scripts/test_surgical_engine.js",
-    "test": "npm run test:hearing && npm run test:radiology && npm run test:vestibular && npm run test:eye-avatar && npm run test:workbench && npm run test:diagnostic && npm run test:surgical"
+    "test:fast": "SKIP_NESTED_BUILD=1 npm run test:hearing && SKIP_NESTED_BUILD=1 npm run test:radiology && SKIP_NESTED_BUILD=1 npm run test:vestibular && SKIP_NESTED_BUILD=1 npm run test:eye-avatar && SKIP_NESTED_BUILD=1 npm run test:workbench && SKIP_NESTED_BUILD=1 npm run test:diagnostic && SKIP_NESTED_BUILD=1 npm run test:surgical",
+    "test:python": "python3 scripts/test_canal_paths.py && python3 src/physics/epley_simulator.py",
+    "test:cdp": "node scripts/verify_mvp_cdp.js",
+    "test": "SKIP_NESTED_BUILD=1 npm run test:hearing && SKIP_NESTED_BUILD=1 npm run test:radiology && SKIP_NESTED_BUILD=1 npm run test:vestibular && SKIP_NESTED_BUILD=1 npm run test:eye-avatar && SKIP_NESTED_BUILD=1 npm run test:workbench && SKIP_NESTED_BUILD=1 npm run test:diagnostic && SKIP_NESTED_BUILD=1 npm run test:surgical",
+    "verify": "npm run sync:assets && npm run typecheck && npm run test:fast && npm run test:python && npm run build"
   }
 }
 

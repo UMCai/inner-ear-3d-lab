@@ -1,0 +1,13 @@
+{
+  "name": "inner-ear-lab",
+  "displayName": "Inner Ear 3D Lab Harness",
+  "version": "1.0.0",
+  "description": "Repo-specific WebGL/Three.js, clinical neurotology, Chrome CDP QA, and Blender IE-Map pipeline harness for inner-ear-3d-lab.",
+  "logo": "assets/logo.svg",
+  "repository": "https://github.com/UMCai/inner-ear-3d-lab",
+  "suggestedPrompts": [
+    "Audit WebGL frame allocations and GPU shader uniforms across all 5 modes",
+    "Run multi-viewport Chrome DevTools & CDP verification across desktop, tablet, and mobile",
+    "Verify clinical physics and IE-Map asset parity across TypeScript and Python"
+  ]
+}

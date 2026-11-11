@@ -512,13 +512,17 @@ assert(
 );
 
 // 51. Production Web TypeScript Build succeeds with 0 errors
-console.log('\n  ⚙️ Validating web TypeScript bundle with "npm run build"...');
-try {
-  execSync('npm --prefix web run build', { stdio: 'pipe' });
-  assert(true, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
-} catch (err) {
-  console.error(err.stdout?.toString() || err.message);
-  assert(false, 'Production Web Build failed');
+if (process.env.SKIP_NESTED_BUILD === '1') {
+  assert(true, 'Production Web Build: deferred to parent pretest/verify (SKIP_NESTED_BUILD=1)');
+} else {
+  console.log('\n  ⚙️ Validating web TypeScript bundle with "npm run build"...');
+  try {
+    execSync('npm --prefix web run build', { stdio: 'pipe' });
+    assert(true, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
+  } catch (err) {
+    console.error(err.stdout?.toString() || err.message);
+    assert(false, 'Production Web Build failed');
+  }
 }
 
 console.log('\n================================================================');

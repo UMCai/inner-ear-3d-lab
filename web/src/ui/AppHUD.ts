@@ -84,6 +84,7 @@ export class AppHUD {
 
   // Bottom Bar Elements
   private bottomBar!: HTMLElement;
+  private bottomResizeObserver: ResizeObserver | null = null;
   private anatomyDockContent!: HTMLElement;
   private hearingDockContent!: HTMLElement;
   private radiologyDockContent!: HTMLElement;
@@ -1229,6 +1230,9 @@ export class AppHUD {
             <div class="modal-actions">
               <button type="button" class="modal-confirm-btn" id="about-confirm-btn">Close</button>
             </div>
+          </div>
+        </div>
+
         <!-- 5B. CALORIC JONGKEES BITHERMAL MATRIX MODAL -->
         <div class="modal-backdrop caloric-modal-backdrop" id="caloric-jongkees-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="jongkees-modal-title">
           <div class="modal-card caloric-modal-sheet">
@@ -1636,7 +1640,16 @@ export class AppHUD {
 
     window.addEventListener('resize', () => {
       this.updateMobileDrawerExclusivity();
+      this.syncDockClearance();
     });
+
+    if (typeof ResizeObserver !== 'undefined' && this.bottomBar) {
+      this.bottomResizeObserver = new ResizeObserver(() => {
+        this.syncDockClearance();
+      });
+      this.bottomResizeObserver.observe(this.bottomBar);
+    }
+    this.syncDockClearance();
 
     // -------------------------------------------------------------------------
     // Settings Button & Popover
@@ -2354,7 +2367,17 @@ export class AppHUD {
     }
   }
 
+  private syncDockClearance(): void {
+    if (!this.bottomBar || typeof window === 'undefined') return;
+    const rect = this.bottomBar.getBoundingClientRect();
+    if (rect.height > 0 && window.innerHeight > 0) {
+      const clearancePx = Math.max(76, Math.ceil(window.innerHeight - rect.top + 10));
+      this.root.style.setProperty('--dock-clearance', `${clearancePx}px`);
+    }
+  }
+
   private updateMobileDrawerExclusivity(): void {
+    this.syncDockClearance();
     if (window.innerWidth <= 640) {
       const anyDrawerOpen =
         this.partsDrawerOpen ||
@@ -2878,6 +2901,7 @@ export class AppHUD {
       this.surgicalDockContent.style.display = 'none';
       this.anatomyDockContent.style.display = 'flex';
     }
+    this.syncDockClearance();
   }
 
   // ===========================================================================
@@ -2904,6 +2928,7 @@ export class AppHUD {
     this.scene.setSurgicalProcedure(proc);
     this.syncSurgicalUI();
     this.renderInspectorCard(this.scene.getSelectedMesh());
+    this.syncDockClearance();
   }
 
   private applyCIParameters(): void {
@@ -3342,6 +3367,7 @@ export class AppHUD {
       this.vorDrawer.setDiagnosticViewMode('nystagmogram');
       this.selectManeuver(this.activeManeuverId);
     }
+    this.syncDockClearance();
   }
 
   public selectCaloricTemp(temp: CaloricIrrigationType): void {

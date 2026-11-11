@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, extname, dirname, resolve } from 'node:path';
@@ -9,10 +9,66 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, '..');
 const DIST_DIR = join(REPO_ROOT, 'web', 'dist');
-const OUTPUT_DIR = join(REPO_ROOT, 'output');
-const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 4188;
 const DEBUG_PORT = 9225;
+
+function parseCliArgs(argv) {
+  let updateBaselines = false;
+  let customOutDir = null;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--update-baselines') {
+      updateBaselines = true;
+    } else if (arg.startsWith('--out-dir=')) {
+      customOutDir = arg.slice('--out-dir='.length);
+    } else if (arg === '--out-dir' && argv[i + 1]) {
+      customOutDir = argv[++i];
+    }
+  }
+  if (customOutDir) {
+    return { outDir: resolve(REPO_ROOT, customOutDir), mode: 'custom' };
+  }
+  if (updateBaselines) {
+    return { outDir: join(REPO_ROOT, 'output'), mode: 'baselines' };
+  }
+  return { outDir: join(tmpdir(), 'inner-ear-cdp'), mode: 'tmp' };
+}
+
+const { outDir: OUTPUT_DIR, mode: OUTPUT_MODE } = parseCliArgs(process.argv.slice(2));
+
+function resolveChromeExecutable() {
+  if (process.env.CHROME_PATH && existsSync(process.env.CHROME_PATH)) {
+    return process.env.CHROME_PATH;
+  }
+  const candidates = [
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/snap/bin/chromium',
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  for (const bin of ['google-chrome', 'chromium', 'chromium-browser']) {
+    try {
+      const resolved = execSync(`command -v ${bin}`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (resolved && existsSync(resolved)) {
+        return resolved;
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+  throw new Error('Could not find Chrome/Chromium binary. Set CHROME_PATH env variable.');
+}
+
+const CHROME_PATH = resolveChromeExecutable();
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -177,9 +233,222 @@ class CdpClient {
   }
 }
 
-// 4. Test Suite Execution
+// 4. Layout Geometry Verification Helper
+async function auditLayoutGeometry(client, label, vp, options = {}) {
+  const { minCanvasPct = null } = options;
+  const geomRes = await client.send('Runtime.evaluate', {
+    expression: `
+      (() => {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const scrollWidth = document.documentElement.scrollWidth;
+        const overflowX = scrollWidth > vw;
+
+        const selectors = [
+          { name: 'header', sel: '.lab-header' },
+          { name: 'bottomDock', sel: '.bottom-viz-bar' },
+          { name: 'inspector', sel: '#inspector-card' },
+          { name: 'gyroFlyout', sel: '#gyro-flyout' },
+          { name: 'partsDrawer', sel: '#parts-drawer' },
+          { name: 'audiogramDrawer', sel: '#audiogram-drawer' },
+          { name: 'ctDrawer', sel: '#ct-slice-drawer' },
+          { name: 'vorDrawer', sel: '#vor-drawer' },
+          { name: 'surgicalDrawer', sel: '#surgical-drawer' },
+        ];
+
+        const boxes = [];
+        for (const item of selectors) {
+          const el = document.querySelector(item.sel);
+          if (!el) continue;
+          const style = getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') === 0) {
+            continue;
+          }
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          const left = Math.max(0, r.left);
+          const top = Math.max(0, r.top);
+          const right = Math.min(vw, r.right);
+          const bottom = Math.min(vh, r.bottom);
+          if (right <= left || bottom <= top) continue;
+          boxes.push({
+            name: item.name,
+            left,
+            top,
+            right,
+            bottom,
+            width: right - left,
+            height: bottom - top,
+            rawLeft: r.left,
+            rawRight: r.right,
+          });
+        }
+
+        const overlaps = [];
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i];
+            const b = boxes[j];
+            const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+            const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+            if (ox > 1 && oy > 1) {
+              overlaps.push({ a: a.name, b: b.name, width: Math.round(ox), height: Math.round(oy) });
+            }
+          }
+        }
+
+        // Exact 2D union area of visible HUD rects via coordinate compression
+        const xs = Array.from(new Set(boxes.flatMap((b) => [b.left, b.right]))).sort((a, b) => a - b);
+        const ys = Array.from(new Set(boxes.flatMap((b) => [b.top, b.bottom]))).sort((a, b) => a - b);
+        let coveredArea = 0;
+        for (let xi = 0; xi < xs.length - 1; xi++) {
+          const x0 = xs[xi], x1 = xs[xi + 1];
+          const dx = x1 - x0;
+          if (dx <= 0) continue;
+          const mx = (x0 + x1) * 0.5;
+          for (let yi = 0; yi < ys.length - 1; yi++) {
+            const y0 = ys[yi], y1 = ys[yi + 1];
+            const dy = y1 - y0;
+            if (dy <= 0) continue;
+            const my = (y0 + y1) * 0.5;
+            if (boxes.some((b) => mx >= b.left && mx <= b.right && my >= b.top && my <= b.bottom)) {
+              coveredArea += dx * dy;
+            }
+          }
+        }
+        const viewportArea = vw * vh;
+        const unobstructedCanvasPct = ((viewportArea - coveredArea) / viewportArea) * 100;
+
+        // Check header cluster non-overlap and brand title containment
+        const headerOverlaps = [];
+        const headerEl = document.querySelector('.lab-header');
+        if (headerEl) {
+          const clusterSels = ['.brand-cluster', '.mode-switcher', '.search-container', '.header-actions'];
+          const clusterRects = [];
+          for (const sel of clusterSels) {
+            const el = headerEl.querySelector(sel);
+            if (!el) continue;
+            const st = getComputedStyle(el);
+            if (st.display === 'none') continue;
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) continue;
+            clusterRects.push({ sel, r });
+          }
+          for (let i = 0; i < clusterRects.length; i++) {
+            for (let j = i + 1; j < clusterRects.length; j++) {
+              const a = clusterRects[i];
+              const b = clusterRects[j];
+              const ox = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+              const oy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+              if (ox > 0.5 && oy > 0.5) {
+                headerOverlaps.push({ a: a.sel, b: b.sel, ox: Math.round(ox), oy: Math.round(oy) });
+              }
+            }
+          }
+          const brandCluster = headerEl.querySelector('.brand-cluster');
+          const brandTitle = headerEl.querySelector('.brand-title');
+          if (brandCluster && brandTitle) {
+            const cr = brandCluster.getBoundingClientRect();
+            const tr = brandTitle.getBoundingClientRect();
+            if (tr.right > cr.right + 1.5 || brandTitle.scrollWidth > brandTitle.clientWidth + 1.5 && getComputedStyle(brandTitle).textOverflow !== 'ellipsis') {
+              headerOverlaps.push({ a: '.brand-title', b: '.brand-cluster', overflow: Math.round(tr.right - cr.right) });
+            }
+          }
+          const searchInput = headerEl.querySelector('#search-input');
+          const clearBtn = headerEl.querySelector('#search-clear-btn');
+          if (searchInput && clearBtn && getComputedStyle(clearBtn).display !== 'none') {
+            const cr = clearBtn.getBoundingClientRect();
+            const padR = parseFloat(getComputedStyle(searchInput).paddingRight || '0');
+            if (cr.width > 0 && padR < cr.width + 2) {
+              headerOverlaps.push({ a: '#search-input', b: '#search-clear-btn', padR, clearW: Math.round(cr.width) });
+            }
+          }
+        }
+
+        // Check bottom dock children containment & slider label/value separation
+        const dockClips = [];
+        const dockEl = document.querySelector('.bottom-viz-bar');
+        if (dockEl) {
+          const dr = dockEl.getBoundingClientRect();
+          const controls = dockEl.querySelectorAll('button, input, .vest-subnav-tab, .surg-subnav-tab');
+          for (const el of controls) {
+            if (el.offsetParent === null) continue;
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) continue;
+            if (r.right > dr.right + 1.5 || r.left < dr.left - 1.5) {
+              dockClips.push({
+                id: el.id || el.className,
+                text: (el.textContent || '').trim().slice(0, 24),
+                overRight: Math.max(0, Math.round(r.right - dr.right)),
+                overLeft: Math.max(0, Math.round(dr.left - r.left)),
+              });
+            }
+          }
+          const sliderHeaders = dockEl.querySelectorAll('.slider-header');
+          for (const sh of sliderHeaders) {
+            if (sh.offsetParent === null) continue;
+            const lbl = sh.querySelector('label');
+            const val = sh.querySelector('.slider-val');
+            if (lbl && val) {
+              const lr = lbl.getBoundingClientRect();
+              const vr = val.getBoundingClientRect();
+              if (lr.right > vr.left + 0.5) {
+                dockClips.push({ id: 'slider-header', label: lbl.textContent, overlap: Math.round(lr.right - vr.left) });
+              }
+            }
+          }
+        }
+
+        return {
+          vw,
+          vh,
+          scrollWidth,
+          overflowX,
+          overlaps,
+          headerOverlaps,
+          dockClips,
+          unobstructedCanvasPct: Number(unobstructedCanvasPct.toFixed(1)),
+          visibleBoxes: boxes.map((b) => ({
+            name: b.name,
+            w: Math.round(b.width),
+            h: Math.round(b.height),
+          })),
+        };
+      })()
+    `,
+    returnByValue: true,
+  });
+
+  const info = geomRes.result.value;
+  if (info.overflowX) {
+    throw new Error(`[${vp.name} / ${label}] Horizontal overflow detected: scrollWidth=${info.scrollWidth} > innerWidth=${info.vw}`);
+  }
+  if (info.overlaps.length > 0) {
+    throw new Error(`[${vp.name} / ${label}] HUD panel overlap detected: ${JSON.stringify(info.overlaps)}`);
+  }
+  if (info.headerOverlaps && info.headerOverlaps.length > 0) {
+    throw new Error(`[${vp.name} / ${label}] Header child overlap/overflow detected: ${JSON.stringify(info.headerOverlaps)}`);
+  }
+  if (info.dockClips && info.dockClips.length > 0) {
+    throw new Error(`[${vp.name} / ${label}] Bottom dock control clipping/overlap detected: ${JSON.stringify(info.dockClips)}`);
+  }
+  if (minCanvasPct !== null && info.unobstructedCanvasPct < minCanvasPct) {
+    throw new Error(
+      `[${vp.name} / ${label}] 3D canvas unobstructed area ${info.unobstructedCanvasPct}% < required ${minCanvasPct}% (boxes: ${JSON.stringify(info.visibleBoxes)})`
+    );
+  }
+  console.log(
+    `✓ Layout Geometry [${label}]: scrollWidth=${info.scrollWidth}<=${info.vw}, 0 overlaps, 3D stage=${info.unobstructedCanvasPct}% (${info.visibleBoxes.map((b) => `${b.name}:${b.w}x${b.h}`).join(', ')})`
+  );
+  return info;
+}
+
+// 5. Test Suite Execution
 async function run() {
   console.log('=== Starting Pure 3D Inner Ear Anatomy Lab Automated CDP Tests ===');
+  console.log(`[CDP] Chrome executable: ${CHROME_PATH}`);
+  console.log(`[CDP] Screenshot output dir (${OUTPUT_MODE}): ${OUTPUT_DIR}`);
+  mkdirSync(OUTPUT_DIR, { recursive: true });
   const server = await startServer();
   const chromeProc = launchChrome();
 
@@ -516,6 +785,15 @@ async function run() {
       if (partsDrawerTest.result.value.rowCount !== 27) {
         throw new Error(`Expected 27 anatomical parts in drawer, found ${partsDrawerTest.result.value.rowCount}`);
       }
+      // Verify Parts Drawer open layout before closing
+      await client.send('Runtime.evaluate', {
+        expression: `(() => { const d = document.querySelector('#parts-drawer'); if (d && !d.classList.contains('open')) document.querySelector('#parts-toggle-btn')?.click(); })()`,
+      });
+      await new Promise((r) => setTimeout(r, 80));
+      await auditLayoutGeometry(client, 'Anatomy + Parts Drawer Open', vp);
+      await client.send('Runtime.evaluate', {
+        expression: `(() => { const d = document.querySelector('#parts-drawer'); if (d?.classList.contains('open')) document.querySelector('#parts-toggle-btn')?.click(); })()`,
+      });
       console.log(`✓ Collapsible 27 Parts Drawer verified (${partsDrawerTest.result.value.rowCount} parts rendered, single-click eye toggled "${partsDrawerTest.result.value.beforeEye}" -> "${partsDrawerTest.result.value.afterEye}")`);
 
       // 10. Test Settings Popover & About Dialog
@@ -533,7 +811,8 @@ async function run() {
             const aboutBtn = document.querySelector('#about-open-btn');
             aboutBtn?.click();
             const modal = document.querySelector('#about-modal');
-            const modalOpen = modal?.style.display !== 'none';
+            const mr = modal?.getBoundingClientRect();
+            const modalOpen = Boolean(modal && getComputedStyle(modal).display !== 'none' && mr && mr.width > 100 && mr.height > 100);
 
             const closeBtn = document.querySelector('#about-close-btn');
             closeBtn?.click();
@@ -550,10 +829,20 @@ async function run() {
       console.log(`✓ Settings Popover & About & Citations Modal verified (3D Labels: Off/Key/All, Reading Depth: Simple/Detailed, Citations)`);
 
       const ss = await client.send('Page.captureScreenshot', { format: 'png' });
-      mkdirSync(OUTPUT_DIR, { recursive: true });
       const ssPath = join(OUTPUT_DIR, `mvp_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(ssPath, Buffer.from(ss.data, 'base64'));
       console.log(`✓ Captured visual screenshot to ${ssPath}`);
+
+      // 10b. Verify Anatomy layout geometry (both with Inspector open and resting Stage view)
+      await auditLayoutGeometry(client, 'Anatomy + Inspector Open', vp);
+      await client.send('Runtime.evaluate', {
+        expression: `document.querySelector('#inspector-close-btn')?.click()`,
+      });
+      await new Promise((r) => setTimeout(r, 150));
+      await auditLayoutGeometry(client, 'Anatomy Resting (No Inspector)', vp, { minCanvasPct: 85 });
+      await client.send('Runtime.evaluate', {
+        expression: `document.querySelector('.preset-btn[data-preset="overview"]')?.click()`,
+      });
 
       // 11. Test Mode Switcher: Switch to Hearing Lab
       const hearingModeTest = await client.send('Runtime.evaluate', {
@@ -676,7 +965,8 @@ async function run() {
       }
       console.log(`✓ Drawer Mutual Exclusivity verified (Audiogram and 27-Parts drawers never overlap)`);
 
-      // 16. Capture Stage 1 Hearing Lab Screenshot
+      // Capture Stage 1 Hearing Lab Screenshot
+      await auditLayoutGeometry(client, 'Hearing + Audiogram Open', vp);
       const hearingSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const hearingSsPath = join(OUTPUT_DIR, `stage1_hearing_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(hearingSsPath, Buffer.from(hearingSs.data, 'base64'));
@@ -814,6 +1104,7 @@ async function run() {
       await new Promise((r) => setTimeout(r, 650));
 
       // 22. Capture Stage 2 Virtual Radiology Visual Screenshot
+      await auditLayoutGeometry(client, 'Radiology + CT Drawer Open', vp);
       const radSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const radSsPath = join(OUTPUT_DIR, `stage2_radiology_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(radSsPath, Buffer.from(radSs.data, 'base64'));
@@ -955,13 +1246,15 @@ async function run() {
             const pitchVal = document.querySelector('#gyro-pitch-val')?.textContent;
             const rollVal = document.querySelector('#gyro-roll-val')?.textContent;
 
-            // Close gyro
-            document.querySelector('#gyro-close-btn')?.click();
-            const flyoutClosed = flyout?.style.display === 'none';
-
-            return { flyoutOpen, yawVal, pitchVal, rollVal, flyoutClosed };
+            return { flyoutOpen, yawVal, pitchVal, rollVal };
           })()
         `,
+        returnByValue: true,
+      });
+      await new Promise((r) => setTimeout(r, 80));
+      await auditLayoutGeometry(client, 'Vestibular BPPV + Gyro Open', vp);
+      const gyroCloseTest = await client.send('Runtime.evaluate', {
+        expression: `(() => { document.querySelector('#gyro-close-btn')?.click(); return document.querySelector('#gyro-flyout')?.style.display === 'none'; })()`,
         returnByValue: true,
       });
       if (
@@ -969,7 +1262,7 @@ async function run() {
         !gyroTest.result.value.yawVal?.includes('45°') ||
         !gyroTest.result.value.pitchVal?.includes('30°') ||
         !gyroTest.result.value.rollVal?.includes('-15°') ||
-        !gyroTest.result.value.flyoutClosed
+        !gyroCloseTest.result.value
       ) {
         throw new Error(`Gyro test failed: ${JSON.stringify(gyroTest.result.value)}`);
       }
@@ -1040,6 +1333,7 @@ async function run() {
       await new Promise((r) => setTimeout(r, 650));
 
       // 28. Capture Stage 3 BPPV Visual Screenshot
+      await auditLayoutGeometry(client, 'Vestibular BPPV + VOR Drawer Open', vp);
       const vestSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const vestSsPath = join(OUTPUT_DIR, `stage3_vestibular_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(vestSsPath, Buffer.from(vestSs.data, 'base64'));
@@ -1145,7 +1439,15 @@ async function run() {
             const openBtn = document.querySelector('#caloric-jongkees-open-btn');
             openBtn?.click();
             const modal = document.querySelector('#caloric-jongkees-modal');
-            const modalOpen = modal && getComputedStyle(modal).display !== 'none';
+            const mr = modal?.getBoundingClientRect();
+            const modalOpen = Boolean(
+              modal &&
+                getComputedStyle(modal).display !== 'none' &&
+                getComputedStyle(modal).visibility !== 'hidden' &&
+                mr &&
+                mr.width > 100 &&
+                mr.height > 100
+            );
 
             // Select Acute Right Neuritis preset
             const rightPreset = document.querySelector('.jongkees-preset-btn[data-preset="right_uw"]');
@@ -1175,6 +1477,7 @@ async function run() {
         throw new Error(`Jongkees modal test failed: ${JSON.stringify(jongkeesTest.result.value)}`);
       }
       console.log(`✓ Jongkees Matrix Calculator verified (UW: ${jongkeesTest.result.value.uwVal}, DP: ${jongkeesTest.result.value.dpVal}, Pathologic Right Paresis flagged)`);
+      await auditLayoutGeometry(client, 'Vestibular Caloric', vp);
 
       // Capture Stage 3 Caloric Screenshot
       const caloricSs = await client.send('Page.captureScreenshot', { format: 'png' });
@@ -1298,6 +1601,7 @@ async function run() {
         throw new Error(`vHIT post-thrust execution failed: ${JSON.stringify(postThrustTest.result.value)}`);
       }
       console.log(`✓ vHIT High-Acceleration Head Thrust executed & verified (Gain: ${postThrustTest.result.value.gainBadge}, Saccades: ${postThrustTest.result.value.saccadeBadge}, Dual-Trace plot active)`);
+      await auditLayoutGeometry(client, 'Vestibular vHIT + VOR Drawer Open', vp);
 
       // Capture Stage 3 vHIT Screenshot
       const vhitSs = await client.send('Page.captureScreenshot', { format: 'png' });
@@ -1384,10 +1688,26 @@ async function run() {
       await new Promise((r) => setTimeout(r, 650));
 
       // Capture Stage 4 Surgical Visual Screenshot
+      await auditLayoutGeometry(client, 'Surgical CI + Surgical Drawer Open', vp);
       const surgSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const surgSsPath = join(OUTPUT_DIR, `stage4_surgical_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(surgSsPath, Buffer.from(surgSs.data, 'base64'));
       console.log(`✓ Captured Stage 4 Surgical visual screenshot to ${surgSsPath}`);
+
+      // Verify Labyrinthectomy and Neurectomy surgical subviews layout too
+      await client.send('Runtime.evaluate', {
+        expression: `(() => { document.querySelector('#surg-subnav-laby')?.click(); })()`,
+      });
+      await new Promise((r) => setTimeout(r, 100));
+      await auditLayoutGeometry(client, 'Surgical Labyrinthectomy', vp);
+      await client.send('Runtime.evaluate', {
+        expression: `(() => { document.querySelector('#surg-subnav-neurectomy')?.click(); })()`,
+      });
+      await new Promise((r) => setTimeout(r, 100));
+      await auditLayoutGeometry(client, 'Surgical Neurectomy', vp);
+      await client.send('Runtime.evaluate', {
+        expression: `(() => { document.querySelector('#surg-subnav-ci')?.click(); })()`,
+      });
 
       // 29. Return to Anatomy Mode and close drawers for clean state
       await client.send('Runtime.evaluate', {

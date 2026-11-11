@@ -832,15 +832,19 @@ assert(
 );
 
 // 50. Production Web Build: tsc && vite build completes cleanly with 0 errors
-console.log('  • Executing production TypeScript bundle compilation test (tsc && vite build)...');
-try {
-  execSync('npm run build', {
-    cwd: path.join(REPO_ROOT, 'web'),
-    stdio: 'pipe',
-  });
-  assert(true, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
-} catch (err) {
-  assert(false, `Production Web Build failed: ${err.message}`);
+if (process.env.SKIP_NESTED_BUILD === '1') {
+  assert(true, 'Production Web Build: deferred to parent pretest/verify (SKIP_NESTED_BUILD=1)');
+} else {
+  console.log('  • Executing production TypeScript bundle compilation test (tsc && vite build)...');
+  try {
+    execSync('npm run build', {
+      cwd: path.join(REPO_ROOT, 'web'),
+      stdio: 'pipe',
+    });
+    assert(true, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
+  } catch (err) {
+    assert(false, `Production Web Build failed: ${err.message}`);
+  }
 }
 
 console.log('\n================================================================');

@@ -722,40 +722,48 @@ assert(
 // -----------------------------------------------------------------------------
 console.log('\n--- Test Suite 7: TypeScript Compilation & Production Build Integrity (3 assertions) ---');
 
-// 48. web/src/render/eyeAvatar.ts compiles cleanly with tsc --noEmit (0 errors)
-let tscClean = false;
-try {
-  execSync('npx tsc --noEmit', { cwd: path.join(REPO_ROOT, 'web'), stdio: 'pipe' });
-  tscClean = true;
-} catch (err) {
-  console.error(err.stdout ? err.stdout.toString() : err.message);
-}
-assert(tscClean, 'web/src/render/eyeAvatar.ts compiles cleanly with tsc --noEmit (0 errors)');
+// 48-50. TypeScript check, Production bundle build, and sibling test suites
+if (process.env.SKIP_NESTED_BUILD === '1') {
+  assert(true, 'TypeScript check deferred to parent verify (SKIP_NESTED_BUILD=1)');
+  assert(true, 'Production bundle build deferred to parent pretest/verify (SKIP_NESTED_BUILD=1)');
+  assert(true, 'Sibling test suites run independently in parent pipeline (SKIP_NESTED_BUILD=1)');
+} else {
+  // 48. web/src/render/eyeAvatar.ts compiles cleanly with tsc --noEmit (0 errors)
+  let tscClean = false;
+  try {
+    execSync('npx tsc --noEmit', { cwd: path.join(REPO_ROOT, 'web'), stdio: 'pipe' });
+    tscClean = true;
+  } catch (err) {
+    console.error(err.stdout ? err.stdout.toString() : err.message);
+  }
+  assert(tscClean, 'web/src/render/eyeAvatar.ts compiles cleanly with tsc --noEmit (0 errors)');
 
-// 49. Production bundle build (npm run build) completes with 0 errors
-let buildClean = false;
-try {
-  execSync('npm --prefix web run build', { cwd: REPO_ROOT, stdio: 'pipe' });
-  buildClean = true;
-} catch (err) {
-  console.error(err.stdout ? err.stdout.toString() : err.message);
-}
-assert(buildClean, 'Production bundle build (npm run build) completes with 0 errors');
+  // 49. Production bundle build (npm run build) completes with 0 errors
+  let buildClean = false;
+  try {
+    execSync('npm --prefix web run build', { cwd: REPO_ROOT, stdio: 'pipe' });
+    buildClean = true;
+  } catch (err) {
+    console.error(err.stdout ? err.stdout.toString() : err.message);
+  }
+  assert(buildClean, 'Production bundle build (npm run build) completes with 0 errors');
 
-// 50. Full test suite (hearing, radiology, vestibular, eye avatar) passes 100%
-let allSuitesPass = false;
-try {
-  execSync('node scripts/test_hearing_engine.js', { cwd: REPO_ROOT, stdio: 'pipe' });
-  execSync('node scripts/test_radiology_engine.js', { cwd: REPO_ROOT, stdio: 'pipe' });
-  execSync('node scripts/test_vestibular_engine.js', { cwd: REPO_ROOT, stdio: 'pipe' });
-  allSuitesPass = true;
-} catch (err) {
-  console.error(err.stdout ? err.stdout.toString() : err.message);
+  // 50. Full test suite (hearing, radiology, vestibular, eye avatar) passes 100%
+  let allSuitesPass = false;
+  try {
+    const childEnv = { ...process.env, SKIP_NESTED_BUILD: '1' };
+    execSync('node scripts/test_hearing_engine.js', { cwd: REPO_ROOT, stdio: 'pipe', env: childEnv });
+    execSync('node scripts/test_radiology_engine.js', { cwd: REPO_ROOT, stdio: 'pipe', env: childEnv });
+    execSync('node scripts/test_vestibular_engine.js', { cwd: REPO_ROOT, stdio: 'pipe', env: childEnv });
+    allSuitesPass = true;
+  } catch (err) {
+    console.error(err.stdout ? err.stdout.toString() : err.message);
+  }
+  assert(
+    allSuitesPass,
+    'Full test suite (hearing, radiology, vestibular, eye avatar) passes 100%'
+  );
 }
-assert(
-  allSuitesPass,
-  'Full test suite (hearing, radiology, vestibular, eye avatar) passes 100%'
-);
 
 console.log('\n================================================================');
 console.log(`🏆 ALL ${passedTests}/${totalTests} DEEP EYE AVATAR & VOR VERIFICATION TESTS PASSED CLEANLY (100%)`);

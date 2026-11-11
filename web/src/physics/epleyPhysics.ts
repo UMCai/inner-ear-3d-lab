@@ -11,7 +11,6 @@ export interface EpleyStepPreset {
   targetReclineDeg: number;
   targetPhiDeg: number;
   phiCapMax: number;
-  audioUrl: string;
   headline: string;
   caption: string;
   patientHeadline: string;
@@ -30,7 +29,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 0.0,
     targetPhiDeg: -84.0,
     phiCapMax: -83.5,
-    audioUrl: '/assets/audio/scene1_locate.wav',
     headline: 'Right Posterior-Canal BPPV: Displaced Otoconia',
     caption:
       'In posterior-canal BPPV, displaced otoconia enter the right posterior semicircular canal, which arches 45° posterolaterally behind the utricle.',
@@ -49,7 +47,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 0.0,
     targetPhiDeg: -84.0,
     phiCapMax: -83.5,
-    audioUrl: '/assets/audio/scene2_pathology.wav',
     headline: 'Pathology: Loose Otoconia Near the Posterior Ampulla (φ = -84°)',
     caption:
       'Dense calcium carbonate otoconia settle at the gravity-dependent base of the posterior canal just distal to the posterior cupula.',
@@ -68,7 +65,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 0.0,
     targetPhiDeg: -84.0,
     phiCapMax: -83.5,
-    audioUrl: '/assets/audio/scene3_step1.wav',
     headline: 'Step 1: Sit Upright & Turn Head 45° Right (ψ = -45°, θ = 0°)',
     caption:
       'Turning the head 45° toward the affected right ear aligns the right posterior semicircular canal with the sagittal plane of the examination table.',
@@ -87,7 +83,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 120.0,
     targetPhiDeg: 30.0,
     phiCapMax: 30.0,
-    audioUrl: '/assets/audio/scene4_step2.wav',
     headline: 'Step 2: Supine + 30° Neck Extension (ψ = -45°, θ = 120° → φ = +30°)',
     caption:
       'Gravity pulls the otoconia ampullofugally away from the cupula around the posterior canal arch toward the apex. Hold 30–60 seconds.',
@@ -106,7 +101,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 120.0,
     targetPhiDeg: 110.0,
     phiCapMax: 110.0,
-    audioUrl: '/assets/audio/scene5_step3.wav',
     headline: 'Step 3: Rotate 90° Left While Extended (ψ = +45°, θ = 120° → φ = +110°)',
     caption:
       'Without raising the head, rotate 90° left. Gravity guides the otoconia across the superior arch into the Common Crus entry.',
@@ -125,7 +119,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 90.0,
     targetPhiDeg: 165.0,
     phiCapMax: 165.0,
-    audioUrl: '/assets/audio/scene6_step4.wav',
     headline: 'Step 4: Left Shoulder Roll, Nose 45° Down (ψ = +135°, θ = 90° → φ = +165°)',
     caption:
       'The Common Crus now points steeply downward, allowing gravity to drain the otoconia through the shared limb to the utricular orifice.',
@@ -144,7 +137,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 0.0,
     targetPhiDeg: 186.0,
     phiCapMax: 186.0,
-    audioUrl: '/assets/audio/scene7_step5.wav',
     headline: 'Step 5: Return to Upright Sitting (ψ = 0°, θ = 0° → φ = +186° Utricle)',
     caption:
       'Keeping the chin tucked, return the patient upright. Otoconia exit into the utricular vestibule where dark cells reabsorb them.',
@@ -163,7 +155,6 @@ export const EPLEY_CLINICAL_STEPS: EpleyStepPreset[] = [
     targetReclineDeg: 0.0,
     targetPhiDeg: 186.0,
     phiCapMax: 186.0,
-    audioUrl: '/assets/audio/scene8_summary.wav',
     headline: 'Clinical Summary: 30° Extension · No Head Lift in Step 3 · 30–60s Holds',
     caption:
       '1. Use a shoulder pillow for 20–30° neck extension; 2. Never lift the head during the Step 3 turn; 3. Hold each step 30–60s until particles settle.',

@@ -30,3 +30,4 @@ web/public/assets/
 *.swo
 scratch/
 .system_generated/
+.impeccable/review/

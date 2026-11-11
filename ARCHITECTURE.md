@@ -2,37 +2,39 @@
 
 > **System:** Inner Ear 3D Lab  
 > **Repository:** `inner-ear-3d-lab`  
-> **Scope:** High-fidelity 3D Anatomical Atlas & Real-Time Biomechanical Simulation Platform
+> **Scope:** High-fidelity 3D Anatomical Atlas & Real-Time Biomechanical Simulation Platform across 5 Clinical Modes
 
 ---
 
 ## 1. System Overview & Architectural Topology
 
-The system comprises two major subsystems:
-1. **Offline Preprocessing & Ingestion Pipeline (Python 3 / Blender 5.2.1 LTS):** Ingests authentic micro-CT / T2-MRI Otsu segmentations, normalizes coordinate frames to stereotaxic RAS, extracts 3D canal pathways, and generates optimized runtime assets.
-2. **Client-Side Real-Time WebGL Application (Three.js / TypeScript / Vite):** A responsive, single-stage 60fps web application delivering interactive 3D exploration, procedural audio synthesis, and contextual clinical workbenches.
+The system comprises two coupled pipelines bridged by canonical IE-Map v1.0.0 assets:
+1. **Offline Preprocessing, Asset Sync & Video Pipeline (Python 3 / Blender 5.2.1 LTS / Node):** Ingests micro-CT / T2-MRI Otsu segmentations, normalizes coordinate frames to stereotaxic RAS, extracts 3D canal pathways, exports `eye_avatar.glb`, and syncs runtime assets from `assets/iemap/` into gitignored `web/public/assets/iemap/` via `scripts/sync_web_assets.mjs`.
+2. **Client-Side Real-Time WebGL Application (Three.js / TypeScript / Vite):** A responsive, single-stage 60fps web application delivering interactive 3D exploration, procedural Web Audio synthesis, and 5 contextual clinical workbenches.
 
 ```mermaid
 graph TD
-    subgraph Offline ["Offline Ingestion Pipeline (Python / Blender)"]
-        CT["Micro-CT & T2-MRI Otsu Segmentations"] --> PREP["src/anatomy/prepare_iemap.py"]
-        PREP --> ASSETS["assets/iemap/<br/>• 27 OBJ/VTK meshes<br/>• GLB Bundle<br/>• RAS 3D Canal Spline<br/>• Slicer Fiducials"]
+    subgraph Offline ["Offline Asset & Blender Pipeline (Python / Blender / Sync)"]
+        CT["Micro-CT & T2-MRI Segmentations"] --> PREP["src/anatomy/prepare_iemap.py<br/>scripts/generate_multicanal_splines.py<br/>scripts/export_eye_avatar_glb.py"]
+        PREP --> ASSETS["assets/iemap/<br/>• 27 OBJ/VTK meshes • GLB Bundle<br/>• 3 RAS Canal Splines • FCSV • eye_avatar.glb"]
+        ASSETS --> SYNC["scripts/sync_web_assets.mjs"]
+        SYNC --> PUB["web/public/assets/iemap/ (gitignored runtime copy)"]
     end
 
     subgraph Runtime ["Online Web Application (web/src/)"]
-        ASSETS --> LOADER["web/src/data/objLoader.ts<br/>Three.js BufferGeometry Cache"]
-        LOADER --> SCENE["web/src/render/DualStageScene.ts<br/>Single-Stage 3D Canvas"]
+        PUB --> LOADER["web/src/data/objLoader.ts (fetch & BufferGeometry parser)<br/>web/src/data/canalPaths.ts (spline memory cache)"]
+        LOADER --> SCENE["web/src/render/DualStageScene.ts<br/>Single-Stage 3D Canvas (+ EyeAvatarEngine)"]
         
-        ONTO["web/src/data/ontology.ts<br/>27-Part Clinical Metadata"] --> SCENE
-        ONTO --> HUD["web/src/ui/AppHUD.ts<br/>Contextual UI Manager"]
+        ENGINES["Clinical Engines<br/>ontology.ts · greenwoodEngine.ts · radiologyEngine.ts<br/>vestibularEngine.ts · diagnosticVestibularEngine.ts · surgicalEngine.ts"] --> SCENE
+        ENGINES --> HUD["web/src/ui/AppHUD.ts + 5 Exclusive Drawers"]
         
-        SHADER["web/src/render/gate3Materials.ts<br/>Custom GLSL Shaders"] --> SCENE
+        SHADER["web/src/render/gate3Materials.ts<br/>Custom GLSL Shaders & Clipping"] --> SCENE
         
-        AUDIO["Web Audio API<br/>Greenwood Sine Synthesizer"] <--> HUD
+        AUDIO["ToneSynthesizer.ts (Web Audio)<br/>Pure-Tone · Drill · EMG · Rupture"] <--> HUD
         SCENE <--> HUD
     end
 
-    HUD --> USER["User (Browser / WebGL)"]
+    HUD --> USER["User (Browser / WebGL2)"]
 ```
 
 ---
@@ -40,30 +42,40 @@ graph TD
 ## 2. Layered Software Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                     LAYER 5: REACTIVE UI & HUD (AppHUD.ts)                    │
-│  • Mode Switcher (Anatomy / Hearing / Vestibular / CT Slicing)                │
-│  • Search Bar with 3D Focus • Floating Inspector Card (Progressive Disclosure)│
-│  • Contextual Bottom Workbench Dock • Responsive Modals & Drawers             │
-├───────────────────────────────────────────────────────────────────────────────┤
-│               LAYER 4: CLINICAL & PHYSIOLOGY DOMAIN ENGINES                   │
-│  • 27-Part Anatomical Ontology & Innervation (ontology.ts)                    │
-│  • Greenwood Auditory Frequency Engine & Sine Tone Synthesis (Web Audio)      │
-│  • BPPV Semicircular Canal Kinematics & Gravity ODE Solver (epleyPhysics.ts)  │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                 LAYER 3: 3D GRAPHICS & SCENE RUNTIME                          │
-│  • DualStageScene.ts (Render loop, OrbitControls, camera fly-to interpolation) │
-│  • Occlusion-Aware Screen-Projected HTML Pins (Three.js Vector3.project)      │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                 LAYER 2: GPU SHADER PIPELINE (gate3Materials.ts)              │
-│  • Custom GLSL Vertex & Fragment Shaders                                      │
-│  • 3-Point Gate 3 Lighting & Fresnel Rim Glow • Single-Surface Backface Cull  │
-│  • Analytic 3D Cross-Section Clipping Plane (uClipActive, uClipNormal)        │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                 LAYER 1: GEOMETRY & ASSET STORAGE LAYER                       │
-│  • 27 Authentic IE-Map v1.0.0 Meshes (RAS Stereotaxic Coordinates in mm)     │
-│  • OBJ Buffers Cached in IndexedDB / Memory • Slicer FCSV Markups             │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                     LAYER 5: REACTIVE UI & HUD (AppHUD.ts & Drawers)                 │
+│  • 5-Mode Switcher (Anatomy / Hearing / Radiology / Vestibular / Surgical)           │
+│  • Search Bar with 3D Focus • Floating Inspector Card (Progressive Disclosure)       │
+│  • Contextual Bottom Workbench Dock (dynamic --dock-clearance via ResizeObserver)    │
+│  • 5 Mutually Exclusive Drawers (#parts, #audiogram, #ct-slice, #vor, #surgical)     │
+│    + #gyro-flyout (3-Axis BPPV Head Gyro)                                            │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│               LAYER 4: CLINICAL & PHYSIOLOGY DOMAIN ENGINES                          │
+│  • 27-Part Anatomical Ontology & Innervation (ontology.ts)                           │
+│  • Greenwood Auditory Frequency Engine & Sine Synthesizer (greenwoodEngine.ts)       │
+│  • Stereotaxic Temporal Bone MPR & SCDS Biomarker Engine (radiologyEngine.ts)        │
+│  • Multi-Canal BPPV Kinematics & Stokes/Steinhausen ODE (vestibularEngine.ts)        │
+│  • Caloric Convection/Jongkees & vHIT Curthoys Engine (diagnosticVestibularEngine.ts)│
+│  • Cochlear Implant / Labyrinthectomy / Neurectomy Engine (surgicalEngine.ts)        │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                 LAYER 3: 3D GRAPHICS & SCENE RUNTIME                                 │
+│  • DualStageScene.ts (Zero-GC render loop, OrbitControls, camera fly-to tweens)      │
+│  • Occlusion-Aware Screen-Projected HTML Pins (pre-allocated candidate buffers)      │
+│  • EyeAvatarEngine (eyeAvatar.ts — 3-DOF Listing's Law + NIR VNG + Ring Buffer)      │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                 LAYER 2: GPU SHADER PIPELINE (gate3Materials.ts)                     │
+│  • Custom GLSL Vertex & Fragment Shaders (3-Point Lighting, Fresnel, SingleSurface)  │
+│  • Analytic 3D MPR Clipping Plane (uClipActive, uClipNormal, uClipConstant)          │
+│  • Cochlear Tonotopy & Loss Mask (uTonotopyMode, uActiveGreenwoodX, uLossMaskActive) │
+│  • Caloric Thermal Glow & Mirror Culling (uCaloricActive, uMirrored)                 │
+│  • Surgical Milling, Unroofing & Breach Alarm (uSurgicalDrillActive, uCanalUnroofed) │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                 LAYER 1: GEOMETRY & ASSET STORAGE LAYER                              │
+│  • Canonical Source: assets/iemap/ (27 IE-Map v1.0.0 OBJs, 3 canal splines, GLB)     │
+│  • Synced Runtime Copy: web/public/assets/iemap/ via scripts/sync_web_assets.mjs     │
+│  • objLoader.ts parses fetched OBJ text on demand into Three.js BufferGeometry       │
+│  • canalPaths.ts caches loaded 3D semicircular canal centerline splines in memory    │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -74,38 +86,24 @@ All internal coordinates adhere to the **Right-Anterior-Superior (RAS)** stereot
 
 $$\mathbf{p}_{\text{RAS}} = \begin{bmatrix} x_{\text{Right}} \\ y_{\text{Anterior}} \\ z_{\text{Superior}} \end{bmatrix} \quad (\text{units: mm})$$
 
-- **Centroid Origin:** Calibrated to `[4.5, 1.4, 0.5]` mm, centering the vestibule and common crus at the world origin `(0, 0, 0)`.
-- **Three.js Mapping:**
+- **Centroid Origin:** Calibrated around `[4.5, 1.4, 0.5]` mm near the vestibule and common crus.
+- **Three.js Axis Mapping:**
   - $+X \implies \text{Patient Right}$ (Lateral)
   - $+Y \implies \text{Patient Anterior}$ (Forward)
-  - $+Z \implies \text{Patient Superior}$ (Cranial)
-- **Camera Frame:**
-  - OrbitControls centers on target `(0, 0, 0)` with default initial position `(40, -50, 30)` mm, providing an elevated $3/4$ anterolateral perspective of the right labyrinth.
+  - $+Z \implies \text{Patient Superior}$ (Cranial; `camera.up = (0, 0, 1)`)
+- **Default Camera Frame (`DualStageScene.ts`):**
+  - `OrbitControls` initializes on target `[4.5, 1.5, 0.2]` mm with initial camera position `[22.5, -10.5, 7.5]` mm, providing an anterolateral 3/4 view of the right labyrinth. Contralateral caloric/vHIT laterality mirrors `labyrinthRoot.scale.x = -1.0` while toggling backface winding (`uMirrored` + `FrontSide`/`BackSide`).
 
 ---
 
 ## 4. GPU Shader & Shading Architecture (`gate3Materials.ts`)
 
-Instead of standard Three.js `MeshStandardMaterial`, the lab employs specialized GLSL shaders optimized for medical translucency:
+Instead of `MeshStandardMaterial`, [`gate3Materials.ts`](web/src/render/gate3Materials.ts) compiles a custom GLSL shader supporting all 5 clinical modes with in-place `.value` uniform mutation:
 
-1. **Gate 3 Three-Point Lighting**:
-   - Computes key, fill, and top rim lighting directly in view space:
-     $$\mathbf{I}_{\text{diffuse}} = \sum_{i=1}^3 w_i \cdot \max(0.0, \mathbf{n} \cdot \mathbf{l}_i)$$
-2. **Fresnel Edge Enhancement**:
-   - Highlights organic contours of delicate membranes (cupulae, ampullae):
-     $$\text{Fresnel} = (1.0 - |\mathbf{n} \cdot \mathbf{v}|)^{\text{uRimPower}}$$
-3. **Single-Surface Cutaway Mode (`uSingleSurface`)**:
-   - For translucent outer shells (e.g. `segT2_th1.07_Otsu`), backfaces (`!gl_FrontFacing`) are discarded dynamically, eliminating visual clutter and internal mesh moiré patterns.
-4. **Analytic Shader-Level Cross-Section Clipping**:
-   - Avoids expensive CPU boolean mesh CSG operations.
-   - Slices geometry instantaneously in fragment shader:
-     ```glsl
-     if (uClipActive > 0.5) {
-       float clipDist = dot(vWorldPosition, uClipNormal) + uClipConstant;
-       if (clipDist < 0.0) discard;
-     }
-     ```
-   - Enables smooth 60fps scrubbing of Pöschl's, Stenvers', and orthogonal CT planes with zero memory re-allocation.
+1. **Gate 3 Three-Point Lighting & Fresnel:** View-space key/fill/rim diffuse shading plus contour rim glow (`uRimPower`) across bony shell and membranous structures.
+2. **Single-Surface Cutaway Mode (`uSingleSurface`):** Discards backfaces (`!gl_FrontFacing` or flipped during `uMirrored`) for translucent outer bony shells to avoid moiré clutter.
+3. **Analytic Cross-Section Clipping (`uClipActive`, `uClipNormal`, `uClipConstant`):** Instantaneous fragment discard along Pöschl, Stenvers, Axial, and Coronal MPR planes with zero CPU geometry rebuilds.
+4. **Tonotopic, Caloric & Surgical Uniforms:** Drives basilar membrane traveling waves (`uTonotopyMode`), horizontal canal thermal convection coloring (`uCaloricActive`, `uCaloricTempDiff`), high-speed bone milling luminescence (`uSurgicalDrillActive`), canal unroofing (`uCanalUnroofed`), and translocation breach warning (`uTranslocationBreach`).
 
 ---
 
@@ -120,36 +118,30 @@ sequenceDiagram
     participant DualStageScene
     participant WebGL
 
-    User->>AppHUD: Clicks Structure / Presets / Sliders
-    AppHUD->>DualStageScene: applyPreset(id) / setBonyPeel(percent)
-    DualStageScene->>DualStageScene: Update uniform values & trigger camera fly-to
-    DualStageScene-->>AppHUD: onStateChange(snapshot)
-    AppHUD->>AppHUD: Re-render DOM (Inspector card, button active states)
-    DualStageScene->>WebGL: Render frame at 60fps (uOpacity, uClipConstant)
+    User->>AppHUD: Clicks Structure / Mode / Presets / Sliders
+    AppHUD->>DualStageScene: setLabMode / applyPreset / setBonyPeel / surgical cmds
+    DualStageScene->>DualStageScene: Mutate uniform values & trigger camera fly-to
+    DualStageScene-->>AppHUD: onStateChange(LabSceneSnapshot) / onSurgicalStateUpdate / onVestibularTelemetry
+    AppHUD->>AppHUD: Update DOM & syncDockClearance (--dock-clearance)
+    DualStageScene->>WebGL: Zero-GC 60fps render frame
     DualStageScene-->>AppHUD: onPinsUpdate(projectedPins2D)
-    AppHUD->>AppHUD: Update screen-projected HTML label positions
+    AppHUD->>AppHUD: Position screen-projected HTML label pins
 ```
 
-### Snapshot Structure (`LabSceneSnapshot`):
-- `selectedMesh: string | null`
-- `hoveredMesh: string | null`
-- `visibilityMap: Record<string, VisibilityState>` (`visible` | `ghost` | `hidden`)
-- `bonyPeelPercent: number` ($0\text{–}100$)
-- `explodePercent: number` ($0\text{–}100$)
-- `labelMode: LabelDensityMode` (`off` | `key` | `all`)
-- `readingDepth: ReadingDepth` (`simple` | `detailed`)
-- `activePresetId: string`
-- `canUndo: boolean`
-- `isIsolated: boolean`
+### Snapshot Fields (`LabSceneSnapshot`):
+- `labMode`: `'anatomy' | 'hearing' | 'radiology' | 'vestibular' | 'surgical'`
+- `hearingState`, `radiologyState`, `surgicalState`
+- `selectedMesh`, `hoveredMesh`, `visibilityMap`, `bonyPeelPercent`, `explodePercent`
+- `labelMode`, `readingDepth`, `activePresetId`, `canUndo`, `isIsolated`, loading progress flags
 
 ---
 
-## 6. The "Modal Workbench" UI Architecture
+## 6. The 5-Mode "Modal Workbench" UI Architecture
 
-To accommodate expansive clinical features without UI degradation:
-- The top header acts as the **Master Mode Switcher**:
-  - `🧬 Anatomy` $\to$ Structural exploration.
-  - `🎧 Hearing` $\to$ Greenwood tonotopy, pure-tone synthesis, audiogram drawer.
-  - `🌀 Vestibular` $\to$ Semicircular canal kinematics, BPPV maneuvers, VOR eye avatar.
-  - `🩻 CT Slicing` $\to$ Multiplanar temporal bone CT clipping (Pöschl, Stenvers).
-- Switching modes morphs **only the bottom dock**, preserving the full-bleed 3D canvas and maintaining muscle memory for camera navigation.
+Top header mode switcher (`AppHUD.ts`) keeps camera orientation and canvas continuity intact while swapping only the bottom workbench dock (`#anatomy-dock-content`, `#hearing-dock-content`, `#radiology-dock-content`, `#vestibular-dock-content`, `#surgical-dock-content`):
+
+1. `🏛️ Anatomy Atlas` — 27-part structural exploration, peel/explode sliders, guided camera presets, `#parts-drawer`.
+2. `🎵 Hearing & Tonotopy` — Greenwood (`20 Hz–20.7 kHz`) slider, Web Audio pure-tone synthesis, `#audiogram-drawer`.
+3. `🩻 Virtual Radiology` — Temporal bone MPR (Pöschl, Stenvers, Axial, Coronal), SCDS simulation, `#ct-slice-drawer`.
+4. `🌀 Vestibular & VOR` — Subnav across `BPPV` (6 maneuvers + `#gyro-flyout`), `Caloric` (COWS/Alexander/Jongkees), and `vHIT` (Curthoys 40–80 ms/HIMP/SHIMP) paired with `#vor-drawer` (`EyeAvatarEngine` + strip plots).
+5. `🔬 Surgical Suites` — Three procedural suites (`Cochlear Implant`, `Labyrinthectomy`, `IAC Neurectomy`), 3D CI array/drill/cleavage visualization, procedural audio, and `#surgical-drawer` (endoscopy monitor + ABR/EMG/force telemetry plot).

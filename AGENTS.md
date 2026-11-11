@@ -1,101 +1,53 @@
 # AI Agent Guidelines (`AGENTS.md`)
 
-> **Project:** Inner Ear 3D Lab (Gate 3 Medaium)  
-> **Repository:** `inner-ear-3d-lab`  
-> **Scope:** WebGL 3D Anatomy & Clinical Simulation Platform  
-> **Tech Stack:** TypeScript, Three.js, Vite, Web Audio API, Python 3, Blender 5.2.1 LTS
+> **Project:** Inner Ear 3D Lab (Gate 3 Medaium) · **Repo:** `inner-ear-3d-lab`  
+> **Stack:** TypeScript, Three.js (GLSL), Vite, Web Audio API, Python 3, Blender 5.2.1 LTS
+
+Scoped domain rules live in [`.agents/rules/`](.agents/rules/) (`01-webgl-shaders-perf.md`, `02-ui-modal-workbench.md`, `03-clinical-ras-biophysics.md`, `04-blender-iemap-pipeline.md`). Workflow playbooks and verification scripts live in the repo plugin [`.agents/plugins/inner-ear-lab/`](.agents/plugins/inner-ear-lab/).
 
 ---
 
-## 1. Core Directives for All AI Agents
+## 1. Non-Negotiable Directives
 
-When contributing to this repository, you must adhere to these non-negotiable principles:
-
-1. **Preserve the "Zero-Clutter / Anti-Cockpit" UI:**
-   - Never add persistent telemetry sidebars, nested sub-windows, or fixed toolbars that steal space from the 3D canvas.
-   - All new features must conform to the **"Modal Workbench"** paradigm outlined in [`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md). The 3D stage commands 85%+ of the screen.
-2. **Maintain 60fps WebGL Performance:**
-   - Never instantiate new geometries, materials, or large object allocations inside the `requestAnimationFrame` render loop.
-   - Do not perform CPU-based mesh slicing; utilize the analytic GPU shader clipping uniforms in [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts).
-3. **Medical & Anatomical Rigor:**
-   - All spatial calculations must respect the Right-Anterior-Superior (RAS) stereotaxic coordinate frame in millimeters.
-   - Ensure medical copy adheres to authoritative otologic and neurotologic standards (e.g., Greenwood frequency function, Ewald's laws, Stokes gravity sedimentation).
-4. **Zero External Audio Bloat:**
-   - Synthesize tones dynamically using native browser Web Audio oscillators (`AudioContext`). Never commit large multi-megabyte static sound files.
+1. **Zero-Clutter / Anti-Cockpit UI:** Preserve the "Modal Workbench" paradigm ([`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md)). No persistent telemetry sidebars; resting 3D stage area stays `>= 85%` across desktop, tablet, and mobile. Maintain strict 5-drawer + `#gyro-flyout` mutual exclusivity.
+2. **60fps Zero-GC WebGL Loop:** Never allocate geometries, materials, arrays, or DOM fragments inside `requestAnimationFrame`. Mutate uniforms in [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts) in-place, preserve `webglcontextlost`/`restored` handling and `.dispose()`, and keep `node_modules`/Vite chunks clean.
+3. **Analytic GPU Clipping:** Never perform CPU mesh slicing; drive `uClipActive`, `uClipNormal`, and `uClipConstant` in GLSL.
+4. **Medical & RAS Coordinate Rigor:** All stereotaxic geometry uses Right-Anterior-Superior (RAS) coordinates in mm (centroid origin `[4.5, 1.4, 0.5]`, Three.js `+X Right / +Y Anterior / +Z Superior`). Keep otologic equations faithful to implemented source constants (Greenwood, Ewald, Steinhausen/Stokes, Curthoys 40–80 ms, CI `28.0 mm` / `650°` / `>= 30 mN` breach, `tau = 72 h`).
+5. **Dynamic Web Audio Only:** Synthesize tones, drill whine, EMG alarms, and rupture snaps dynamically via [`web/src/audio/ToneSynthesizer.ts`](web/src/audio/ToneSynthesizer.ts) (`masterGain -> safetyLimiter -> destination` with exponential ramps). Never commit binary audio files.
+6. **Canonical Asset Single Source:** Author meshes/splines/GLBs only in `assets/iemap/` (or Blender generators in `src/` & `scripts/`). Sync into gitignored `web/public/assets/iemap/` via `npm run sync:assets`; never hand-edit `web/public/assets/` or `web/dist/`.
 
 ---
 
-## 2. Repository Layout & Module Boundaries
+## 2. Five Clinical Modes & Module Map
 
-| Directory | Primary Technology | Responsibility |
+| Mode (Header Order) | UI & Renderer Surface | Primary Domain Engine(s) |
 | :--- | :--- | :--- |
-| `web/src/render/` | Three.js, GLSL Shaders | Single-stage canvas renderer, camera tweening, occlusion-aware pins, custom Gate 3 shaders. |
-| `web/src/ui/` | TypeScript, Vanilla DOM | Responsive HUD, search bar, floating inspector, contextual bottom workbench, modal sheets. |
-| `web/src/data/` | TypeScript | 27-part anatomical ontology, morphometry, Latin terms, OBJ buffer loaders, Slicer markups. |
-| `web/src/physics/`| TypeScript | BPPV canalithiasis kinematics, Epley/Gufoni step presets, gravity rotation matrices. |
-| `assets/iemap/` | OBJ, VTK, GLB, JSON | 27 authentic IE-Map v1.0.0 meshes, smooth canal splines, and Slicer fiducials. |
-| `docs/` | Markdown | UI design specifications, clinical expansion pillars, memory, and ADRs. |
-| `src/` & `scripts/`| Python 3, Blender | Headless Blender render pipeline for Gate 3 editorial video generation. |
+| 1. `🏛️ Anatomy Atlas` | `AppHUD.ts`, `#parts-drawer` | [`web/src/data/ontology.ts`](web/src/data/ontology.ts), [`objLoader.ts`](web/src/data/objLoader.ts) (fetch + `BufferGeometry` parser, no IndexedDB cache) |
+| 2. `🎵 Hearing & Tonotopy` | `#audiogram-drawer` (`AudiogramDrawer.ts`) | [`web/src/data/greenwoodEngine.ts`](web/src/data/greenwoodEngine.ts), [`ToneSynthesizer.ts`](web/src/audio/ToneSynthesizer.ts) |
+| 3. `🩻 Virtual Radiology` | `#ct-slice-drawer` (`CTSliceDrawer.ts`) | [`web/src/data/radiologyEngine.ts`](web/src/data/radiologyEngine.ts), `gate3Materials.ts` clipping |
+| 4. `🌀 Vestibular & VOR` | `#vor-drawer` (`VORDrawer.ts`), `#gyro-flyout` | [`canalPaths.ts`](web/src/data/canalPaths.ts) (spline cache), [`vestibularEngine.ts`](web/src/physics/vestibularEngine.ts), [`diagnosticVestibularEngine.ts`](web/src/physics/diagnosticVestibularEngine.ts), [`eyeAvatar.ts`](web/src/render/eyeAvatar.ts) |
+| 5. `🔬 Surgical Suites` | `#surgical-drawer` (`SurgicalDrawer.ts`) | [`web/src/physics/surgicalEngine.ts`](web/src/physics/surgicalEngine.ts), `DualStageScene.ts`, `ToneSynthesizer.ts` |
 
 ---
 
-## 3. TypeScript & Three.js Coding Standards
+## 3. Two-Tier Verification Matrix
 
-### TypeScript
-- Use strict typing. Avoid `any` at all costs. Define precise interfaces for scene snapshots, presets, and uniforms.
-- Keep components modular. Separate rendering concerns (`DualStageScene.ts`) from DOM/HUD management (`AppHUD.ts`).
-
-### Three.js Best Practices
-- **Shared Geometries & Buffers:** Cache parsed OBJ buffers via `objLoader.ts`. Do not duplicate geometry across state changes.
-- **Shader Uniform Updates:** Update material uniforms in-place via `.value` mutation rather than re-creating shader materials:
-  ```typescript
-  material.uniforms.uOpacity.value = targetOpacity;
-  material.uniforms.uHighlight.value = isHovered ? 1.0 : 0.0;
-  ```
-- **Disposal:** If meshes or textures are dynamically detached, call `.dispose()` on geometry and materials to prevent WebGL context memory leaks.
-
-### Web Audio API Guidelines
-- Instantiate a single, shared `AudioContext` lazily on first user interaction (pointerdown / click) to comply with browser autoplay policies:
-  ```typescript
-  if (audioCtx.state === 'suspended') {
-    await audioCtx.resume();
-  }
-  ```
-- Always apply an exponential or linear ramp on the `GainNode` to prevent audible speaker clicks/pops during tone start and stop:
-  ```typescript
-  gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(targetGain, now + 0.05);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-  ```
-
----
-
-## 4. Build, Development & Verification Commands
-
+**Fast Inner Loop (run during active edits):**
 ```bash
-# 1. Start Web Development Server (Vite @ http://127.0.0.1:5173/)
-cd web && npm run dev
-
-# 2. Compile & Validate Web TypeScript Bundle (Must pass with 0 errors)
-cd web && npm run build
-
-# 3. Preview Production Web Build
-cd web && npm run preview
-
-# 4. (Optional) Run Blender Headless Video Render Pass
-/Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/build_full_video.py
-
-# 5. (Optional) Run Python BPPV Physics Self-Test
-python3 src/physics/epley_simulator.py
+npm run typecheck                       # tsc -p web/tsconfig.json --noEmit (0 errors)
+SKIP_NESTED_BUILD=1 node scripts/test_<domain>.js
+python3 scripts/test_canal_paths.py     # All 3 canal splines + clearance checks
+python3 src/physics/epley_simulator.py  # 5-step Epley Stokes sedimentation self-test
 ```
 
----
+**Release & Cross-Viewport Verification (run before completing tasks):**
+```bash
+npm run sync:assets                     # Sync assets/iemap/ -> web/public/assets/iemap/
+npm run verify                          # typecheck + test:fast + test:python + vite build
+npm test                                # Full build + 7 Node test suites (392 assertions)
+npm run test:cdp                        # Headless Chrome 4-viewport CDP + layout audit (writes to tmpdir)
+# Optional video pipeline:
+/Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/build_full_video.py
+```
 
-## 5. Verification Checklist for Changes
-
-Before finalizing any task, verify:
-- [ ] `cd web && npm run build` completes cleanly with **0 TypeScript and Vite errors**.
-- [ ] Responsive layout remains unbroken across desktop (`1440×900`), tablet (`768×1024`), and mobile (`390×844`).
-- [ ] 3D canvas maintains 60fps orbit/pan/zoom responsiveness.
-- [ ] No regression in core anatomy tools (search bar, bone peeling slider, exploded view slider, 27-parts drawer).
-- [ ] [`docs/MEMORY.md`](docs/MEMORY.md) and [`STATUS.md`](STATUS.md) are updated if new milestones or architectural changes occur.
+Update [`docs/MEMORY.md`](docs/MEMORY.md) and [`STATUS.md`](STATUS.md) when architectural decisions or clinical parameters change.

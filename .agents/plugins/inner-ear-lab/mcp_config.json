@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "inner-ear-chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless",
+        "--isolated",
+        "--screenshotFormat",
+        "webp",
+        "--screenshotMaxWidth",
+        "1440",
+        "--no-usage-statistics"
+      ]
+    }
+  }
+}

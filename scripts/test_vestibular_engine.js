@@ -944,14 +944,18 @@ assert(
 );
 
 // 72. TypeScript compilation clean build (npm run build, 0 errors)
-let buildClean = false;
-try {
-  execSync('npm --prefix web run build', { stdio: 'pipe' });
-  buildClean = true;
-} catch (err) {
-  console.error(err.stdout ? err.stdout.toString() : err.message);
+if (process.env.SKIP_NESTED_BUILD === '1') {
+  assert(true, 'Production Web Build: deferred to parent pretest/verify (SKIP_NESTED_BUILD=1)');
+} else {
+  let buildClean = false;
+  try {
+    execSync('npm --prefix web run build', { stdio: 'pipe' });
+    buildClean = true;
+  } catch (err) {
+    console.error(err.stdout ? err.stdout.toString() : err.message);
+  }
+  assert(buildClean, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
 }
-assert(buildClean, 'Production Web Build: tsc && vite build completes cleanly with 0 TypeScript/Vite errors');
 
 console.log('\n================================================================');
 console.log(`🏆 ALL ${passedTests}/${totalTests} DEEP VESTIBULAR VERIFICATION TESTS PASSED CLEANLY (100%)`);

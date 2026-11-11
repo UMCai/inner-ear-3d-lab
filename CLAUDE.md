@@ -1,49 +1,45 @@
 # Claude Code Project Reference (`CLAUDE.md`)
 
-> **Project:** Inner Ear 3D Lab  
-> **Repository:** `inner-ear-3d-lab`  
-> **Key Frameworks:** Three.js, TypeScript, Vite, Web Audio API, Python 3 / Blender 5.2.1 LTS  
-> **Primary Specification:** [`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md)
+> **Project:** Inner Ear 3D Lab (Gate 3 Medaium) · **Repo:** `inner-ear-3d-lab`  
+> **Frameworks:** Three.js (GLSL), TypeScript, Vite, Web Audio API, Python 3, Blender 5.2.1 LTS  
+> **Canonical Guidelines:** [`AGENTS.md`](AGENTS.md) · **UI Spec:** [`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md)
 
 ---
 
-## 1. Quick Reference & Common Commands
+## 1. Quick Reference & Portable Commands
 
 ```bash
-# Web application (Single-Stage Three.js WebGL)
-cd web && npm run dev       # Starts Vite dev server on http://localhost:5173
-cd web && npm run build     # Compiles TypeScript and builds production bundle in web/dist/
-cd web && npm run preview   # Serves web/dist/ for local inspection
+# Development & Asset Sync
+npm run sync:assets                 # Copy canonical assets/iemap/ -> web/public/assets/iemap/
+npm run dev                         # Vite dev server on http://127.0.0.1:5173/
 
-# Python Pipeline (Blender & Physics)
-python3 src/anatomy/prepare_iemap.py        # Ingests authentic IE-Map meshes and splines
-python3 src/physics/epley_simulator.py      # Runs 5-step Stokes gravity sedimentation test
-/Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/build_full_video.py  # Render pass
+# Fast Inner-Loop Verification
+npm run typecheck                   # tsc -p web/tsconfig.json --noEmit
+npm run test:fast                   # All 7 Node test suites (single pre-check without nested rebuilds)
+npm run test:python                 # canal path spline tests + Epley physics self-test
+
+# Full Build & Headless Chrome QA
+npm run verify                      # typecheck + test:fast + test:python + production vite build
+npm test                            # Production build + all 7 Node test suites (392 assertions)
+npm run test:cdp                    # 4-viewport headless Chrome CDP + geometric overlap/canvas% checks
+
+# Headless Blender Editorial Video Pipeline
+/Applications/Blender.app/Contents/MacOS/Blender -b -P scripts/build_full_video.py
 ```
 
 ---
 
-## 2. Core Architecture & Workflow Rules
+## 2. Architecture & Clinical Ground Rules
 
-1. **Anti-Cockpit Philosophy:**
-   - Always protect the 3D stage. Do not add permanent sidebars, telemetry dials, or intrusive popups.
-   - Use the **Modal Workbench** system: top header selects Mode (`🧬 Anatomy`, `🎧 Hearing`, `🌀 Vestibular`, `🩻 CT`), and the bottom dock contextually swaps controls.
-2. **WebGL Performance Rule:**
-   - Keep the render loop in [`web/src/render/DualStageScene.ts`](web/src/render/DualStageScene.ts) lean. No memory allocations or GC pressure inside `requestAnimationFrame`.
-   - Update shaders in-place via existing uniforms in [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts).
-3. **Medical Accuracy:**
-   - All spatial meshes use Right-Anterior-Superior (RAS) stereotaxic coordinates with origin calibrated at `[4.5, 1.4, 0.5]` mm.
-   - Frequency tonotopy follows the Donald D. Greenwood human formula ($A=165.4, a=2.1, k=0.88$).
-4. **Permanent Documentation & Memory:**
-   - Always record important architectural decisions in [`docs/MEMORY.md`](docs/MEMORY.md).
-   - Refer to [`docs/CLINICAL_PILLARS.md`](docs/CLINICAL_PILLARS.md) for clinical and physiological specifications.
+1. **Modal Workbench & Mutual Exclusivity:** Protect the 3D stage (`>= 85%` resting viewport area). Top header switches the 5 active modes (`🏛️ Anatomy Atlas`, `🎵 Hearing & Tonotopy`, `🩻 Virtual Radiology`, `🌀 Vestibular & VOR`, `🔬 Surgical Suites`); only one bottom dock subview and at most one drawer/flyout (`#parts-drawer`, `#audiogram-drawer`, `#ct-slice-drawer`, `#vor-drawer`, `#surgical-drawer`, `#gyro-flyout`) may stay open at once.
+2. **Zero-GC 60fps WebGL & Analytic Clipping:** Never allocate inside `requestAnimationFrame` in [`web/src/render/DualStageScene.ts`](web/src/render/DualStageScene.ts) or [`web/src/render/eyeAvatar.ts`](web/src/render/eyeAvatar.ts). Mutate uniforms in-place in [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts).
+3. **RAS Stereotaxic & Biophysic Accuracy:** Right labyrinth RAS mm frame calibrated to centroid `[4.5, 1.4, 0.5]`; Greenwood tonotopy ($A=165.4, a=2.1, k=0.88$); Ewald + Steinhausen + Curthoys 40–80 ms VOR; CI `28.0 mm` / `650°` / `>= 30 mN` breach and `tau = 72 h` labyrinthectomy compensation.
 
 ---
 
 ## 3. Key Source Files
 
-- [`web/src/render/DualStageScene.ts`](web/src/render/DualStageScene.ts): Three.js scene, camera controls, mesh loading, raycasting, and pin projection.
-- [`web/src/render/gate3Materials.ts`](web/src/render/gate3Materials.ts): GLSL shaders, rim lighting, ghost translucency, and analytic clipping plane.
-- [`web/src/ui/AppHUD.ts`](web/src/ui/AppHUD.ts): Reactive UI manager, search, floating inspector card, and bottom dock.
-- [`web/src/data/ontology.ts`](web/src/data/ontology.ts): 27-part anatomy metadata, Latin names, CN VIII innervation, fluid compartments, and clinical pearls.
-- [`web/src/physics/epleyPhysics.ts`](web/src/physics/epleyPhysics.ts): 5-step BPPV kinematics and gravity rotation math.
+- **Rendering & Audio:** [`DualStageScene.ts`](web/src/render/DualStageScene.ts), [`gate3Materials.ts`](web/src/render/gate3Materials.ts), [`eyeAvatar.ts`](web/src/render/eyeAvatar.ts), [`ToneSynthesizer.ts`](web/src/audio/ToneSynthesizer.ts)
+- **Data & Loaders:** [`ontology.ts`](web/src/data/ontology.ts), [`objLoader.ts`](web/src/data/objLoader.ts), [`canalPaths.ts`](web/src/data/canalPaths.ts), [`greenwoodEngine.ts`](web/src/data/greenwoodEngine.ts), [`radiologyEngine.ts`](web/src/data/radiologyEngine.ts)
+- **Clinical Physics:** [`vestibularEngine.ts`](web/src/physics/vestibularEngine.ts), [`diagnosticVestibularEngine.ts`](web/src/physics/diagnosticVestibularEngine.ts), [`surgicalEngine.ts`](web/src/physics/surgicalEngine.ts)
+- **UI & Drawers:** [`AppHUD.ts`](web/src/ui/AppHUD.ts), [`AudiogramDrawer.ts`](web/src/ui/AudiogramDrawer.ts), [`CTSliceDrawer.ts`](web/src/ui/CTSliceDrawer.ts), [`VORDrawer.ts`](web/src/ui/VORDrawer.ts), [`SurgicalDrawer.ts`](web/src/ui/SurgicalDrawer.ts), [`style.css`](web/src/style.css)
