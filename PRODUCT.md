@@ -22,7 +22,7 @@ Unlike textbook diagrams, static radiology viewers, or "cockpit" surgical softwa
 
 ## Operating Context
 
-- **Dual-Purpose Surface:** Works as both a shareable first-impression web showcase (`web/showcase.html`) and a live blueprint for the 5-mode production application (`web/index.html` / `AppHUD.ts`), usable in dark lighting (workstation / studio reveal) and daylight reading conditions.
+- **Unified Dual-Theme Production App + Showcase:** Both the shareable static showcase (`web/showcase.html`) and the full 5-mode clinical production application (`web/index.html` / `AppHUD.ts` / `hudChrome.ts` / `DualStageScene.ts`) share the Dark Glassroom + Light Paper-Technical editorial specimen UI (`#note-sidebar`), usable in dark workstation and daylight reading conditions.
 - **Five Clinical Modes (Canonical Order):**
   1. `Anatomy Atlas` (`27` IE-Map structures, outer bone peel, radial explode, isolated inspection)
   2. `Hearing & Tonotopy` (Greenwood frequency-place mapping `20 Hz–20.7 kHz`, travelling wave, pure-tone Web Audio, Right Ear Pure-Tone Audiogram)
@@ -32,10 +32,10 @@ Unlike textbook diagrams, static radiology viewers, or "cockpit" surgical softwa
 
 ## Capabilities and Constraints
 
-- **Anti-Cockpit Invariant:** Resting 3D stage area must stay `>= 85%` across desktop (`1440×900`, `1280×800`), tablet (`768×1024`), and mobile (`390×844`), with strict 1-at-a-time mutual exclusivity across all 5 workbench drawers and the 3-axis gyro flyout, plus mobile inspector suppression when a drawer opens.
+- **Anti-Cockpit Invariant:** Resting 3D stage area must stay `>= 85%` across desktop (`1440×900`, `1280×800`), tablet (`768×1024`), and mobile (`390×844`), with strict 1-at-a-time mutual exclusivity across all 5 `#sidebar-pane-lab` drawers, `#gyro-flyout`, and expanded `#note-sidebar`.
 - **Clinical & Coordinate Fidelity:** Preserve authentic IE-Map mesh identifiers, anatomical Latin names, RAS millimeter coordinates, and otologic formulas/parameters already implemented in the repository.
-- **Rendering & Audio Constraints:** Three.js `0.170.0` WebGL2 zero-GC `requestAnimationFrame` loop; analytic GPU shader clipping in `gate3Materials.ts`; dynamic Web Audio synthesis only (no binary audio files); canonical assets sourced from `assets/iemap/` and synced into `web/public/assets/iemap/`.
-- **Static Showcase Scope (Phase 1):** Redesign the frontend shell and interactive 3D hero showcase first (`web/showcase.html`) while keeping existing production `AppHUD.ts` contracts and domain tests green until the follow-up dynamic logic wiring phase.
+- **Rendering & Audio Constraints:** Three.js `0.170.0` WebGL2 zero-GC `requestAnimationFrame` loop with `AgXToneMapping`, `RoomEnvironment` IBL, alpha-transparent background, and `setViewOffset` dynamic stage framing; analytic GPU shader clipping in `gate3Materials.ts`; dynamic Web Audio synthesis only (no binary audio files); canonical assets sourced from `assets/iemap/` and synced into `web/public/assets/iemap/`.
+- **Multi-Surface Coverage (Phase 1 Showcase + Phase 2 Production):** Both `web/index.html` (full interactive clinical simulator) and `web/showcase.html` (lightweight interactive overview) build and ship together through Vite.
 
 ## Brand Commitments
 

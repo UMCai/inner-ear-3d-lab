@@ -26,9 +26,9 @@ graph TD
         LOADER --> SCENE["web/src/render/DualStageScene.ts<br/>Single-Stage 3D Canvas (+ EyeAvatarEngine)"]
         
         ENGINES["Clinical Engines<br/>ontology.ts · greenwoodEngine.ts · radiologyEngine.ts<br/>vestibularEngine.ts · diagnosticVestibularEngine.ts · surgicalEngine.ts"] --> SCENE
-        ENGINES --> HUD["web/src/ui/AppHUD.ts + 5 Exclusive Drawers"]
+        ENGINES --> HUD["web/src/ui/AppHUD.ts + hudChrome.ts<br/>Unified #note-sidebar &amp; #sidebar-pane-lab (5 Drawers)"]
         
-        SHADER["web/src/render/gate3Materials.ts<br/>Custom GLSL Shaders & Clipping"] --> SCENE
+        SHADER["web/src/render/gate3Materials.ts<br/>Custom GLSL Shaders, AgX &amp; Clipping"] --> SCENE
         
         AUDIO["ToneSynthesizer.ts (Web Audio)<br/>Pure-Tone · Drill · EMG · Rupture"] <--> HUD
         SCENE <--> HUD
@@ -43,12 +43,12 @@ graph TD
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
-│                     LAYER 5: REACTIVE UI & HUD (AppHUD.ts & Drawers)                 │
-│  • 5-Mode Switcher (Anatomy / Hearing / Radiology / Vestibular / Surgical)           │
-│  • Search Bar with 3D Focus • Floating Inspector Card (Progressive Disclosure)       │
-│  • Contextual Bottom Workbench Dock (dynamic --dock-clearance via ResizeObserver)    │
-│  • 5 Mutually Exclusive Drawers (#parts, #audiogram, #ct-slice, #vor, #surgical)     │
-│    + #gyro-flyout (3-Axis BPPV Head Gyro)                                            │
+│           LAYER 5: REACTIVE DUAL-THEME UI & HUD (AppHUD.ts & hudChrome.ts)           │
+│  • 5-Mode Header Tablist + Light/Dark Theme Switcher (#settings-popover)             │
+│  • Search Combobox with 3D Focus · Native <dialog id="report-dialog">                │
+│  • Unified #note-sidebar (collapsed -> compact -> expanded [Note|Lab] -> wide-read)  │
+│  • Contextual Bottom Dock (--dock-clearance via ResizeObserver & --dock-shift-x)     │
+│  • 5 Mutually Exclusive #sidebar-pane-lab Drawers + #gyro-flyout (3-Axis Head Gyro)  │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
 │               LAYER 4: CLINICAL & PHYSIOLOGY DOMAIN ENGINES                          │
 │  • 27-Part Anatomical Ontology & Innervation (ontology.ts)                           │
@@ -59,12 +59,14 @@ graph TD
 │  • Cochlear Implant / Labyrinthectomy / Neurectomy Engine (surgicalEngine.ts)        │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
 │                 LAYER 3: 3D GRAPHICS & SCENE RUNTIME                                 │
-│  • DualStageScene.ts (Zero-GC render loop, OrbitControls, camera fly-to tweens)      │
-│  • Occlusion-Aware Screen-Projected HTML Pins (pre-allocated candidate buffers)      │
+│  • DualStageScene.ts (Zero-GC render loop, AgX + RoomEnvironment IBL, alpha stage)   │
+│  • Dynamic Camera Framing (setStageFraming / camera.setViewOffset for open sidebars) │
+│  • Occlusion-Aware Screen-Projected HTML Pins (pre-allocated keep-out decluttering)  │
 │  • EyeAvatarEngine (eyeAvatar.ts — 3-DOF Listing's Law + NIR VNG + Ring Buffer)      │
 ├──────────────────────────────────────────────────────────────────────────────────────┤
 │                 LAYER 2: GPU SHADER PIPELINE (gate3Materials.ts)                     │
-│  • Custom GLSL Vertex & Fragment Shaders (3-Point Lighting, Fresnel, SingleSurface)  │
+│  • Custom GLSL Vertex & Fragment Shaders + #include <tonemapping_fragment>           │
+│  • Dual-Polarity Adaptive Rim & Lumen Shading (uThemeLight, uSingleSurface)          │
 │  • Analytic 3D MPR Clipping Plane (uClipActive, uClipNormal, uClipConstant)          │
 │  • Cochlear Tonotopy & Loss Mask (uTonotopyMode, uActiveGreenwoodX, uLossMaskActive) │
 │  • Caloric Thermal Glow & Mirror Culling (uCaloricActive, uMirrored)                 │
@@ -136,12 +138,12 @@ sequenceDiagram
 
 ---
 
-## 6. The 5-Mode "Modal Workbench" UI Architecture
+## 6. The 5-Mode Dual-Theme "Editorial Specimen" UI Architecture
 
-Top header mode switcher (`AppHUD.ts`) keeps camera orientation and canvas continuity intact while swapping only the bottom workbench dock (`#anatomy-dock-content`, `#hearing-dock-content`, `#radiology-dock-content`, `#vestibular-dock-content`, `#surgical-dock-content`):
+Top header mode switcher (`AppHUD.ts` + `hudChrome.ts`) preserves WebGL2 camera state and specimen continuity while swapping the contextual bottom workbench dock (`#anatomy-dock-content`, `#hearing-dock-content`, `#radiology-dock-content`, `#vestibular-dock-content`, `#surgical-dock-content`) alongside unified `#note-sidebar` (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read` via `<details id="further-read-details">`):
 
-1. `🏛️ Anatomy Atlas` — 27-part structural exploration, peel/explode sliders, guided camera presets, `#parts-drawer`.
-2. `🎵 Hearing & Tonotopy` — Greenwood (`20 Hz–20.7 kHz`) slider, Web Audio pure-tone synthesis, `#audiogram-drawer`.
-3. `🩻 Virtual Radiology` — Temporal bone MPR (Pöschl, Stenvers, Axial, Coronal), SCDS simulation, `#ct-slice-drawer`.
-4. `🌀 Vestibular & VOR` — Subnav across `BPPV` (6 maneuvers + `#gyro-flyout`), `Caloric` (COWS/Alexander/Jongkees), and `vHIT` (Curthoys 40–80 ms/HIMP/SHIMP) paired with `#vor-drawer` (`EyeAvatarEngine` + strip plots).
-5. `🔬 Surgical Suites` — Three procedural suites (`Cochlear Implant`, `Labyrinthectomy`, `IAC Neurectomy`), 3D CI array/drill/cleavage visualization, procedural audio, and `#surgical-drawer` (endoscopy monitor + ABR/EMG/force telemetry plot).
+1. `Anatomy Atlas` — 27-part structural exploration, peel/explode sliders, guided camera presets, `#parts-drawer`.
+2. `Hearing & Tonotopy` — Greenwood (`20 Hz–20.7 kHz`) slider, Web Audio pure-tone synthesis, `#audiogram-drawer`.
+3. `Virtual Radiology` — Temporal bone MPR (Pöschl, Stenvers, Axial, Coronal), SCDS simulation, `#ct-slice-drawer`.
+4. `Vestibular & VOR` — Subnav across `BPPV` (6 maneuvers + `#gyro-flyout`), `Caloric` (COWS/Alexander/Jongkees), and `vHIT` (Curthoys 40–80 ms/HIMP/SHIMP) paired with `#vor-drawer` (`EyeAvatarEngine` + strip plots).
+5. `Surgical Suites` — Three procedural suites (`Cochlear Implant`, `Labyrinthectomy`, `IAC Neurectomy`), 3D CI array/drill/cleavage visualization, procedural audio, and `#surgical-drawer` (endoscopy monitor + ABR/EMG/force telemetry plot).

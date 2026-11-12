@@ -47,14 +47,49 @@ import {
   SCDS_PARAMETERS,
   getLandmarkForDepth,
 } from '../data/radiologyEngine';
+import {
+  MODE_LABELS,
+  MODE_LAB_TAB_LABELS,
+  SVG_ICONS,
+  THEME_STORAGE_KEY,
+  buildLoadingOverlayHTML,
+  buildReportDialogHTML,
+  buildSettingsPopoverHTML,
+  compactFluidLabel,
+  formatRAS,
+  formatStructureHeadline,
+  getCompactNoteSentence,
+  getStructurePrimaryMetric,
+  supportsTopLayerExit,
+  updateRangeProgress,
+  type NoteState,
+  type SidebarTab,
+  type ThemePreference,
+} from './hudChrome';
 
 export class AppHUD {
   private root: HTMLElement;
   private scene: DualStageScene;
+  private appShell!: HTMLElement;
   private canvasHost!: HTMLElement;
   private pinsLayer!: HTMLElement;
   private pinElements = new Map<string, HTMLElement>();
+  private pinHalfWidths = new Map<string, number>();
   private activePinIdSet = new Set<string>();
+  private placedPinRects = new Float32Array(256);
+  private keepOutZones: Array<{ l: number; t: number; r: number; b: number }> = [];
+  private stageWidthPx = 1280;
+  private headerEl: HTMLElement | null = null;
+  private framingRafQueued = false;
+
+  // Theme Controller
+  private metaColorScheme: HTMLMetaElement | null = null;
+  private darkMediaQuery: MediaQueryList;
+  private reducedMotionQuery: MediaQueryList;
+  private themePreference: ThemePreference = 'system';
+  private resolvedTheme: 'light' | 'dark' = 'dark';
+  private themeToggleBtn!: HTMLButtonElement;
+  private appearanceHint!: HTMLElement;
 
   // Cached Vestibular Telemetry Elements (Eliminates per-frame querySelector & innerHTML)
   private cachedCn8Val: HTMLElement | null = null;
@@ -64,25 +99,61 @@ export class AppHUD {
   private cachedVestClearanceVal: HTMLElement | null = null;
   private cachedVestStatusBadge: HTMLElement | null = null;
 
-  // Mode Switcher Elements
-  private modeAnatomyBtn!: HTMLButtonElement;
-  private modeHearingBtn!: HTMLButtonElement;
-  private modeRadiologyBtn!: HTMLButtonElement;
-  private modeVestibularBtn!: HTMLButtonElement;
+  // Header & Mode Switcher Elements
+  private modeSwitcher: HTMLElement | null = null;
+  private modePills: HTMLButtonElement[] = [];
+  private modeScrollObserver: IntersectionObserver | null = null;
 
-  // Header Elements
   private searchInput!: HTMLInputElement;
   private searchClearBtn!: HTMLButtonElement;
   private searchDropdown!: HTMLElement;
+  private headerSearchBtn!: HTMLButtonElement;
+  private reportOpenBtn!: HTMLButtonElement;
   private settingsBtn!: HTMLButtonElement;
   private settingsPopover!: HTMLElement;
   private settingsOpen = false;
 
-  // Floating Inspector Card Elements
-  private inspectorCard!: HTMLElement;
-  private medDetailsAccordionExpanded = false;
+  // Unified Expandable Note & Lab Sidebar
+  private noteSidebar!: HTMLElement;
+  private noteCollapsedPill!: HTMLButtonElement;
+  private notePillDot!: HTMLElement;
+  private notePillLabel!: HTMLElement;
+  private noteCard!: HTMLElement;
+  private noteSystemDot!: HTMLElement;
+  private noteSystemLabel!: HTMLElement;
+  private noteTitleEl!: HTMLElement;
+  private noteCompactBody!: HTMLElement;
+  private noteCompactLead!: HTMLElement;
+  private noteReadBtn!: HTMLButtonElement;
+  private noteLabShortcutBtn!: HTMLButtonElement;
+  private noteExpandToggleBtn!: HTMLButtonElement;
+  private noteCollapseBtn!: HTMLButtonElement;
+  private noteScrollBody!: HTMLElement;
+  private tabNoteBtn!: HTMLButtonElement;
+  private tabLabBtn!: HTMLButtonElement;
+  private sidebarPaneNote!: HTMLElement;
+  private sidebarPaneLab!: HTMLElement;
+  private noteLeadProse!: HTMLElement;
+  private inspFluidEl!: HTMLElement;
+  private inspMetricKeyEl!: HTMLElement;
+  private inspMetricValEl!: HTMLElement;
+  private btnIsolate!: HTMLButtonElement;
+  private btnResetView!: HTMLButtonElement;
+  private noteContextBoxes!: HTMLElement;
+  private furtherReadDetails!: HTMLDetailsElement;
+  private furtherReadHint!: HTMLElement;
+  private inspDeepProse!: HTMLElement;
+  private inspLatinEl!: HTMLElement;
+  private inspInnervationEl!: HTMLElement;
+  private inspMorphometryEl!: HTMLElement;
+  private inspRasChipEl!: HTMLElement;
+  private inspPearlEl!: HTMLElement;
 
-  // Bottom Bar Elements
+  private noteState: NoteState = 'compact';
+  private sidebarTab: SidebarTab = 'note';
+  private isSwitchingDrawers = false;
+
+  // Bottom Bar & Stage Utils
   private bottomBar!: HTMLElement;
   private bottomResizeObserver: ResizeObserver | null = null;
   private anatomyDockContent!: HTMLElement;
@@ -90,10 +161,11 @@ export class AppHUD {
   private radiologyDockContent!: HTMLElement;
   private vestibularDockContent!: HTMLElement;
   private surgicalDockContent!: HTMLElement;
-  private modeSurgicalBtn!: HTMLButtonElement;
-  private surgicalDrawer!: SurgicalDrawer;
+  private toolLabelsBtn!: HTMLButtonElement;
+  private toolResetBtn!: HTMLButtonElement;
 
   // Surgical Workbench Controls
+  private surgicalDrawer!: SurgicalDrawer;
   private surgSubnavTabs: HTMLButtonElement[] = [];
   private surgSubviews = new Map<string, HTMLElement>();
   private activeSurgProcedure: SurgicalProcedure = 'cochlear_implant';
@@ -134,14 +206,22 @@ export class AppHUD {
   private neurectomyKoosValEl!: HTMLElement;
   private neurectomyCleavageBtn!: HTMLButtonElement;
 
-  // Anatomy Dock Controls
+  // Anatomy Dock & Parts Lab Controls
   private boneSlider!: HTMLInputElement;
   private boneValEl!: HTMLElement;
   private explodeSlider!: HTMLInputElement;
   private explodeValEl!: HTMLElement;
+  private mobileBoneSlider!: HTMLInputElement;
+  private mobileBoneValEl!: HTMLElement;
+  private mobileExplodeSlider!: HTMLInputElement;
+  private mobileExplodeValEl!: HTMLElement;
   private presetButtons = new Map<string, HTMLButtonElement>();
   private partsToggleBtn!: HTMLButtonElement;
   private partsDrawer!: HTMLElement;
+  private partsFilterInput!: HTMLInputElement;
+  private partsFilterChips: HTMLButtonElement[] = [];
+  private partsSystemFilter: 'all' | SystemGroupId = 'all';
+  private partsSearchQuery = '';
   private partsDrawerOpen = false;
 
   // Hearing Workbench Dock Controls
@@ -268,7 +348,9 @@ export class AppHUD {
   private remainingHoldSec = 30;
 
   // Modals & Overlays
-  private aboutModal!: HTMLElement;
+  private reportDialog!: HTMLDialogElement;
+  private repActivePartEl!: HTMLElement;
+  private repActiveModeEl!: HTMLElement;
   private aboutModalOpen = false;
   private loadingOverlay!: HTMLElement;
   private loadingFill!: HTMLElement;
@@ -286,17 +368,19 @@ export class AppHUD {
   private static readonly STORAGE_KEYS = {
     labelMode: 'gate3_label_mode',
     readingDepth: 'gate3_reading_depth',
-    medDetailsOpen: 'gate3_med_details_open',
-    partsDrawerOpen: 'gate3_parts_drawer_open',
   };
 
   constructor(root: HTMLElement) {
     this.root = root;
+    this.darkMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    this.reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.metaColorScheme = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
     this.loadSavedPreferences();
     this.buildDOM();
     this.scene = new DualStageScene(this.canvasHost);
     this.scene.setVORDrawer(this.vorDrawer);
     this.scene.setSurgicalDrawer(this.surgicalDrawer);
+    this.applyTheme(this.themePreference);
     this.renderPartsTree();
 
     this.scene.onStateChange((snap) => this.renderState(snap));
@@ -311,9 +395,8 @@ export class AppHUD {
       this.syncFrequencyUI(freqHz, true);
     });
 
-    window.addEventListener('resize', () => {
-      // Recompute responsive pin boundaries on window resize
-    });
+    this.root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(updateRangeProgress);
+    this.syncSidebarDOM();
   }
 
   public async init(): Promise<void> {
@@ -323,10 +406,23 @@ export class AppHUD {
       labelMode: this.activeLabelMode,
       readingDepth: this.activeReadingDepth,
     });
+    this.scene.setThemePolarity(this.resolvedTheme === 'light');
     this.renderState(this.scene.getSnapshot());
+    this.scheduleGeometrySync();
+  }
+
+  private readStoredTheme(): ThemePreference {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === 'light' || stored === 'dark') return stored;
+    } catch {
+      // Ignore storage error
+    }
+    return 'system';
   }
 
   private loadSavedPreferences(): void {
+    this.themePreference = this.readStoredTheme();
     try {
       const savedLabel = localStorage.getItem(AppHUD.STORAGE_KEYS.labelMode);
       if (savedLabel === 'off' || savedLabel === 'key' || savedLabel === 'all') {
@@ -336,109 +432,141 @@ export class AppHUD {
       if (savedDepth === 'simple' || savedDepth === 'detailed') {
         this.activeReadingDepth = savedDepth;
       }
-      this.medDetailsAccordionExpanded =
-        localStorage.getItem(AppHUD.STORAGE_KEYS.medDetailsOpen) === 'true';
-      this.partsDrawerOpen =
-        localStorage.getItem(AppHUD.STORAGE_KEYS.partsDrawerOpen) === 'true';
     } catch {
       // Ignore localStorage errors in private browsing
     }
   }
 
+  private applyTheme(pref: ThemePreference): void {
+    this.themePreference = pref;
+    try {
+      if (pref === 'system') {
+        localStorage.removeItem(THEME_STORAGE_KEY);
+      } else {
+        localStorage.setItem(THEME_STORAGE_KEY, pref);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    if (this.metaColorScheme) {
+      this.metaColorScheme.content = pref === 'system' ? 'light dark' : pref;
+    }
+
+    this.resolvedTheme = pref === 'system' ? (this.darkMediaQuery.matches ? 'dark' : 'light') : pref;
+    if (this.appShell) {
+      this.appShell.setAttribute('data-resolved-theme', this.resolvedTheme);
+    }
+
+    if (this.appearanceHint) {
+      this.appearanceHint.textContent =
+        pref === 'system'
+          ? `Following system preference (${this.resolvedTheme === 'dark' ? 'Dark' : 'Light'})`
+          : `Manual ${pref === 'dark' ? 'Dark Glassroom' : 'Light Paper-Technical'} mode`;
+    }
+
+    this.root.querySelectorAll<HTMLButtonElement>('[data-theme-pref]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.themePref === pref);
+    });
+
+    if (this.scene) {
+      this.scene.setThemePolarity(this.resolvedTheme === 'light');
+    }
+  }
+
   private buildDOM(): void {
     this.root.innerHTML = `
-      <div class="lab-shell">
-        <!-- 1. FULL-SCREEN 3D CANVAS & PINS LAYER -->
-        <main class="canvas-host" id="canvas-host">
-          <div class="pins-layer" id="pins-layer" aria-hidden="true"></div>
-        </main>
-
-        <!-- 2. MINIMAL TOP HEADER -->
+      <div class="lab-shell" id="app-shell" data-mode="anatomy" data-note-state="compact" data-wide-read="false" data-resolved-theme="dark">
+        <!-- 1. STREAMLINED SINGLE-ROW HEADER -->
         <header class="lab-header" role="banner">
           <div class="brand-cluster">
             <span class="brand-badge">IE-MAP 3D</span>
-            <div class="title-group">
-              <h1 class="brand-title">Inner Ear 3D Lab</h1>
-              <span class="brand-sub">27-Part Anatomy Atlas</span>
-            </div>
+            <h1 class="brand-title">Inner Ear 3D Lab</h1>
           </div>
 
-          <!-- Lab Mode Switcher -->
-          <nav class="mode-switcher" role="tablist" aria-label="Lab Modes">
-            <button
-              type="button"
-              class="mode-pill active"
-              id="mode-anatomy-btn"
-              role="tab"
-              aria-selected="true"
-              aria-controls="anatomy-dock-content"
-              title="3D Anatomy Atlas (27 Parts)"
-            >
-              <span class="mode-icon">🏛️</span>
-              <span class="mode-label">Anatomy Atlas</span>
-            </button>
-            <button
-              type="button"
-              class="mode-pill"
-              id="mode-hearing-btn"
-              role="tab"
-              aria-selected="false"
-              aria-controls="hearing-dock-content"
-              title="Tonotopy & Hearing Lab (Georg von Békésy Wave)"
-            >
-              <span class="mode-icon">🎵</span>
-              <span class="mode-label">Hearing &amp; Tonotopy</span>
-            </button>
-            <button
-              type="button"
-              class="mode-pill"
-              id="mode-radiology-btn"
-              role="tab"
-              aria-selected="false"
-              aria-controls="radiology-dock-content"
-              title="Virtual Temporal Bone Radiology &amp; SCDS Simulation"
-            >
-              <span class="mode-icon">🩻</span>
-              <span class="mode-label">Virtual Radiology</span>
-            </button>
-            <button
-              type="button"
-              class="mode-pill"
-              id="mode-vestibular-btn"
-              data-mode="vestibular"
-              role="tab"
-              aria-selected="false"
-              aria-controls="vestibular-dock-content"
-              title="Multi-Canal Vestibular Dynamics &amp; 3D VOR"
-            >
-              <span class="mode-icon">🌀</span>
-              <span class="mode-label">Vestibular &amp; VOR</span>
-            </button>
-            <button
-              type="button"
-              class="mode-pill"
-              id="mode-surgical-btn"
-              data-mode="surgical"
-              role="tab"
-              aria-selected="false"
-              aria-controls="surgical-dock-content"
-              title="Surgical Approaches &amp; Implant Simulations"
-            >
-              <span class="mode-icon">🔬</span>
-              <span class="mode-label">Surgical Suites</span>
-            </button>
+          <nav class="mode-switcher-shell" aria-label="Clinical Modes">
+            <div class="mode-switcher" role="tablist">
+              <button
+                type="button"
+                class="mode-pill active"
+                id="mode-anatomy-btn"
+                data-mode="anatomy"
+                role="tab"
+                aria-selected="true"
+                aria-controls="anatomy-dock-content"
+                title="3D Anatomy Atlas (27 Parts)"
+              >
+                ${SVG_ICONS.anatomy}
+                <span class="mode-label">Anatomy<span class="mode-label-ext"> Atlas</span></span>
+              </button>
+              <button
+                type="button"
+                class="mode-pill"
+                id="mode-hearing-btn"
+                data-mode="hearing"
+                role="tab"
+                aria-selected="false"
+                aria-controls="hearing-dock-content"
+                title="Tonotopy &amp; Hearing Lab (Georg von Békésy Wave)"
+              >
+                ${SVG_ICONS.hearing}
+                <span class="mode-label">Hearing<span class="mode-label-ext"> &amp; Tonotopy</span></span>
+              </button>
+              <button
+                type="button"
+                class="mode-pill"
+                id="mode-radiology-btn"
+                data-mode="radiology"
+                role="tab"
+                aria-selected="false"
+                aria-controls="radiology-dock-content"
+                title="Virtual Temporal Bone Radiology &amp; SCDS Simulation"
+              >
+                ${SVG_ICONS.radiology}
+                <span class="mode-label"><span class="mode-label-ext">Virtual </span>Radiology</span>
+              </button>
+              <button
+                type="button"
+                class="mode-pill"
+                id="mode-vestibular-btn"
+                data-mode="vestibular"
+                role="tab"
+                aria-selected="false"
+                aria-controls="vestibular-dock-content"
+                title="Multi-Canal Vestibular Dynamics &amp; 3D VOR"
+              >
+                ${SVG_ICONS.vestibular}
+                <span class="mode-label">Vestibular<span class="mode-label-ext"> &amp; VOR</span></span>
+              </button>
+              <button
+                type="button"
+                class="mode-pill"
+                id="mode-surgical-btn"
+                data-mode="surgical"
+                role="tab"
+                aria-selected="false"
+                aria-controls="surgical-dock-content"
+                title="Surgical Approaches &amp; Implant Simulations"
+              >
+                ${SVG_ICONS.surgical}
+                <span class="mode-label">Surgical<span class="mode-label-ext"> Suites</span></span>
+              </button>
+            </div>
           </nav>
 
-          <!-- Quick Search Bar -->
-          <div class="search-container">
+          <search class="search-container">
             <div class="search-input-shell">
-              <span class="search-icon" aria-hidden="true">🔍</span>
+              <span class="search-icon" aria-hidden="true">${SVG_ICONS.search}</span>
               <input
                 type="text"
                 class="search-input"
                 id="search-input"
                 placeholder="Find an ear part..."
-                aria-label="Find an ear part"
+                aria-label="Find an anatomical ear structure"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="search-dropdown"
                 autocomplete="off"
                 spellcheck="false"
               />
@@ -447,90 +575,267 @@ export class AppHUD {
                 class="search-clear-btn"
                 id="search-clear-btn"
                 aria-label="Clear search"
+                hidden
                 style="display: none;"
-              >✕</button>
+              >${SVG_ICONS.close}</button>
             </div>
-            <div class="search-dropdown" id="search-dropdown" role="listbox"></div>
-          </div>
+            <div class="search-dropdown glass-surface" id="search-dropdown" role="listbox" aria-label="Structure matches"></div>
+          </search>
 
-          <!-- Header Controls: Single Settings Button -->
           <div class="header-actions">
+            <button
+              type="button"
+              class="header-icon-btn header-search-trigger"
+              id="header-search-btn"
+              aria-label="Search 27 anatomical parts"
+            >${SVG_ICONS.search}</button>
+
+            <button
+              type="button"
+              class="header-report-btn"
+              id="report-open-btn"
+              aria-label="Open clinical summary report"
+            >
+              ${SVG_ICONS.report}
+              <span class="header-btn-text">Report</span>
+            </button>
+
+            <button type="button" class="header-icon-btn" id="theme-toggle-btn" title="Switch color polarity">
+              ${SVG_ICONS.sun}
+              ${SVG_ICONS.moon}
+              <span class="visually-hidden theme-text-to-light">Switch to light theme</span>
+              <span class="visually-hidden theme-text-to-dark">Switch to dark theme</span>
+            </button>
+
             <button
               type="button"
               class="header-icon-btn"
               id="settings-btn"
-              title="Settings & Lab Options"
-              aria-label="Settings"
+              popovertarget="settings-popover"
+              title="Display &amp; Lab Settings"
+              aria-label="Display &amp; Lab Settings"
               aria-expanded="false"
-            >⚙️</button>
-
-            <!-- Settings Popover Menu -->
-            <div class="settings-popover" id="settings-popover" role="dialog" aria-label="Settings Menu">
-              <div class="popover-header">
-                <h3>Settings &amp; Options</h3>
-                <button type="button" class="popover-close-btn" id="popover-close-btn" aria-label="Close settings">✕</button>
-              </div>
-
-              <!-- 3D Label Density Segmented Control -->
-              <div class="popover-section">
-                <label class="popover-label" id="label-mode-heading">3D Part Labels</label>
-                <div class="segmented-control" role="group" aria-labelledby="label-mode-heading">
-                  <button type="button" class="segment-btn ${this.activeLabelMode === 'off' ? 'active' : ''}" data-label-mode="off">Off</button>
-                  <button type="button" class="segment-btn ${this.activeLabelMode === 'key' ? 'active' : ''}" data-label-mode="key">Key</button>
-                  <button type="button" class="segment-btn ${this.activeLabelMode === 'all' ? 'active' : ''}" data-label-mode="all">All</button>
-                </div>
-              </div>
-
-              <!-- Reading Depth Segmented Control -->
-              <div class="popover-section">
-                <label class="popover-label" id="reading-depth-heading">Reading Depth</label>
-                <div class="segmented-control" role="group" aria-labelledby="reading-depth-heading">
-                  <button type="button" class="segment-btn ${this.activeReadingDepth === 'simple' ? 'active' : ''}" data-reading-depth="simple">Simple</button>
-                  <button type="button" class="segment-btn ${this.activeReadingDepth === 'detailed' ? 'active' : ''}" data-reading-depth="detailed">Detailed</button>
-                </div>
-              </div>
-
-              <div class="popover-divider"></div>
-
-              <!-- About & Citations Trigger -->
-              <div class="popover-section">
-                <button type="button" class="popover-action-btn" id="about-open-btn">
-                  <span class="btn-icon">ℹ️</span>
-                  <span>About &amp; Citations</span>
-                </button>
-              </div>
-            </div>
+              aria-controls="settings-popover"
+            >${SVG_ICONS.settings}</button>
           </div>
         </header>
 
-        <!-- 3. FLOATING PART INSPECTOR CARD -->
-        <aside class="inspector-card" id="inspector-card" aria-label="Structure Inspector"></aside>
+        ${buildSettingsPopoverHTML(this.activeLabelMode, this.activeReadingDepth)}
 
-        <!-- 4. COMPACT BOTTOM VISUALIZATION BAR / WORKBENCH -->
-        <nav class="bottom-viz-bar" id="bottom-bar" aria-label="Visualization Controls">
+        <!-- 2. FULL-BLEED 3D SPECIMEN STAGE -->
+        <main class="specimen-stage" id="specimen-stage">
+          <div class="stage-frame" aria-hidden="true">
+            <span class="corner-bracket tl"></span>
+            <span class="corner-bracket tr"></span>
+            <span class="corner-bracket bl"></span>
+            <span class="corner-bracket br"></span>
+          </div>
+
+          <div class="canvas-host" id="canvas-host" aria-label="Interactive 3D Inner Ear Labyrinth Viewport"></div>
+          <div class="pins-layer" id="pins-layer" aria-hidden="true"></div>
+
+          <!-- 3. UNIFIED EXPANDABLE LEFT NOTE & LAB SIDEBAR -->
+          <aside
+            class="note-sidebar"
+            id="note-sidebar"
+            data-note-state="compact"
+            data-sidebar-tab="note"
+            data-wide-read="false"
+            aria-label="Specimen Note and Clinical Lab Sidebar"
+          >
+            <button type="button" class="note-collapsed-pill glass-surface" id="note-collapsed-pill" hidden>
+              <span class="pill-dot" id="note-pill-dot"></span>
+              <span id="note-pill-label">Labyrinth · Open Note</span>
+            </button>
+
+            <section class="note-card glass-surface" id="note-card" aria-labelledby="note-title">
+              <div class="note-card-header">
+                <div class="note-system-tag">
+                  <span class="pill-dot" id="note-system-dot"></span>
+                  <span id="note-system-label">Inner Ear Atlas</span>
+                </div>
+
+                <div class="note-header-controls">
+                  <div class="note-tab-switch" id="note-tab-switch" role="tablist" aria-label="Sidebar View">
+                    <button
+                      type="button"
+                      class="note-tab-btn active"
+                      id="tab-note-btn"
+                      data-sidebar-tab="note"
+                      role="tab"
+                      aria-selected="true"
+                    >Note</button>
+                    <button
+                      type="button"
+                      class="note-tab-btn"
+                      id="tab-lab-btn"
+                      data-sidebar-tab="lab"
+                      role="tab"
+                      aria-selected="false"
+                    >Parts</button>
+                  </div>
+                  <button
+                    type="button"
+                    class="icon-close-btn note-size-btn"
+                    id="note-expand-toggle-btn"
+                    aria-expanded="false"
+                    aria-label="Expand note sidebar for full reading"
+                    title="Expand / compact note"
+                  >
+                    ${SVG_ICONS.expand}
+                    ${SVG_ICONS.shrink}
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-close-btn note-min-btn"
+                    id="note-collapse-btn"
+                    aria-label="Collapse note sidebar"
+                    title="Minimize note to corner pill"
+                  >${SVG_ICONS.collapse}</button>
+                </div>
+              </div>
+
+              <h2 class="note-title" id="note-title">Inner Ear Labyrinth</h2>
+
+              <div class="note-compact-body" id="note-compact-body">
+                <p class="note-compact-lead" id="note-compact-lead">Click any inner ear structure in 3D or search above to inspect stereotaxic anatomy.</p>
+                <div class="note-compact-actions">
+                  <button type="button" class="primary-action-btn" id="note-read-btn">Read Note</button>
+                  <button type="button" class="secondary-action-btn" id="note-lab-shortcut-btn">Parts</button>
+                </div>
+              </div>
+
+              <div class="note-scroll-body" id="note-scroll-body" hidden>
+                <div class="sidebar-pane" id="sidebar-pane-note">
+                  <p class="note-lead-prose" id="insp-summary"></p>
+
+                  <div class="note-metrics-strip">
+                    <div class="telemetry-cell">
+                      <span class="telemetry-key">Fluid</span>
+                      <span class="telemetry-val" id="insp-fluid">—</span>
+                    </div>
+                    <div class="telemetry-cell">
+                      <span class="telemetry-key" id="insp-metric-key">Geometry</span>
+                      <span class="telemetry-val" id="insp-metric-val">—</span>
+                    </div>
+                  </div>
+
+                  <div class="note-action-row">
+                    <button type="button" class="primary-action-btn" id="btn-isolate">Isolate Part</button>
+                    <button type="button" class="secondary-action-btn" id="btn-reset-view">Reset View</button>
+                  </div>
+
+                  <div id="note-context-boxes"></div>
+
+                  <details class="further-read-details" id="further-read-details">
+                    <summary class="further-read-summary">
+                      <span class="further-read-label">Further Read</span>
+                      <span class="further-read-hint" id="further-read-hint">Clinical Details · Patient</span>
+                    </summary>
+                    <div class="further-read-content">
+                      <div class="depth-inline-row">
+                        <span class="depth-inline-label">Tone</span>
+                        <div class="segmented-control compact-seg" role="group" aria-label="Reading style">
+                          <button type="button" class="segment-btn ${this.activeReadingDepth === 'simple' ? 'active' : ''}" data-reading-depth="simple">Patient</button>
+                          <button type="button" class="segment-btn ${this.activeReadingDepth === 'detailed' ? 'active' : ''}" data-reading-depth="detailed">Clinical</button>
+                        </div>
+                      </div>
+                      <p class="note-deep-prose" id="insp-deep-prose"></p>
+                      <dl class="further-read-dl">
+                        <div class="dl-pair">
+                          <dt>Latin Name</dt>
+                          <dd><em id="insp-latin">—</em></dd>
+                        </div>
+                        <div class="dl-pair">
+                          <dt>Innervation</dt>
+                          <dd id="insp-innervation">—</dd>
+                        </div>
+                        <div class="dl-pair">
+                          <dt>Morphometry</dt>
+                          <dd id="insp-morphometry">—</dd>
+                        </div>
+                        <div class="dl-pair">
+                          <dt>RAS Centroid (mm)</dt>
+                          <dd class="mono-dd" id="insp-ras-chip">—</dd>
+                        </div>
+                        <div class="dl-pair">
+                          <dt>Clinical Pearl</dt>
+                          <dd id="insp-pearl">—</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </details>
+                </div>
+
+                <!-- Re-Hosted Inline Lab Pane (5 Mutually Exclusive Drawers) -->
+                <div class="sidebar-pane" id="sidebar-pane-lab" hidden>
+                  <div class="parts-drawer" id="parts-drawer" role="region" aria-label="Anatomical Parts List">
+                    <div class="parts-drawer-header">
+                      <h2 class="parts-drawer-title">All 27 Anatomical Structures</h2>
+                      <button type="button" class="drawer-close-btn" id="drawer-close-btn" aria-label="Close parts list">✕</button>
+                    </div>
+                    <div class="lab-filter-row" id="parts-filter-chips" role="group" aria-label="Filter by system">
+                      <button type="button" class="chip-btn active" data-sys-filter="all">All (27)</button>
+                      <button type="button" class="chip-btn" data-sys-filter="cochlear_system">Cochlea</button>
+                      <button type="button" class="chip-btn" data-sys-filter="semicircular_ducts">Canals</button>
+                      <button type="button" class="chip-btn" data-sys-filter="ampullae_cupulae">Ampullae</button>
+                      <button type="button" class="chip-btn" data-sys-filter="otolith_vestibule">Otoliths</button>
+                      <button type="button" class="chip-btn" data-sys-filter="bony_capsule">Bone</button>
+                    </div>
+                    <div class="lab-search-shell">
+                      ${SVG_ICONS.search}
+                      <input
+                        type="text"
+                        class="lab-search-input"
+                        id="parts-filter-input"
+                        placeholder="Filter 27 structures..."
+                        aria-label="Filter 27 anatomical structures"
+                        autocomplete="off"
+                      />
+                    </div>
+                    <div class="mobile-parts-sliders" id="mobile-parts-sliders">
+                      <div class="slider-control">
+                        <div class="slider-label-row">
+                          <label for="mobile-bone-peel-slider">Bone Peel</label>
+                          <span class="slider-value" id="mobile-bone-val">80%</span>
+                        </div>
+                        <input type="range" id="mobile-bone-peel-slider" min="0" max="100" value="80" aria-label="Outer Bone Shell Opacity Peel" />
+                      </div>
+                      <div class="slider-control">
+                        <div class="slider-label-row">
+                          <label for="mobile-explode-slider">Separate</label>
+                          <span class="slider-value" id="mobile-explode-val">0%</span>
+                        </div>
+                        <input type="range" id="mobile-explode-slider" min="0" max="100" value="0" aria-label="Separate Parts Radial Explode" />
+                      </div>
+                    </div>
+                    <div class="parts-tree-body" id="parts-tree-body"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </main>
+
+        <!-- 4. CONTEXTUAL BOTTOM WORKBENCH DOCK -->
+        <nav class="bottom-viz-bar glass-surface" id="bottom-bar" aria-label="Visualization Controls">
           <!-- 4A. Anatomy Dock Content -->
           <div class="anatomy-dock-content" id="anatomy-dock-content">
-            <!-- 4 Guided Presets -->
             <div class="preset-group" role="group" aria-label="Guided Anatomy Presets">
               <button type="button" class="preset-btn active" data-preset="overview" title="Full 27-part inner ear labyrinth">
-                <span class="preset-icon">🌐</span>
                 <span class="preset-label">Overview</span>
               </button>
               <button type="button" class="preset-btn" data-preset="balance_system" title="3 Semicircular canals and vestibule">
-                <span class="preset-icon">⚖️</span>
-                <span class="preset-label">Balance System</span>
+                <span class="preset-label">Balance</span>
               </button>
               <button type="button" class="preset-btn" data-preset="hearing_snail" title="Cochlea and internal scala chambers">
-                <span class="preset-icon">🐚</span>
-                <span class="preset-label">Hearing Snail</span>
+                <span class="preset-label">Hearing</span>
               </button>
               <button type="button" class="preset-btn" data-preset="exploded_view" title="Radial separation of all 27 parts">
-                <span class="preset-icon">💥</span>
-                <span class="preset-label">Exploded View</span>
+                <span class="preset-label">Exploded</span>
               </button>
             </div>
 
-            <!-- 2 Visual Sliders -->
             <div class="sliders-group">
               <div class="slider-item">
                 <div class="slider-header">
@@ -562,17 +867,16 @@ export class AppHUD {
               </div>
             </div>
 
-            <!-- Collapsible 27 Parts Toggle -->
             <div class="parts-toggle-wrap">
               <button
                 type="button"
-                class="parts-toggle-btn ${this.partsDrawerOpen ? 'open' : ''}"
+                class="parts-toggle-btn"
                 id="parts-toggle-btn"
-                aria-expanded="${this.partsDrawerOpen ? 'true' : 'false'}"
+                aria-expanded="false"
                 aria-controls="parts-drawer"
               >
-                <span class="toggle-arrow" aria-hidden="true">${this.partsDrawerOpen ? '▾' : '▸'}</span>
-                <span class="toggle-text">Browse All 27 Parts</span>
+                <span class="toggle-arrow" aria-hidden="true">▸</span>
+                <span class="toggle-text">27 Parts</span>
                 <span class="parts-badge">27</span>
               </button>
             </div>
@@ -580,7 +884,6 @@ export class AppHUD {
 
           <!-- 4B. Hearing Workbench Dock Content -->
           <div class="hearing-dock-content" id="hearing-dock-content" style="display: none;">
-            <!-- Play / Pause Pure-Tone Button -->
             <button
               type="button"
               class="tone-play-btn"
@@ -592,10 +895,9 @@ export class AppHUD {
               <span class="tone-label" id="tone-label">Play Tone</span>
             </button>
 
-            <!-- Logarithmic Frequency Slider & Metric Readout -->
             <div class="hearing-slider-wrap">
               <div class="hearing-slider-header">
-                <span class="hearing-slider-title">Stimulus Frequency</span>
+                <span class="hearing-slider-title">Frequency</span>
                 <div class="hearing-readout-wrap">
                   <span class="hearing-freq-val" id="hearing-freq-readout">1000 Hz</span>
                   <span class="hearing-landmark-badge" id="hearing-landmark-badge">Vowel 1st Formant (19.4 mm)</span>
@@ -612,7 +914,6 @@ export class AppHUD {
               />
             </div>
 
-            <!-- Standard Audiometric Octave Chips -->
             <div class="octave-chips-group" role="group" aria-label="Audiometric Octave Steps">
               <button type="button" class="octave-chip" data-octave="125">125</button>
               <button type="button" class="octave-chip" data-octave="250">250</button>
@@ -623,7 +924,6 @@ export class AppHUD {
               <button type="button" class="octave-chip" data-octave="8000">8k</button>
             </div>
 
-            <!-- Clinical Audiogram Drawer Toggle Button -->
             <button
               type="button"
               class="audiogram-toggle-btn"
@@ -632,7 +932,6 @@ export class AppHUD {
               aria-controls="audiogram-drawer"
               title="Open Clinical Pure-Tone Audiogram Drawer"
             >
-              <span class="audiogram-icon">📊</span>
               <span class="audiogram-label">Audiogram</span>
               <span class="audiogram-arrow" id="audiogram-arrow">▸</span>
             </button>
@@ -640,27 +939,21 @@ export class AppHUD {
 
           <!-- 4C. Radiology Workbench Dock Content -->
           <div class="radiology-dock-content" id="radiology-dock-content" style="display: none;">
-            <!-- 4 Canonical Plane Selection Chips -->
             <div class="radiology-plane-group" id="rad-plane-chips" role="group" aria-label="Radiological Slicing Planes">
               <button type="button" class="plane-chip active" data-plane="poschl" title="Pöschl's Oblique Sagittal (Parallel to SSC)">
-                <span class="chip-icon">📐</span>
-                <span class="chip-label">Pöschl (SSCD)</span>
+                <span class="chip-label">Pöschl</span>
               </button>
               <button type="button" class="plane-chip" data-plane="stenvers" title="Stenvers' Oblique Coronal (Perpendicular to SSC)">
-                <span class="chip-icon">📐</span>
-                <span class="chip-label">Stenvers (Arch)</span>
+                <span class="chip-label">Stenvers</span>
               </button>
-              <button type="button" class="plane-chip" data-plane="axial" title="True Axial Transverse MPR (Lateral Canal Signet Ring)">
-                <span class="chip-icon">📐</span>
-                <span class="chip-label">True Axial</span>
+              <button type="button" class="plane-chip" data-plane="axial" title="True Axial Transverse MPR">
+                <span class="chip-label">Axial</span>
               </button>
-              <button type="button" class="plane-chip" data-plane="coronal" title="True Coronal Frontal MPR (Cochlear Modiolus 2.5 Turns)">
-                <span class="chip-icon">📐</span>
-                <span class="chip-label">True Coronal</span>
+              <button type="button" class="plane-chip" data-plane="coronal" title="True Coronal Frontal MPR">
+                <span class="chip-label">Coronal</span>
               </button>
             </div>
 
-            <!-- Continuous Depth Slider & Live Landmark Badge -->
             <div class="radiology-depth-wrap">
               <div class="radiology-depth-header">
                 <span class="depth-title">Slice Depth</span>
@@ -684,46 +977,18 @@ export class AppHUD {
               </div>
             </div>
 
-            <!-- Action & Scenario Buttons -->
             <div class="radiology-actions-group">
-              <button
-                type="button"
-                class="rad-action-btn"
-                id="rad-flip-btn"
-                title="Invert clipping half-space normal direction"
-              >
-                <span class="rad-btn-icon">⇄</span>
+              <button type="button" class="rad-action-btn" id="rad-flip-btn" title="Invert clipping half-space normal direction">
                 <span class="rad-btn-text">Flip Cut</span>
               </button>
-
-              <button
-                type="button"
-                class="rad-action-btn active"
-                id="rad-guide-btn"
-                title="Toggle 3D semi-transparent cutting plane quad"
-              >
-                <span class="rad-btn-icon">📐</span>
-                <span class="rad-btn-text">Guide Plane</span>
+              <button type="button" class="rad-action-btn active" id="rad-guide-btn" title="Toggle 3D cutting plane quad">
+                <span class="rad-btn-text">Guide</span>
               </button>
-
-              <button
-                type="button"
-                class="rad-action-btn scds-toggle-btn"
-                id="rad-scds-toggle-btn"
-                title="Toggle Superior Canal Dehiscence Syndrome (1.5 mm apical defect &amp; third-window leak)"
-              >
-                <span class="rad-btn-icon">⚡</span>
-                <span class="rad-btn-text">SCDS Defect</span>
+              <button type="button" class="rad-action-btn scds-toggle-btn" id="rad-scds-toggle-btn" title="Toggle Superior Canal Dehiscence Syndrome (1.5 mm defect)">
+                <span class="rad-btn-text">SSCD Defect</span>
               </button>
-
-              <button
-                type="button"
-                class="rad-action-btn ct-card-toggle-btn"
-                id="rad-ct-toggle-btn"
-                title="Toggle Synchronized 2D CT MPR Slice Drawer"
-              >
-                <span class="rad-btn-icon">🩻</span>
-                <span class="rad-btn-text">2D CT Card</span>
+              <button type="button" class="rad-action-btn ct-card-toggle-btn" id="rad-ct-toggle-btn" title="Toggle Synchronized 2D CT MPR Slice Drawer" aria-expanded="false" aria-controls="ct-slice-drawer">
+                <span class="rad-btn-text">CT MPR</span>
                 <span class="ct-card-arrow" id="ct-card-arrow">▸</span>
               </button>
             </div>
@@ -731,18 +996,15 @@ export class AppHUD {
 
           <!-- 4D. Vestibular & VOR Workbench Dock Content -->
           <div class="vestibular-dock-content" id="vestibular-dock-content" style="display: none;">
-            <!-- Subnav Bar: Switch between BPPV Maneuvers, Caloric (COWS), and vHIT -->
             <div class="vest-subnav-bar" id="vest-subnav-bar" role="tablist" aria-label="Diagnostic Vestibular Modalities">
-              <button type="button" class="vest-subnav-tab active" data-submode="bppv" id="vest-subnav-bppv">🌀 BPPV Maneuvers</button>
-              <button type="button" class="vest-subnav-tab" data-submode="caloric" id="vest-subnav-caloric">🌡️ Caloric (COWS)</button>
-              <button type="button" class="vest-subnav-tab" data-submode="vhit" id="vest-subnav-vhit">⚡ vHIT Test</button>
+              <button type="button" class="vest-subnav-tab active" data-submode="bppv" id="vest-subnav-bppv">BPPV Maneuvers</button>
+              <button type="button" class="vest-subnav-tab" data-submode="caloric" id="vest-subnav-caloric">Caloric (COWS)</button>
+              <button type="button" class="vest-subnav-tab" data-submode="vhit" id="vest-subnav-vhit">vHIT Impulse</button>
             </div>
 
-            <!-- Subview 1: BPPV Maneuvers (Existing BPPV Controls) -->
             <div class="vest-subview vest-bppv-subview" id="vest-bppv-subview" style="display: flex;">
-              <!-- 1. Protocol Selector Chips (Grouped by Canal) -->
               <div class="vestibular-protocol-group" id="vest-protocol-chips" role="group" aria-label="BPPV Clinical Protocols">
-                <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal Canalithiasis - 5 Steps)">
+                <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal - 5 Steps)">
                   <span class="chip-badge">Post</span>
                   <span class="chip-label">Epley (5s)</span>
                 </button>
@@ -750,15 +1012,15 @@ export class AppHUD {
                   <span class="chip-badge">Post</span>
                   <span class="chip-label">Semont (3s)</span>
                 </button>
-                <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Canal Geotropic - 4 Steps)">
+                <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Geotropic - 4 Steps)">
                   <span class="chip-badge">Horiz</span>
                   <span class="chip-label">Gufoni Geo</span>
                 </button>
-                <button type="button" class="protocol-chip" data-maneuver="gufoni_apogeotropic" title="Gufoni Maneuver (Horizontal Canal Apogeotropic - 4 Steps)">
+                <button type="button" class="protocol-chip" data-maneuver="gufoni_apogeotropic" title="Gufoni Maneuver (Horizontal Apogeotropic - 4 Steps)">
                   <span class="chip-badge">Horiz</span>
                   <span class="chip-label">Gufoni Apo</span>
                 </button>
-                <button type="button" class="protocol-chip" data-maneuver="barbecue_roll" title="Lempert 360° Barbecue Roll (Horizontal Canal - 5 Steps)">
+                <button type="button" class="protocol-chip" data-maneuver="barbecue_roll" title="Lempert 360° Barbecue Roll (Horizontal - 5 Steps)">
                   <span class="chip-badge">Horiz</span>
                   <span class="chip-label">Barbecue 360°</span>
                 </button>
@@ -768,7 +1030,6 @@ export class AppHUD {
                 </button>
               </div>
 
-              <!-- 2. Timeline Step Scrubber & Sequence Controls -->
               <div class="vestibular-timeline-wrap">
                 <div class="timeline-header">
                   <span class="timeline-title" id="vest-step-title">Step 1 of 5: Start Sitting Upright</span>
@@ -796,71 +1057,44 @@ export class AppHUD {
                 </div>
               </div>
 
-              <!-- 3. Actions & Modals: 3-Axis Gyro, Reset, VOR Eyes Toggle -->
               <div class="vestibular-actions-group">
-                <button
-                  type="button"
-                  class="vest-action-btn gyro-toggle-btn"
-                  id="vest-gyro-toggle-btn"
-                  title="Toggle Interactive 3-Axis Head Gyro Sliders"
-                  aria-expanded="false"
-                >
-                  <span class="vest-btn-icon">🕹️</span>
+                <button type="button" class="vest-action-btn gyro-toggle-btn" id="vest-gyro-toggle-btn" title="Toggle 3-Axis Head Gyro Sliders" aria-expanded="false">
                   <span class="vest-btn-text">Head Gyro</span>
                 </button>
-
-                <button
-                  type="button"
-                  class="vest-action-btn reset-crystals-btn"
-                  id="vest-reset-btn"
-                  title="Reset Otoconia to Initial Cupular Resting Position"
-                >
-                  <span class="vest-btn-icon">⚡</span>
+                <button type="button" class="vest-action-btn reset-crystals-btn" id="vest-reset-btn" title="Reset Otoconia">
                   <span class="vest-btn-text">Reset</span>
                 </button>
-
-                <button
-                  type="button"
-                  class="vest-action-btn vor-toggle-btn"
-                  id="vest-vor-toggle-btn"
-                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
-                  aria-expanded="false"
-                  aria-controls="vor-drawer"
-                >
-                  <span class="vest-btn-icon">👁️</span>
+                <button type="button" class="vest-action-btn vor-toggle-btn" id="vest-vor-toggle-btn" title="Toggle 3D VOR Eye Avatar &amp; VNG Drawer" aria-expanded="false" aria-controls="vor-drawer">
                   <span class="vest-btn-text">VOR Eyes</span>
                   <span class="vor-arrow" id="vor-arrow">▸</span>
                 </button>
               </div>
             </div>
 
-            <!-- Subview 2: Caloric Testing Suite (COWS & Alexander's Law) -->
             <div class="vest-subview vest-caloric-subview" id="vest-caloric-subview" style="display: none;">
-              <!-- 1. Irrigation Ear & Temperature Selector -->
               <div class="vestibular-protocol-group" id="caloric-temp-chips" role="group" aria-label="Caloric Irrigations">
-                <button type="button" class="caloric-chip active" data-caloric-temp="R44" title="Right Warm 44°C (Ampullopetal excitation -> Fast phase Right/Same)">
-                  <span class="chip-badge warm">🔴 Warm</span>
+                <button type="button" class="caloric-chip active" data-caloric-temp="R44" title="Right Warm 44°C">
+                  <span class="chip-badge warm">Warm</span>
                   <span class="chip-label">R 44°C</span>
                 </button>
-                <button type="button" class="caloric-chip" data-caloric-temp="R30" title="Right Cold 30°C (Ampullofugal inhibition -> Fast phase Left/Opposite)">
-                  <span class="chip-badge cold">🔵 Cold</span>
+                <button type="button" class="caloric-chip" data-caloric-temp="R30" title="Right Cold 30°C">
+                  <span class="chip-badge cold">Cold</span>
                   <span class="chip-label">R 30°C</span>
                 </button>
-                <button type="button" class="caloric-chip" data-caloric-temp="L44" title="Left Warm 44°C (Ampullopetal excitation -> Fast phase Left/Same)">
-                  <span class="chip-badge warm">🔴 Warm</span>
+                <button type="button" class="caloric-chip" data-caloric-temp="L44" title="Left Warm 44°C">
+                  <span class="chip-badge warm">Warm</span>
                   <span class="chip-label">L 44°C</span>
                 </button>
-                <button type="button" class="caloric-chip" data-caloric-temp="L30" title="Left Cold 30°C (Ampullofugal inhibition -> Fast phase Right/Opposite)">
-                  <span class="chip-badge cold">🔵 Cold</span>
+                <button type="button" class="caloric-chip" data-caloric-temp="L30" title="Left Cold 30°C">
+                  <span class="chip-badge cold">Cold</span>
                   <span class="chip-label">L 30°C</span>
                 </button>
-                <button type="button" class="caloric-chip" data-caloric-temp="Ice4" title="Ice Water 4°C (Severe hypofunction / areflexia confirmation)">
-                  <span class="chip-badge ice">🧊 Ice</span>
+                <button type="button" class="caloric-chip" data-caloric-temp="Ice4" title="Ice Water 4°C">
+                  <span class="chip-badge ice">Ice</span>
                   <span class="chip-label">Ice 4°C</span>
                 </button>
               </div>
 
-              <!-- 2. Caloric Posture, Irrigation Controls & Timeline -->
               <div class="vestibular-timeline-wrap">
                 <div class="timeline-header">
                   <span class="timeline-title" id="caloric-status-title">COWS: Warm Same, Cold Opposite</span>
@@ -873,8 +1107,7 @@ export class AppHUD {
                   <button type="button" class="timeline-btn play-btn" id="caloric-play-btn" title="Start / Pause Caloric Irrigation (40s)">
                     <span class="play-icon" id="caloric-play-icon">▶</span>
                   </button>
-                  <button type="button" class="vest-action-btn posture-btn" id="caloric-posture-btn" title="Align to Supine +30° Head Up Posture (θ=60°)">
-                    <span class="vest-btn-icon">🛏️</span>
+                  <button type="button" class="vest-action-btn posture-btn" id="caloric-posture-btn" title="Align to Supine +30° Head Up Posture">
                     <span class="vest-btn-text">Supine +30°</span>
                   </button>
                   <div class="alexander-hud-group" role="group" aria-label="Alexander's Law Gaze Modulation">
@@ -887,57 +1120,39 @@ export class AppHUD {
                 </div>
               </div>
 
-              <!-- 3. Actions: Jongkees Matrix, Laterality Badge, VOR Toggle -->
               <div class="vestibular-actions-group">
                 <span class="caloric-laterality-tag" id="caloric-laterality-badge">Right Ear (Ipsilateral)</span>
-                <button
-                  type="button"
-                  class="vest-action-btn"
-                  id="caloric-jongkees-open-btn"
-                  title="Open Interactive Jongkees Bithermal Matrix Calculator"
-                >
-                  <span class="vest-btn-icon">📊</span>
+                <button type="button" class="vest-action-btn" id="caloric-jongkees-open-btn" title="Open Interactive Jongkees Matrix Calculator">
                   <span class="vest-btn-text">Jongkees</span>
                 </button>
-                <button
-                  type="button"
-                  class="vest-action-btn vor-toggle-btn"
-                  id="caloric-vor-toggle-btn"
-                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
-                  aria-expanded="false"
-                  aria-controls="vor-drawer"
-                >
-                  <span class="vest-btn-icon">👁️</span>
+                <button type="button" class="vest-action-btn vor-toggle-btn" id="caloric-vor-toggle-btn" title="Toggle 3D VOR &amp; VNG Drawer" aria-expanded="false" aria-controls="vor-drawer">
                   <span class="vest-btn-text">VOR Eyes</span>
                   <span class="vor-arrow" id="caloric-vor-arrow">▸</span>
                 </button>
               </div>
             </div>
 
-            <!-- Subview 3: Video Head Impulse Test (vHIT) -->
             <div class="vest-subview vest-vhit-subview" id="vest-vhit-subview" style="display: none;">
-              <!-- 1. Canal Pair Selector Chips & Thrust Direction -->
               <div class="vestibular-protocol-group" id="vhit-pair-chips" role="group" aria-label="vHIT Canal Pairs">
                 <button type="button" class="vhit-pair-chip active" data-vhit-pair="horizontal" title="Horizontal Semicircular Canals (Yaw Impulse)">
                   <span class="chip-badge">Yaw</span>
                   <span class="chip-label">Horizontal</span>
                 </button>
-                <button type="button" class="vhit-pair-chip" data-vhit-pair="ralp" title="Right Anterior / Left Posterior (Pitch/Roll +45°)">
-                  <span class="chip-badge">Ant/Post</span>
-                  <span class="chip-label">RALP (+45°)</span>
+                <button type="button" class="vhit-pair-chip" data-vhit-pair="ralp" title="Right Anterior / Left Posterior (+45°)">
+                  <span class="chip-badge">A/P</span>
+                  <span class="chip-label">RALP</span>
                 </button>
-                <button type="button" class="vhit-pair-chip" data-vhit-pair="larp" title="Left Anterior / Right Posterior (Pitch/Roll -45°)">
-                  <span class="chip-badge">Ant/Post</span>
-                  <span class="chip-label">LARP (-45°)</span>
+                <button type="button" class="vhit-pair-chip" data-vhit-pair="larp" title="Left Anterior / Right Posterior (-45°)">
+                  <span class="chip-badge">A/P</span>
+                  <span class="chip-label">LARP</span>
                 </button>
-                <button type="button" class="timeline-btn vhit-dir-btn" id="vhit-dir-left-btn" data-vhit-dir="-1" title="Thrust Head Left">◀ Thrust L</button>
-                <button type="button" class="timeline-btn vhit-dir-btn active" id="vhit-dir-right-btn" data-vhit-dir="1" title="Thrust Head Right">Thrust R ▶</button>
+                <button type="button" class="timeline-btn vhit-dir-btn" id="vhit-dir-left-btn" data-vhit-dir="-1" title="Thrust Head Left">◀ L</button>
+                <button type="button" class="timeline-btn vhit-dir-btn active" id="vhit-dir-right-btn" data-vhit-dir="1" title="Thrust Head Right">R ▶</button>
               </div>
 
-              <!-- 2. Pathology Presets & Paradigm -->
               <div class="vestibular-timeline-wrap">
                 <div class="timeline-header">
-                  <span class="timeline-title" id="vhit-status-title">High-Acceleration Head Impulse (15°, 120ms)</span>
+                  <span class="timeline-title" id="vhit-status-title">Head Impulse (15°, 120ms)</span>
                   <div class="timeline-meta-cluster">
                     <span class="hold-timer-badge" id="vhit-gain-badge">Gain: 1.00</span>
                     <span class="clearance-badge" id="vhit-saccade-badge">Normal (No Saccades)</span>
@@ -945,34 +1160,19 @@ export class AppHUD {
                 </div>
                 <div class="timeline-slider-row vhit-presets-row">
                   <button type="button" class="vhit-preset-chip active" data-vhit-preset="normal">Normal</button>
-                  <button type="button" class="vhit-preset-chip" data-vhit-preset="acute_neuritis">Acute Neuritis</button>
+                  <button type="button" class="vhit-preset-chip" data-vhit-preset="acute_neuritis">Neuritis</button>
                   <button type="button" class="vhit-preset-chip" data-vhit-preset="chronic_schwannoma">Schwannoma</button>
-                  <button type="button" class="vhit-preset-chip" data-vhit-preset="bilateral_loss">Bilateral Loss</button>
-                  <button type="button" class="vhit-toggle-btn" id="vhit-paradigm-toggle-btn" title="Toggle HIMP (Earth-Fixed) vs SHIMP (Head-Fixed)">HIMP</button>
+                  <button type="button" class="vhit-preset-chip" data-vhit-preset="bilateral_loss">Bilateral</button>
+                  <button type="button" class="vhit-toggle-btn" id="vhit-paradigm-toggle-btn" title="Toggle HIMP vs SHIMP">HIMP</button>
                   <button type="button" class="vhit-toggle-btn" id="vhit-slippage-toggle-btn" title="Toggle Goggle Slippage Artifact">Slippage: Off</button>
                 </div>
               </div>
 
-              <!-- 3. Actions: Deliver Thrust & VOR Drawer -->
               <div class="vestibular-actions-group">
-                <button
-                  type="button"
-                  class="vest-action-btn vhit-deliver-thrust-btn"
-                  id="vhit-deliver-thrust-btn"
-                  title="Deliver 15° 120ms High-Acceleration Passive Head Impulse Thrust"
-                >
-                  <span class="vest-btn-icon">⚡</span>
+                <button type="button" class="vest-action-btn vhit-deliver-thrust-btn" id="vhit-deliver-thrust-btn" title="Deliver 15° 120ms High-Acceleration Head Impulse">
                   <span class="vest-btn-text">Deliver Thrust</span>
                 </button>
-                <button
-                  type="button"
-                  class="vest-action-btn vor-toggle-btn"
-                  id="vhit-vor-toggle-btn"
-                  title="Toggle Docked 3D VOR Eye Avatar &amp; Clinical VNG Drawer"
-                  aria-expanded="false"
-                  aria-controls="vor-drawer"
-                >
-                  <span class="vest-btn-icon">👁️</span>
+                <button type="button" class="vest-action-btn vor-toggle-btn" id="vhit-vor-toggle-btn" title="Toggle 3D VOR &amp; VNG Drawer" aria-expanded="false" aria-controls="vor-drawer">
                   <span class="vest-btn-text">VOR Eyes</span>
                   <span class="vor-arrow" id="vhit-vor-arrow">▸</span>
                 </button>
@@ -982,31 +1182,29 @@ export class AppHUD {
 
           <!-- 4E. Surgical Suites Workbench Dock Content -->
           <div class="surgical-dock-content" id="surgical-dock-content" style="display: none;">
-            <!-- Subnav: CI vs Labyrinthectomy vs Neurectomy -->
             <div class="surg-subnav-bar" id="surg-subnav-bar" role="tablist" aria-label="Surgical Procedures">
-              <button type="button" class="surg-subnav-tab active" data-submode="ci" id="surg-subnav-ci">🦻 Cochlear Implant</button>
-              <button type="button" class="surg-subnav-tab" data-submode="labyrinthectomy" id="surg-subnav-laby">🪚 Transmastoid Labyrinthectomy</button>
-              <button type="button" class="surg-subnav-tab" data-submode="neurectomy" id="surg-subnav-neurectomy">🧠 Retrosigmoid Neurectomy &amp; CPA</button>
+              <button type="button" class="surg-subnav-tab active" data-submode="ci" id="surg-subnav-ci">Cochlear Implant</button>
+              <button type="button" class="surg-subnav-tab" data-submode="labyrinthectomy" id="surg-subnav-laby">Transmastoid Labyrinthectomy</button>
+              <button type="button" class="surg-subnav-tab" data-submode="neurectomy" id="surg-subnav-neurectomy">Retrosigmoid Neurectomy &amp; CPA</button>
             </div>
 
-            <!-- Subview 1: Cochlear Implant (CI) -->
             <div class="surg-subview surg-ci-subview" id="surg-ci-subview" style="display: flex;">
               <div class="surg-chip-group" role="group" aria-label="CI Hardware &amp; Approach">
-                <button type="button" class="surg-chip active" id="ci-approach-rw" data-approach="round_window" title="Atraumatic Round Window Membrane Approach">
+                <button type="button" class="surg-chip active" id="ci-approach-rw" data-approach="round_window" title="Round Window Membrane Approach">
                   <span class="chip-badge">Approach</span>
-                  <span class="chip-label">🎯 Round Window</span>
+                  <span class="chip-label">Round Window</span>
                 </button>
-                <button type="button" class="surg-chip" id="ci-approach-coch" data-approach="cochleostomy" title="Anteroinferior Cochleostomy Approach (1mm to RW)">
+                <button type="button" class="surg-chip" id="ci-approach-coch" data-approach="cochleostomy" title="Anteroinferior Cochleostomy">
                   <span class="chip-badge">Approach</span>
-                  <span class="chip-label">⚙️ Cochleostomy</span>
+                  <span class="chip-label">Cochleostomy</span>
                 </button>
                 <button type="button" class="surg-chip active" id="ci-array-lateral" data-array="lateral_wall" title="Flexible Straight Lateral Wall Array (28mm)">
                   <span class="chip-badge">Array</span>
-                  <span class="chip-label">〰️ Lateral Wall</span>
+                  <span class="chip-label">Lateral Wall</span>
                 </button>
                 <button type="button" class="surg-chip" id="ci-array-peri" data-array="perimodiolar" title="Pre-Curved Perimodiolar AOS Array (21mm)">
                   <span class="chip-badge">Array</span>
-                  <span class="chip-label">🌀 Perimodiolar</span>
+                  <span class="chip-label">Perimodiolar</span>
                 </button>
               </div>
 
@@ -1043,22 +1241,13 @@ export class AppHUD {
               </div>
 
               <div class="surg-actions-group">
-                <button
-                  type="button"
-                  class="vest-action-btn surg-drawer-toggle-btn"
-                  id="ci-drawer-toggle-btn"
-                  title="Toggle Docked Surgical Endoscopy &amp; Biotelemetry Drawer"
-                  aria-expanded="false"
-                  aria-controls="surgical-drawer"
-                >
-                  <span class="vest-btn-icon">🔬</span>
+                <button type="button" class="vest-action-btn surg-drawer-toggle-btn" id="ci-drawer-toggle-btn" title="Toggle Surgical Endoscopy &amp; Biotelemetry Drawer" aria-expanded="false" aria-controls="surgical-drawer">
                   <span class="vest-btn-text">Monitor</span>
                   <span class="surg-arrow" id="ci-surg-arrow">▸</span>
                 </button>
               </div>
             </div>
 
-            <!-- Subview 2: Transmastoid Labyrinthectomy -->
             <div class="surg-subview surg-laby-subview" id="surg-laby-subview" style="display: none;">
               <div class="surg-chip-group" role="group" aria-label="Labyrinthectomy Steps">
                 <button type="button" class="surg-chip active" data-laby-step="0">Step 1: Mastoidectomy</button>
@@ -1076,38 +1265,27 @@ export class AppHUD {
                   </div>
                 </div>
                 <div class="timeline-slider-row">
-                  <button type="button" class="vest-action-btn drill-btn" id="laby-drill-toggle-btn" title="Toggle Otologic Drill (70,000 RPM &amp; Audio Whine)">
-                    <span class="vest-btn-icon">🪚</span>
+                  <button type="button" class="vest-action-btn drill-btn" id="laby-drill-toggle-btn" title="Toggle Otologic Drill (70,000 RPM)">
                     <span class="vest-btn-text" id="laby-drill-text">Drill: On</span>
                   </button>
                   <div class="compensation-row">
                     <label class="ci-mini-lbl">Comp Time: <span id="laby-comp-val">0h (Acute)</span></label>
                     <input type="range" class="surgical-slider" id="laby-comp-slider" min="0" max="720" value="0" step="6" title="Central Vestibular Compensation Hours (0 to 720h)" />
                   </div>
-                  <button type="button" class="vest-action-btn ablate-btn" id="laby-ablate-all-btn" title="Complete Acute Deafferentation of all 5 Balance End-Organs">
-                    <span class="vest-btn-icon">⚡</span>
+                  <button type="button" class="vest-action-btn ablate-btn" id="laby-ablate-all-btn" title="Complete Acute Deafferentation">
                     <span class="vest-btn-text">Ablate All</span>
                   </button>
                 </div>
               </div>
 
               <div class="surg-actions-group">
-                <button
-                  type="button"
-                  class="vest-action-btn surg-drawer-toggle-btn"
-                  id="laby-drawer-toggle-btn"
-                  title="Toggle Docked Surgical Drawer"
-                  aria-expanded="false"
-                  aria-controls="surgical-drawer"
-                >
-                  <span class="vest-btn-icon">🔬</span>
+                <button type="button" class="vest-action-btn surg-drawer-toggle-btn" id="laby-drawer-toggle-btn" title="Toggle Surgical Drawer" aria-expanded="false" aria-controls="surgical-drawer">
                   <span class="vest-btn-text">Monitor</span>
                   <span class="surg-arrow" id="laby-surg-arrow">▸</span>
                 </button>
               </div>
             </div>
 
-            <!-- Subview 3: Retrosigmoid Neurectomy & CPA -->
             <div class="surg-subview surg-neurectomy-subview" id="surg-neurectomy-subview" style="display: none;">
               <div class="surg-chip-group" role="group" aria-label="Neurectomy Steps">
                 <button type="button" class="surg-chip active" data-neurectomy-step="0">Step 1: Craniotomy</button>
@@ -1126,59 +1304,57 @@ export class AppHUD {
                 </div>
                 <div class="timeline-slider-row">
                   <div class="tool-btn-group" role="group" aria-label="Microsurgical Tools">
-                    <button type="button" class="surg-tool-btn active" data-tool="scissors" title="Micro-Scissors">✂️ Scissors</button>
-                    <button type="button" class="surg-tool-btn" data-tool="hook" title="Nerve Hook">🪝 Hook</button>
-                    <button type="button" class="surg-tool-btn" data-tool="bipolar" title="Bipolar Coagulation">⚡ Bipolar</button>
+                    <button type="button" class="surg-tool-btn active" data-tool="scissors" title="Micro-Scissors">Scissors</button>
+                    <button type="button" class="surg-tool-btn" data-tool="hook" title="Nerve Hook">Hook</button>
+                    <button type="button" class="surg-tool-btn" data-tool="bipolar" title="Bipolar Coagulation">Bipolar</button>
                   </div>
                   <div class="koos-row">
                     <label class="ci-mini-lbl">Koos: <span id="neurectomy-koos-val">Stage 0</span></label>
                     <input type="range" class="mini-slider" id="neurectomy-koos-slider" min="0" max="4" value="0" step="1" title="Acoustic Neuroma Koos Staging (0 to IV)" />
                   </div>
                   <button type="button" class="vest-action-btn" id="neurectomy-cleavage-btn" title="Toggle Cleavage Plane Highlight">
-                    <span class="vest-btn-icon">📐</span>
                     <span class="vest-btn-text">Cleavage</span>
                   </button>
                 </div>
               </div>
 
               <div class="surg-actions-group">
-                <button
-                  type="button"
-                  class="vest-action-btn surg-drawer-toggle-btn"
-                  id="neurectomy-drawer-toggle-btn"
-                  title="Toggle Docked Surgical Drawer"
-                  aria-expanded="false"
-                  aria-controls="surgical-drawer"
-                >
-                  <span class="vest-btn-icon">🔬</span>
+                <button type="button" class="vest-action-btn surg-drawer-toggle-btn" id="neurectomy-drawer-toggle-btn" title="Toggle Surgical Drawer" aria-expanded="false" aria-controls="surgical-drawer">
                   <span class="vest-btn-text">Monitor</span>
                   <span class="surg-arrow" id="neurectomy-surg-arrow">▸</span>
                 </button>
               </div>
             </div>
           </div>
+
+          <div class="dock-divider" aria-hidden="true"></div>
+          <div class="dock-stage-utils" aria-label="Stage utilities">
+            <button type="button" class="dock-icon-btn active" id="tool-labels-btn" title="Cycle 3D structure pins (Off / Key / All)" aria-label="Cycle 3D labels" aria-pressed="true">
+              ${SVG_ICONS.labels}
+            </button>
+            <button type="button" class="dock-icon-btn" id="tool-reset-btn" title="Reset specimen camera view" aria-label="Reset camera view">
+              ${SVG_ICONS.reset}
+            </button>
+          </div>
         </nav>
 
-        <!-- 4. Interactive 3-Axis Head Gyro Flyout Panel -->
-        <div class="gyro-flyout" id="gyro-flyout" style="display: none;" role="region" aria-label="3-Axis Head Orientation Gyro">
+        <!-- Interactive 3-Axis Head Gyro Flyout Panel -->
+        <div class="gyro-flyout glass-surface" id="gyro-flyout" style="display: none;" role="region" aria-label="3-Axis Head Orientation Gyro">
           <div class="gyro-header">
             <span class="gyro-title">3-DOF Head Orientation</span>
             <button type="button" class="gyro-close-btn" id="gyro-close-btn" aria-label="Close Gyro Controls">✕</button>
           </div>
           <div class="gyro-controls-body">
-            <!-- Yaw Slider: -180° to +180° -->
             <div class="gyro-slider-row">
               <span class="gyro-axis-label">Yaw (ψ):</span>
               <input type="range" class="gyro-slider" id="gyro-yaw-slider" min="-180" max="180" value="0" />
               <span class="gyro-val-badge" id="gyro-yaw-val">0°</span>
             </div>
-            <!-- Pitch / Recline Slider: -30° to +120° -->
             <div class="gyro-slider-row">
               <span class="gyro-axis-label">Pitch (θ):</span>
               <input type="range" class="gyro-slider" id="gyro-pitch-slider" min="-30" max="120" value="0" />
               <span class="gyro-val-badge" id="gyro-pitch-val">0°</span>
             </div>
-            <!-- Roll Slider: -90° to +90° -->
             <div class="gyro-slider-row">
               <span class="gyro-axis-label">Roll (γ):</span>
               <input type="range" class="gyro-slider" id="gyro-roll-slider" min="-90" max="90" value="0" />
@@ -1187,53 +1363,7 @@ export class AppHUD {
           </div>
         </div>
 
-        <!-- Collapsible 27 Parts Drawer -->
-        <div class="parts-drawer ${this.partsDrawerOpen ? 'open' : ''}" id="parts-drawer" role="region" aria-label="Anatomical Parts List">
-          <div class="parts-drawer-header">
-            <h2 class="parts-drawer-title">All 27 Anatomical Structures</h2>
-            <button type="button" class="drawer-close-btn" id="drawer-close-btn" aria-label="Close parts list">✕</button>
-          </div>
-          <div class="parts-tree-body" id="parts-tree-body"></div>
-        </div>
-
-        <!-- 5. ABOUT & CITATIONS MODAL -->
-        <div class="modal-backdrop" id="about-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="about-title">
-          <div class="modal-card">
-            <div class="modal-header">
-              <h2 id="about-title">About Inner Ear 3D Lab</h2>
-              <button type="button" class="modal-close-btn" id="about-close-btn" aria-label="Close dialog">✕</button>
-            </div>
-            <div class="modal-body">
-              <div class="disclaimer-callout">
-                <span class="callout-icon">⚖️</span>
-                <p><strong>Educational &amp; Research Atlas:</strong> This 3D laboratory is created exclusively for anatomical education and research visualization. It does not provide medical diagnosis, clinical triage, or patient treatment advice.</p>
-              </div>
-
-              <h3>Anatomical Dataset Sources &amp; Citations</h3>
-              <ul class="citation-list">
-                <li>
-                  <strong>IE-Map v1.0.0:</strong> High-resolution micro-CT &amp; T2 MRI Otsu segmentations of the human inner ear labyrinth and petrous temporal bone.
-                </li>
-                <li>
-                  <strong>David et al. (Morphometry):</strong> Co-planar stereotaxic alignment of anterior, posterior, and lateral semicircular canals and cochlear scala chambers in Right Anterior Superior (RAS) anatomical coordinates.
-                </li>
-                <li>
-                  <strong>Vestibular Physiology:</strong> Ewald's Laws of semicircular canal cupular displacement, ampullofugal/ampullopetal flow dynamics, and CN VIII innervation mapping.
-                </li>
-              </ul>
-
-              <div class="modal-footer-info">
-                <span>Version: MVP 1.0.0</span>
-                <span>Render Engine: Three.js Single-Stage WebGL (60fps)</span>
-              </div>
-            </div>
-            <div class="modal-actions">
-              <button type="button" class="modal-confirm-btn" id="about-confirm-btn">Close</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 5B. CALORIC JONGKEES BITHERMAL MATRIX MODAL -->
+        <!-- Caloric Jongkees Bithermal Matrix Modal -->
         <div class="modal-backdrop caloric-modal-backdrop" id="caloric-jongkees-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="jongkees-modal-title">
           <div class="modal-card caloric-modal-sheet">
             <div class="modal-header">
@@ -1247,8 +1377,6 @@ export class AppHUD {
               <p class="modal-lead">
                 Bithermal caloric irrigation assesses unilateral weakness (canal paresis) and directional preponderance using peak slow-phase eye velocity (SPV °/s) per Jongkees (1962).
               </p>
-
-              <!-- Clinical Presets -->
               <div class="jongkees-presets-row" role="group" aria-label="Clinical Presets">
                 <span class="jongkees-lbl">Presets:</span>
                 <button type="button" class="jongkees-preset-btn active" data-preset="normal">Normal</button>
@@ -1257,8 +1385,6 @@ export class AppHUD {
                 <button type="button" class="jongkees-preset-btn" data-preset="dp_right">DP Right (48%)</button>
                 <button type="button" class="jongkees-preset-btn" data-preset="bilateral">Bilateral Loss</button>
               </div>
-
-              <!-- 4-Ear SPV Inputs Grid -->
               <div class="jongkees-grid">
                 <div class="jongkees-ear-col right-ear">
                   <h4>Right Ear (AD)</h4>
@@ -1271,7 +1397,6 @@ export class AppHUD {
                     <input type="number" id="jongkees-r30" min="0" max="100" step="0.5" value="20.0" />
                   </div>
                 </div>
-
                 <div class="jongkees-ear-col left-ear">
                   <h4>Left Ear (AS)</h4>
                   <div class="input-field-group">
@@ -1284,8 +1409,6 @@ export class AppHUD {
                   </div>
                 </div>
               </div>
-
-              <!-- Calculated Results & Interpretation -->
               <div class="jongkees-results-panel">
                 <div class="jongkees-result-metric">
                   <span class="metric-title">Unilateral Weakness (UW)</span>
@@ -1303,7 +1426,6 @@ export class AppHUD {
                   <span class="metric-sub">Hypofunction: &lt; 12°/s</span>
                 </div>
               </div>
-
               <div class="caloric-interp-card" id="caloric-interp-card">
                 <strong>Symmetric Vestibular Function:</strong> Bilateral horizontal canal caloric responses are within normative limits (UW &lt; 25%, DP &lt; 30%, Total &ge; 12°/s).
               </div>
@@ -1314,23 +1436,8 @@ export class AppHUD {
           </div>
         </div>
 
-        <!-- 6. HIGH-PERFORMANCE INITIAL LOADING OVERLAY -->
-        <div class="loading-overlay" id="loading-overlay" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-          <div class="loading-panel">
-            <div class="loading-brand">
-              <span class="brand-badge">IE-MAP 3D</span>
-              <h2>Inner Ear 3D Lab</h2>
-            </div>
-            <p class="loading-desc">Loading 27 high-resolution anatomical structures...</p>
-            <div class="loading-bar-track">
-              <div class="loading-bar-fill" id="loading-fill" style="width: 0%;"></div>
-            </div>
-            <div class="loading-status-row">
-              <span class="loading-status-text" id="loading-status-text">Initializing WebGL Engine...</span>
-              <span class="loading-count-text" id="loading-count-text">0 / 27</span>
-            </div>
-          </div>
-        </div>
+        ${buildReportDialogHTML()}
+        ${buildLoadingOverlayHTML()}
       </div>
     `;
 
@@ -1339,29 +1446,83 @@ export class AppHUD {
   }
 
   private bindDOMReferences(): void {
+    this.appShell = this.root.querySelector('#app-shell') as HTMLElement;
+    this.headerEl = this.root.querySelector('.lab-header') as HTMLElement | null;
     this.canvasHost = this.root.querySelector('#canvas-host') as HTMLElement;
     this.pinsLayer = this.root.querySelector('#pins-layer') as HTMLElement;
-    this.modeAnatomyBtn = this.root.querySelector('#mode-anatomy-btn') as HTMLButtonElement;
-    this.modeHearingBtn = this.root.querySelector('#mode-hearing-btn') as HTMLButtonElement;
-    this.modeRadiologyBtn = this.root.querySelector('#mode-radiology-btn') as HTMLButtonElement;
+
+    this.modeSwitcher = this.root.querySelector('.mode-switcher') as HTMLElement | null;
+    this.modePills = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.mode-pill'));
+
     this.searchInput = this.root.querySelector('#search-input') as HTMLInputElement;
     this.searchClearBtn = this.root.querySelector('#search-clear-btn') as HTMLButtonElement;
     this.searchDropdown = this.root.querySelector('#search-dropdown') as HTMLElement;
+    this.headerSearchBtn = this.root.querySelector('#header-search-btn') as HTMLButtonElement;
+    this.reportOpenBtn = this.root.querySelector('#report-open-btn') as HTMLButtonElement;
+    this.themeToggleBtn = this.root.querySelector('#theme-toggle-btn') as HTMLButtonElement;
     this.settingsBtn = this.root.querySelector('#settings-btn') as HTMLButtonElement;
     this.settingsPopover = this.root.querySelector('#settings-popover') as HTMLElement;
-    this.inspectorCard = this.root.querySelector('#inspector-card') as HTMLElement;
+    this.appearanceHint = this.root.querySelector('#appearance-hint') as HTMLElement;
+
+    // Unified Note & Lab Sidebar
+    this.noteSidebar = this.root.querySelector('#note-sidebar') as HTMLElement;
+    this.noteCollapsedPill = this.root.querySelector('#note-collapsed-pill') as HTMLButtonElement;
+    this.notePillDot = this.root.querySelector('#note-pill-dot') as HTMLElement;
+    this.notePillLabel = this.root.querySelector('#note-pill-label') as HTMLElement;
+    this.noteCard = this.root.querySelector('#note-card') as HTMLElement;
+    this.noteSystemDot = this.root.querySelector('#note-system-dot') as HTMLElement;
+    this.noteSystemLabel = this.root.querySelector('#note-system-label') as HTMLElement;
+    this.noteTitleEl = this.root.querySelector('#note-title') as HTMLElement;
+    this.noteCompactBody = this.root.querySelector('#note-compact-body') as HTMLElement;
+    this.noteCompactLead = this.root.querySelector('#note-compact-lead') as HTMLElement;
+    this.noteReadBtn = this.root.querySelector('#note-read-btn') as HTMLButtonElement;
+    this.noteLabShortcutBtn = this.root.querySelector('#note-lab-shortcut-btn') as HTMLButtonElement;
+    this.noteExpandToggleBtn = this.root.querySelector('#note-expand-toggle-btn') as HTMLButtonElement;
+    this.noteCollapseBtn = this.root.querySelector('#note-collapse-btn') as HTMLButtonElement;
+    this.noteScrollBody = this.root.querySelector('#note-scroll-body') as HTMLElement;
+    this.tabNoteBtn = this.root.querySelector('#tab-note-btn') as HTMLButtonElement;
+    this.tabLabBtn = this.root.querySelector('#tab-lab-btn') as HTMLButtonElement;
+    this.sidebarPaneNote = this.root.querySelector('#sidebar-pane-note') as HTMLElement;
+    this.sidebarPaneLab = this.root.querySelector('#sidebar-pane-lab') as HTMLElement;
+    this.noteLeadProse = this.root.querySelector('#insp-summary') as HTMLElement;
+    this.inspFluidEl = this.root.querySelector('#insp-fluid') as HTMLElement;
+    this.inspMetricKeyEl = this.root.querySelector('#insp-metric-key') as HTMLElement;
+    this.inspMetricValEl = this.root.querySelector('#insp-metric-val') as HTMLElement;
+    this.btnIsolate = this.root.querySelector('#btn-isolate') as HTMLButtonElement;
+    this.btnResetView = this.root.querySelector('#btn-reset-view') as HTMLButtonElement;
+    this.noteContextBoxes = this.root.querySelector('#note-context-boxes') as HTMLElement;
+    this.furtherReadDetails = this.root.querySelector('#further-read-details') as HTMLDetailsElement;
+    this.furtherReadHint = this.root.querySelector('#further-read-hint') as HTMLElement;
+    this.inspDeepProse = this.root.querySelector('#insp-deep-prose') as HTMLElement;
+    this.inspLatinEl = this.root.querySelector('#insp-latin') as HTMLElement;
+    this.inspInnervationEl = this.root.querySelector('#insp-innervation') as HTMLElement;
+    this.inspMorphometryEl = this.root.querySelector('#insp-morphometry') as HTMLElement;
+    this.inspRasChipEl = this.root.querySelector('#insp-ras-chip') as HTMLElement;
+    this.inspPearlEl = this.root.querySelector('#insp-pearl') as HTMLElement;
+
+    // Dock & Stage Utilities
     this.bottomBar = this.root.querySelector('#bottom-bar') as HTMLElement;
     this.anatomyDockContent = this.root.querySelector('#anatomy-dock-content') as HTMLElement;
     this.hearingDockContent = this.root.querySelector('#hearing-dock-content') as HTMLElement;
     this.radiologyDockContent = this.root.querySelector('#radiology-dock-content') as HTMLElement;
+    this.vestibularDockContent = this.root.querySelector('#vestibular-dock-content') as HTMLElement;
+    this.surgicalDockContent = this.root.querySelector('#surgical-dock-content') as HTMLElement;
+    this.toolLabelsBtn = this.root.querySelector('#tool-labels-btn') as HTMLButtonElement;
+    this.toolResetBtn = this.root.querySelector('#tool-reset-btn') as HTMLButtonElement;
 
-    // Anatomy Controls
+    // Anatomy Dock & Parts List
     this.boneSlider = this.root.querySelector('#bone-peel-slider') as HTMLInputElement;
     this.boneValEl = this.root.querySelector('#bone-val') as HTMLElement;
     this.explodeSlider = this.root.querySelector('#explode-slider') as HTMLInputElement;
     this.explodeValEl = this.root.querySelector('#explode-val') as HTMLElement;
+    this.mobileBoneSlider = this.root.querySelector('#mobile-bone-peel-slider') as HTMLInputElement;
+    this.mobileBoneValEl = this.root.querySelector('#mobile-bone-val') as HTMLElement;
+    this.mobileExplodeSlider = this.root.querySelector('#mobile-explode-slider') as HTMLInputElement;
+    this.mobileExplodeValEl = this.root.querySelector('#mobile-explode-val') as HTMLElement;
     this.partsToggleBtn = this.root.querySelector('#parts-toggle-btn') as HTMLButtonElement;
     this.partsDrawer = this.root.querySelector('#parts-drawer') as HTMLElement;
+    this.partsFilterInput = this.root.querySelector('#parts-filter-input') as HTMLInputElement;
+    this.partsFilterChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#parts-filter-chips [data-sys-filter]'));
 
     // Hearing Controls
     this.tonePlayBtn = this.root.querySelector('#tone-play-btn') as HTMLButtonElement;
@@ -1370,28 +1531,31 @@ export class AppHUD {
     this.hearingSlider = this.root.querySelector('#hearing-freq-slider') as HTMLInputElement;
     this.hearingFreqReadout = this.root.querySelector('#hearing-freq-readout') as HTMLElement;
     this.hearingLandmarkBadge = this.root.querySelector('#hearing-landmark-badge') as HTMLElement;
+    this.octaveChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-octave]'));
     this.audiogramToggleBtn = this.root.querySelector('#audiogram-toggle-btn') as HTMLButtonElement;
     this.audiogramArrowEl = this.root.querySelector('#audiogram-arrow') as HTMLElement;
-    this.octaveChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.octave-chip'));
 
     // Radiology Controls
-    this.planeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.plane-chip'));
+    this.planeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#rad-plane-chips [data-plane]'));
     this.radiologyDepthSlider = this.root.querySelector('#radiology-depth-slider') as HTMLInputElement;
     this.radiologyDepthValEl = this.root.querySelector('#radiology-depth-val') as HTMLElement;
     this.radiologyLandmarkBadgeEl = this.root.querySelector('#radiology-landmark-badge') as HTMLElement;
     this.depthDecBtn = this.root.querySelector('#depth-dec-btn') as HTMLButtonElement;
     this.depthIncBtn = this.root.querySelector('#depth-inc-btn') as HTMLButtonElement;
-    this.radiologyFlipBtn = this.root.querySelector('#rad-flip-btn, #radiology-flip-btn') as HTMLButtonElement;
-    this.radiologyGuideBtn = this.root.querySelector('#rad-guide-btn, #radiology-guide-btn') as HTMLButtonElement;
-    this.radiologyScdsBtn = this.root.querySelector('#rad-scds-toggle-btn, #radiology-scds-btn') as HTMLButtonElement;
-    this.radiologyCtToggleBtn = this.root.querySelector('#rad-ct-toggle-btn, #radiology-ct-toggle-btn') as HTMLButtonElement;
+    this.radiologyFlipBtn = this.root.querySelector('#rad-flip-btn') as HTMLButtonElement;
+    this.radiologyGuideBtn = this.root.querySelector('#rad-guide-btn') as HTMLButtonElement;
+    this.radiologyScdsBtn = this.root.querySelector('#rad-scds-toggle-btn') as HTMLButtonElement;
+    this.radiologyCtToggleBtn = this.root.querySelector('#rad-ct-toggle-btn') as HTMLButtonElement;
     this.ctCardArrowEl = this.root.querySelector('#ct-card-arrow') as HTMLElement;
 
-    this.modeVestibularBtn = this.root.querySelector('#mode-vestibular-btn') as HTMLButtonElement;
-    this.vestibularDockContent = this.root.querySelector('#vestibular-dock-content') as HTMLElement;
-
     // Vestibular Controls
-    this.vestProtocolChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.protocol-chip'));
+    this.vestSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#vest-subnav-bar .vest-subnav-tab'));
+    this.vestBppvSubview = this.root.querySelector('#vest-bppv-subview') as HTMLElement;
+    this.vestCaloricSubview = this.root.querySelector('#vest-caloric-subview') as HTMLElement;
+    this.vestVhitSubview = this.root.querySelector('#vest-vhit-subview') as HTMLElement;
+    this.vestSubviews = [this.vestBppvSubview, this.vestCaloricSubview, this.vestVhitSubview];
+
+    this.vestProtocolChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#vest-protocol-chips [data-maneuver]'));
     this.vestStepTitleEl = this.root.querySelector('#vest-step-title') as HTMLElement;
     this.vestHoldTimerBadgeEl = this.root.querySelector('#vest-hold-timer-badge') as HTMLElement;
     this.vestClearanceBadgeEl = this.root.querySelector('#vest-clearance-badge') as HTMLElement;
@@ -1405,15 +1569,8 @@ export class AppHUD {
     this.vestVorToggleBtn = this.root.querySelector('#vest-vor-toggle-btn') as HTMLButtonElement;
     this.vorArrowEl = this.root.querySelector('#vor-arrow') as HTMLElement;
 
-    // Diagnostic Vestibular Submodes
-    this.vestSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.vest-subnav-tab'));
-    this.vestBppvSubview = this.root.querySelector('#vest-bppv-subview') as HTMLElement;
-    this.vestCaloricSubview = this.root.querySelector('#vest-caloric-subview') as HTMLElement;
-    this.vestVhitSubview = this.root.querySelector('#vest-vhit-subview') as HTMLElement;
-    this.vestSubviews = [this.vestBppvSubview, this.vestCaloricSubview, this.vestVhitSubview].filter(Boolean);
-
-    // Caloric Testing Controls
-    this.caloricTempChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.caloric-chip'));
+    // Caloric Controls
+    this.caloricTempChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#caloric-temp-chips [data-caloric-temp]'));
     this.caloricPlayBtn = this.root.querySelector('#caloric-play-btn') as HTMLButtonElement;
     this.caloricPlayIconEl = this.root.querySelector('#caloric-play-icon') as HTMLElement;
     this.caloricTimerBadgeEl = this.root.querySelector('#caloric-timer-badge') as HTMLElement;
@@ -1421,7 +1578,7 @@ export class AppHUD {
     this.caloricStatusTitleEl = this.root.querySelector('#caloric-status-title') as HTMLElement;
     this.caloricLateralityBadgeEl = this.root.querySelector('#caloric-laterality-badge') as HTMLElement;
     this.caloricPostureBtn = this.root.querySelector('#caloric-posture-btn') as HTMLButtonElement;
-    this.caloricGazeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.alex-gaze-chip'));
+    this.caloricGazeChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-alex-gaze]'));
     this.caloricAlexBadgeEl = this.root.querySelector('#caloric-alex-degree-badge') as HTMLElement;
     this.caloricJongkeesOpenBtn = this.root.querySelector('#caloric-jongkees-open-btn') as HTMLButtonElement;
     this.caloricJongkeesModal = this.root.querySelector('#caloric-jongkees-modal') as HTMLElement;
@@ -1440,7 +1597,7 @@ export class AppHUD {
     this.caloricVorArrowEl = this.root.querySelector('#caloric-vor-arrow') as HTMLElement;
 
     // vHIT Controls
-    this.vhitPairChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-vhit-pair]'));
+    this.vhitPairChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#vhit-pair-chips [data-vhit-pair]'));
     this.vhitDirLeftBtn = this.root.querySelector('#vhit-dir-left-btn') as HTMLButtonElement;
     this.vhitDirRightBtn = this.root.querySelector('#vhit-dir-right-btn') as HTMLButtonElement;
     this.vhitPresetChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-vhit-preset]'));
@@ -1463,59 +1620,15 @@ export class AppHUD {
     this.gyroPitchValEl = this.root.querySelector('#gyro-pitch-val') as HTMLElement;
     this.gyroRollValEl = this.root.querySelector('#gyro-roll-val') as HTMLElement;
 
-    // Lab Drawers Initialization
-    const labShell = this.root.querySelector('.lab-shell') as HTMLElement;
-    this.audiogramDrawer = new AudiogramDrawer(labShell);
-    this.ctSliceDrawer = new CTSliceDrawer(labShell);
-    this.vorDrawer = new VORDrawer(labShell);
-
-    this.ctSliceDrawer.onDepthChange((depthMm) => {
-      this.scene.setRadiologyDepth(depthMm);
-      this.syncRadiologyDepthUI(depthMm);
-    });
-
-    this.ctSliceDrawer.onWindowModeChange((mode) => {
-      this.scene.setCTWindowMode(mode);
-    });
-
-    this.ctSliceDrawer.onClose(() => {
-      this.radiologyCtToggleBtn.classList.remove('open');
-      this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
-      this.ctCardArrowEl.textContent = '▸';
-      this.updateMobileDrawerExclusivity();
-    });
-
-    this.vorDrawer.onClose(() => {
-      this.syncVORDrawerButtons(false);
-      this.updateMobileDrawerExclusivity();
-    });
-
-    this.vorDrawer.onDiagnosticModeChange((mode) => {
-      if (this.scene.getSnapshot().labMode === 'vestibular') {
-        const submode = mode === 'nystagmogram' ? 'bppv' : mode;
-        if (this.vestSubmode !== submode) {
-          this.switchVestibularSubmode(submode);
-        }
-      }
-    });
-
-    this.vorDrawer.onAlexanderGazeChange((gaze) => {
-      this.selectCaloricAlexanderGaze(gaze);
-    });
-    this.vorDrawer.setCaloricData(22, 20, 21, 21);
-
     // Surgical Workbench Controls
-    this.surgicalDockContent = this.root.querySelector('#surgical-dock-content') as HTMLElement;
-    this.modeSurgicalBtn = this.root.querySelector('#mode-surgical-btn') as HTMLButtonElement;
-    this.surgSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.surg-subnav-tab'));
-    const ciSub = this.root.querySelector('#surg-ci-subview') as HTMLElement;
-    const labySub = this.root.querySelector('#surg-laby-subview') as HTMLElement;
-    const neurectomySub = this.root.querySelector('#surg-neurectomy-subview') as HTMLElement;
-    if (ciSub) this.surgSubviews.set('ci', ciSub);
-    if (labySub) this.surgSubviews.set('labyrinthectomy', labySub);
-    if (neurectomySub) this.surgSubviews.set('neurectomy', neurectomySub);
+    this.surgSubnavTabs = Array.from(this.root.querySelectorAll<HTMLButtonElement>('#surg-subnav-bar .surg-subnav-tab'));
+    const surgCiSubview = this.root.querySelector('#surg-ci-subview') as HTMLElement;
+    const surgLabySubview = this.root.querySelector('#surg-laby-subview') as HTMLElement;
+    const surgNeurSubview = this.root.querySelector('#surg-neurectomy-subview') as HTMLElement;
+    this.surgSubviews.set('ci', surgCiSubview);
+    this.surgSubviews.set('labyrinthectomy', surgLabySubview);
+    this.surgSubviews.set('neurectomy', surgNeurSubview);
 
-    // CI Controls
     this.ciApproachChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-approach]'));
     this.ciArrayChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-array]'));
     this.ciDepthSlider = this.root.querySelector('#ci-depth-slider') as HTMLInputElement;
@@ -1529,7 +1642,6 @@ export class AppHUD {
     this.ciAutoInsertBtn = this.root.querySelector('#ci-auto-insert-btn') as HTMLButtonElement;
     this.ciRetractBtn = this.root.querySelector('#ci-retract-btn') as HTMLButtonElement;
 
-    // Labyrinthectomy Controls
     this.labyStepChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-laby-step]'));
     this.labyStepTitleEl = this.root.querySelector('#laby-step-title') as HTMLElement;
     this.labyDrillBadgeEl = this.root.querySelector('#laby-drill-badge') as HTMLElement;
@@ -1540,9 +1652,8 @@ export class AppHUD {
     this.labyCompValEl = this.root.querySelector('#laby-comp-val') as HTMLElement;
     this.labyAblateAllBtn = this.root.querySelector('#laby-ablate-all-btn') as HTMLButtonElement;
 
-    // Neurectomy Controls
     this.neurectomyStepChips = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-neurectomy-step]'));
-    this.neurectomyToolBtns = Array.from(this.root.querySelectorAll<HTMLButtonElement>('.surg-tool-btn'));
+    this.neurectomyToolBtns = Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-tool]'));
     this.neurectomyStepTitleEl = this.root.querySelector('#neurectomy-step-title') as HTMLElement;
     this.neurectomyAbrBadgeEl = this.root.querySelector('#neurectomy-abr-badge') as HTMLElement;
     this.neurectomyEmgBadgeEl = this.root.querySelector('#neurectomy-emg-badge') as HTMLElement;
@@ -1550,50 +1661,49 @@ export class AppHUD {
     this.neurectomyKoosValEl = this.root.querySelector('#neurectomy-koos-val') as HTMLElement;
     this.neurectomyCleavageBtn = this.root.querySelector('#neurectomy-cleavage-btn') as HTMLButtonElement;
 
-    // Surgical Drawer Initialization
-    this.surgicalDrawer = new SurgicalDrawer(labShell);
-    this.surgicalDrawer.onClose(() => {
-      this.syncSurgicalDrawerButtonUI(false);
-      this.updateMobileDrawerExclusivity();
+    // Re-host 4 Modal Workbench Drawers inside #sidebar-pane-lab
+    this.audiogramDrawer = new AudiogramDrawer(this.sidebarPaneLab);
+    this.ctSliceDrawer = new CTSliceDrawer(this.sidebarPaneLab);
+    this.vorDrawer = new VORDrawer(this.sidebarPaneLab);
+    this.surgicalDrawer = new SurgicalDrawer(this.sidebarPaneLab);
+
+    // Preset Buttons
+    this.root.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((btn) => {
+      const id = btn.getAttribute('data-preset');
+      if (id) {
+        this.presetButtons.set(id, btn);
+      }
     });
 
-    this.aboutModal = this.root.querySelector('#about-modal') as HTMLElement;
+    // Dialog & Loading Overlay
+    this.reportDialog = this.root.querySelector('#report-dialog') as HTMLDialogElement;
+    this.repActivePartEl = this.root.querySelector('#rep-active-part') as HTMLElement;
+    this.repActiveModeEl = this.root.querySelector('#rep-active-mode') as HTMLElement;
     this.loadingOverlay = this.root.querySelector('#loading-overlay') as HTMLElement;
     this.loadingFill = this.root.querySelector('#loading-fill') as HTMLElement;
     this.loadingText = this.root.querySelector('#loading-status-text') as HTMLElement;
     this.loadingCount = this.root.querySelector('#loading-count-text') as HTMLElement;
-
-    const presetBtns = this.bottomBar.querySelectorAll<HTMLButtonElement>('.preset-btn');
-    presetBtns.forEach((btn) => {
-      const presetId = btn.getAttribute('data-preset');
-      if (presetId) {
-        this.presetButtons.set(presetId, btn);
-      }
-    });
   }
 
   private attachEventListeners(): void {
-    // -------------------------------------------------------------------------
-    // Top Search Bar
-    // -------------------------------------------------------------------------
+    // 1. Search Bar & Dropdown
     this.searchInput.addEventListener('input', () => {
-      const query = this.searchInput.value.trim().toLowerCase();
-      this.searchClearBtn.style.display = query.length > 0 ? 'block' : 'none';
+      const query = this.searchInput.value.trim();
+      this.searchClearBtn.hidden = !query;
+      this.searchClearBtn.style.display = query ? 'inline-flex' : 'none';
       this.activeSearchIndex = -1;
       this.renderSearchResults(query);
     });
 
     this.searchInput.addEventListener('focus', () => {
-      const query = this.searchInput.value.trim().toLowerCase();
-      if (query.length > 0) {
+      const query = this.searchInput.value.trim();
+      if (query) {
         this.renderSearchResults(query);
       }
     });
 
     this.searchInput.addEventListener('keydown', (ev) => {
-      const items = Array.from(
-        this.searchDropdown.querySelectorAll<HTMLElement>('.search-result-item')
-      );
+      const items = Array.from(this.searchDropdown.querySelectorAll<HTMLElement>('.search-result-item'));
       if (ev.key === 'Escape') {
         this.closeSearchDropdown();
         this.searchInput.blur();
@@ -1624,70 +1734,109 @@ export class AppHUD {
 
     this.searchClearBtn.addEventListener('click', () => {
       this.searchInput.value = '';
+      this.searchClearBtn.hidden = true;
       this.searchClearBtn.style.display = 'none';
       this.closeSearchDropdown();
       this.searchInput.focus();
     });
 
-    document.addEventListener('click', (ev) => {
-      if (!this.searchInput.contains(ev.target as Node) && !this.searchDropdown.contains(ev.target as Node)) {
+    this.headerSearchBtn?.addEventListener('click', () => {
+      this.switchLabMode('anatomy');
+      this.openPartsDrawer();
+      requestAnimationFrame(() => this.partsFilterInput?.focus());
+    });
+
+    document.addEventListener('pointerdown', (ev) => {
+      const target = ev.target as Node | null;
+      if (target && !this.searchInput.contains(target) && !this.searchDropdown.contains(target)) {
         this.closeSearchDropdown();
       }
-      if (this.settingsOpen && !this.settingsPopover.contains(ev.target as Node) && !this.settingsBtn.contains(ev.target as Node)) {
+    });
+
+    document.addEventListener('click', (ev) => {
+      const target = ev.target as Node | null;
+      if (target && !this.searchInput.contains(target) && !this.searchDropdown.contains(target)) {
+        this.closeSearchDropdown();
+      }
+      if (
+        this.settingsOpen &&
+        target &&
+        !this.settingsPopover.contains(target) &&
+        !this.settingsBtn.contains(target)
+      ) {
         this.closeSettingsPopover();
       }
     });
 
+    // 2. Geometry Sync & Dock ResizeObserver
     window.addEventListener('resize', () => {
-      this.updateMobileDrawerExclusivity();
-      this.syncDockClearance();
+      this.scheduleGeometrySync();
     });
 
     if (typeof ResizeObserver !== 'undefined' && this.bottomBar) {
-      this.bottomResizeObserver = new ResizeObserver(() => {
+      this.bottomResizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const h = Math.ceil(entry.contentRect.height + 20);
+          this.appShell?.style.setProperty('--dock-clearance', `${h}px`);
+        }
         this.syncDockClearance();
+        this.scheduleGeometrySync();
       });
       this.bottomResizeObserver.observe(this.bottomBar);
     }
     this.syncDockClearance();
 
-    // -------------------------------------------------------------------------
-    // Settings Button & Popover
-    // -------------------------------------------------------------------------
-    this.settingsBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      this.toggleSettingsPopover();
+    this.noteCard?.addEventListener('transitionend', () => {
+      this.refreshPinKeepOutZones();
     });
 
-    const popoverCloseBtn = this.root.querySelector('#popover-close-btn') as HTMLButtonElement;
-    popoverCloseBtn?.addEventListener('click', () => this.closeSettingsPopover());
+    // 3. Theme Polarity Listeners
+    this.darkMediaQuery.addEventListener('change', () => {
+      if (this.themePreference === 'system') {
+        this.applyTheme('system');
+      }
+    });
 
-    // 3D Label Mode Toggle (Off / Key / All)
-    const labelBtns = this.settingsPopover.querySelectorAll<HTMLButtonElement>('[data-label-mode]');
+    this.themeToggleBtn?.addEventListener('click', () => {
+      const nextTheme: ThemePreference = this.resolvedTheme === 'dark' ? 'light' : 'dark';
+      const osMatchesNext = (nextTheme === 'dark') === this.darkMediaQuery.matches;
+      this.applyTheme(osMatchesNext ? 'system' : nextTheme);
+    });
+
+    this.root.querySelectorAll<HTMLButtonElement>('[data-theme-pref]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pref = (btn.dataset.themePref as ThemePreference) || 'system';
+        this.applyTheme(pref);
+      });
+    });
+
+    // 4. Settings Native Popover & Preferences
+    this.settingsPopover?.addEventListener('toggle', (ev) => {
+      const toggleEv = ev as ToggleEvent;
+      const isOpen = toggleEv.newState === 'open';
+      this.settingsOpen = isOpen;
+      this.settingsBtn?.setAttribute('aria-expanded', String(isOpen));
+    });
+
+    const labelBtns = this.root.querySelectorAll<HTMLButtonElement>('[data-label-mode]');
     labelBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const mode = btn.getAttribute('data-label-mode') as LabelDensityMode;
         if (mode) {
-          this.activeLabelMode = mode;
-          labelBtns.forEach((b) => b.classList.toggle('active', b === btn));
-          this.scene.setOverlays({ labelMode: mode });
-          try {
-            localStorage.setItem(AppHUD.STORAGE_KEYS.labelMode, mode);
-          } catch {
-            // ignore
-          }
+          this.setLabelDensity(mode);
         }
       });
     });
 
-    // Reading Depth Toggle (Simple / Detailed)
-    const depthBtns = this.settingsPopover.querySelectorAll<HTMLButtonElement>('[data-reading-depth]');
+    const depthBtns = this.root.querySelectorAll<HTMLButtonElement>('[data-reading-depth]');
     depthBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const depth = btn.getAttribute('data-reading-depth') as ReadingDepth;
         if (depth) {
           this.activeReadingDepth = depth;
-          depthBtns.forEach((b) => b.classList.toggle('active', b === btn));
+          this.root.querySelectorAll<HTMLButtonElement>('[data-reading-depth]').forEach((b) => {
+            b.classList.toggle('active', b.getAttribute('data-reading-depth') === depth);
+          });
           this.scene.setReadingDepth(depth);
           try {
             localStorage.setItem(AppHUD.STORAGE_KEYS.readingDepth, depth);
@@ -1699,78 +1848,218 @@ export class AppHUD {
       });
     });
 
-    // About Dialog Trigger
-    const aboutOpenBtn = this.root.querySelector('#about-open-btn') as HTMLButtonElement;
-    aboutOpenBtn?.addEventListener('click', () => {
-      this.closeSettingsPopover();
-      this.openAboutModal();
-    });
+    // 5. Report / Clinical Summary Top-Layer Dialog
+    const aboutOpenBtn = this.root.querySelector('#about-open-btn') as HTMLButtonElement | null;
+    aboutOpenBtn?.addEventListener('click', () => this.openAboutModal());
+    this.reportOpenBtn?.addEventListener('click', () => this.openAboutModal());
 
-    const aboutCloseBtn = this.root.querySelector('#about-close-btn') as HTMLButtonElement;
+    const aboutCloseBtn = this.root.querySelector('#about-close-btn') as HTMLButtonElement | null;
     aboutCloseBtn?.addEventListener('click', () => this.closeAboutModal());
 
-    const aboutConfirmBtn = this.root.querySelector('#about-confirm-btn') as HTMLButtonElement;
+    const aboutConfirmBtn = this.root.querySelector('#about-confirm-btn') as HTMLButtonElement | null;
     aboutConfirmBtn?.addEventListener('click', () => this.closeAboutModal());
 
-    this.aboutModal.addEventListener('click', (ev) => {
-      if (ev.target === this.aboutModal) {
-        this.closeAboutModal();
+    const reportPrintBtn = this.root.querySelector('#report-print-btn') as HTMLButtonElement | null;
+    reportPrintBtn?.addEventListener('click', () => window.print());
+
+    this.reportDialog?.addEventListener('cancel', (ev) => {
+      if (this.reducedMotionQuery.matches || supportsTopLayerExit()) {
+        this.aboutModalOpen = false;
+        return;
+      }
+      ev.preventDefault();
+      void this.closeTopLayerDialog(this.reportDialog);
+    });
+
+    this.reportDialog?.addEventListener('close', () => {
+      this.aboutModalOpen = false;
+    });
+
+    if (this.reportDialog && !('closedBy' in HTMLDialogElement.prototype)) {
+      this.reportDialog.addEventListener('click', (ev) => {
+        if (ev.target !== this.reportDialog) return;
+        const rect = this.reportDialog.getBoundingClientRect();
+        const clickedInDialog =
+          rect.top <= ev.clientY &&
+          ev.clientY <= rect.top + rect.height &&
+          rect.left <= ev.clientX &&
+          ev.clientX <= rect.left + rect.width;
+        if (!clickedInDialog) {
+          this.closeAboutModal();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (ev) => {
+      if (
+        ev.key === 'Escape' &&
+        this.noteState === 'expanded' &&
+        !this.aboutModalOpen &&
+        !(this.reportDialog && this.reportDialog.open) &&
+        !(this.settingsPopover && this.settingsPopover.matches(':popover-open')) &&
+        !this.searchDropdown.classList.contains('open') &&
+        !(this.caloricJongkeesModal && this.caloricJongkeesModal.style.display === 'flex')
+      ) {
+        this.setNoteState('compact', 'note');
       }
     });
 
-    // -------------------------------------------------------------------------
-    // Visual Sliders
-    // -------------------------------------------------------------------------
+    // 6. Unified Note & Lab Sidebar State Listeners
+    this.noteCollapsedPill?.addEventListener('click', () => this.setNoteState('compact'));
+    this.noteCollapseBtn?.addEventListener('click', () => this.setNoteState('collapsed'));
+    this.noteReadBtn?.addEventListener('click', () => this.setNoteState('expanded', 'note'));
+    this.noteLabShortcutBtn?.addEventListener('click', () => this.openLabTabForCurrentMode());
+    this.noteExpandToggleBtn?.addEventListener('click', () => {
+      this.setNoteState(this.noteState === 'expanded' ? 'compact' : 'expanded');
+    });
+
+    this.tabNoteBtn?.addEventListener('click', () => this.setNoteState('expanded', 'note'));
+    this.tabLabBtn?.addEventListener('click', () => this.openLabTabForCurrentMode());
+
+    [this.tabNoteBtn, this.tabLabBtn].forEach((tabBtn, idx, list) => {
+      tabBtn?.addEventListener('keydown', (ev) => {
+        if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+          ev.preventDefault();
+          const target = list[(idx + 1) % list.length];
+          target?.focus();
+          const nextTab = (target?.dataset.sidebarTab as SidebarTab) || 'note';
+          if (nextTab === 'lab') {
+            this.openLabTabForCurrentMode();
+          } else {
+            this.setNoteState('expanded', 'note');
+          }
+        }
+      });
+    });
+
+    this.furtherReadDetails?.addEventListener('toggle', () => {
+      this.syncSidebarDOM();
+    });
+
+    this.btnIsolate?.addEventListener('click', () => {
+      const snap = this.scene.getSnapshot();
+      if (snap.isIsolated) {
+        this.scene.restoreAllVisibility();
+      } else {
+        this.scene.isolateSelected();
+      }
+    });
+
+    this.btnResetView?.addEventListener('click', () => {
+      this.scene.resetView();
+    });
+
+    // 7. Trailing Stage Utilities
+    this.toolLabelsBtn?.addEventListener('click', () => {
+      const order: LabelDensityMode[] = ['key', 'all', 'off'];
+      const next = order[(order.indexOf(this.activeLabelMode) + 1) % order.length];
+      this.setLabelDensity(next);
+    });
+
+    this.toolResetBtn?.addEventListener('click', () => {
+      this.scene.resetView();
+    });
+
+    // 8. Anatomy Sliders & Parts Lab Filters
     this.boneSlider.addEventListener('input', () => {
       const val = parseInt(this.boneSlider.value, 10);
-      this.boneValEl.textContent = `${val}%`;
+      this.syncBoneSliderUI(val);
+      this.scene.setSliders({ bonyPeelPercent: val });
+    });
+
+    this.mobileBoneSlider?.addEventListener('input', () => {
+      const val = parseInt(this.mobileBoneSlider.value, 10);
+      this.syncBoneSliderUI(val);
       this.scene.setSliders({ bonyPeelPercent: val });
     });
 
     this.explodeSlider.addEventListener('input', () => {
       const val = parseInt(this.explodeSlider.value, 10);
-      this.explodeValEl.textContent = `${val}%`;
+      this.syncExplodeSliderUI(val);
       this.scene.setSliders({ explodePercent: val });
     });
 
-    // -------------------------------------------------------------------------
-    // 4 Guided Presets
-    // -------------------------------------------------------------------------
+    this.mobileExplodeSlider?.addEventListener('input', () => {
+      const val = parseInt(this.mobileExplodeSlider.value, 10);
+      this.syncExplodeSliderUI(val);
+      this.scene.setSliders({ explodePercent: val });
+    });
+
     this.presetButtons.forEach((btn, presetId) => {
       btn.addEventListener('click', () => {
-        this.presetButtons.forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.scene.applyDissectionPreset(presetId);
+        this.scene.applyDissectionPreset(presetId, true);
       });
     });
 
-    // -------------------------------------------------------------------------
-    // Collapsible 27 Parts Drawer
-    // -------------------------------------------------------------------------
     this.partsToggleBtn.addEventListener('click', () => {
       this.togglePartsDrawer();
     });
 
-    const drawerCloseBtn = this.root.querySelector('#drawer-close-btn') as HTMLButtonElement;
+    const drawerCloseBtn = this.root.querySelector('#drawer-close-btn') as HTMLButtonElement | null;
     drawerCloseBtn?.addEventListener('click', () => {
       this.closePartsDrawer();
     });
 
-    // -------------------------------------------------------------------------
-    // Lab Mode Switcher (Anatomy Atlas vs Hearing Workbench)
-    // -------------------------------------------------------------------------
-    this.modeAnatomyBtn.addEventListener('click', () => {
-      this.switchLabMode('anatomy');
+    this.partsFilterChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        this.partsSystemFilter = (chip.dataset.sysFilter as 'all' | SystemGroupId) || 'all';
+        this.partsFilterChips.forEach((c) => c.classList.toggle('active', c === chip));
+        this.renderPartsTree();
+      });
     });
 
-    this.modeHearingBtn.addEventListener('click', () => {
-      this.switchLabMode('hearing');
+    this.partsFilterInput?.addEventListener('input', () => {
+      this.partsSearchQuery = this.partsFilterInput.value.trim().toLowerCase();
+      this.renderPartsTree();
     });
 
-    // -------------------------------------------------------------------------
-    // Hearing Workbench Controls
-    // -------------------------------------------------------------------------
-    // Pure-Tone Play/Pause Toggle
+    // 9. Mode Switcher Tabs (Click + Roving Arrow Keys + Scroll Fade Fallback)
+    this.modePills.forEach((pill, index) => {
+      pill.addEventListener('click', () => {
+        const mode = (pill.dataset.mode as LabMode) || 'anatomy';
+        this.switchLabMode(mode);
+      });
+      pill.addEventListener('keydown', (ev) => {
+        let nextIdx = -1;
+        if (ev.key === 'ArrowRight') nextIdx = (index + 1) % this.modePills.length;
+        else if (ev.key === 'ArrowLeft') nextIdx = (index - 1 + this.modePills.length) % this.modePills.length;
+        else if (ev.key === 'Home') nextIdx = 0;
+        else if (ev.key === 'End') nextIdx = this.modePills.length - 1;
+        if (nextIdx >= 0) {
+          ev.preventDefault();
+          const target = this.modePills[nextIdx];
+          target.focus();
+          this.switchLabMode((target.dataset.mode as LabMode) || 'anatomy');
+        }
+      });
+    });
+
+    if (
+      this.modeSwitcher &&
+      this.modeSwitcher.firstElementChild &&
+      this.modeSwitcher.lastElementChild &&
+      typeof CSS !== 'undefined' &&
+      typeof CSS.supports === 'function' &&
+      !CSS.supports('animation-timeline', 'scroll()')
+    ) {
+      this.modeScrollObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!this.modeSwitcher) continue;
+            if (entry.target === this.modeSwitcher.firstElementChild) {
+              this.modeSwitcher.classList.toggle('more-start', entry.intersectionRatio < 1);
+            } else if (entry.target === this.modeSwitcher.lastElementChild) {
+              this.modeSwitcher.classList.toggle('more-end', entry.intersectionRatio < 1);
+            }
+          }
+        },
+        { root: this.modeSwitcher, threshold: 1, rootMargin: '1px' }
+      );
+      this.modeScrollObserver.observe(this.modeSwitcher.firstElementChild);
+      this.modeScrollObserver.observe(this.modeSwitcher.lastElementChild);
+    }
+
+    // 10. Hearing Workbench Listeners
     this.tonePlayBtn.addEventListener('click', () => {
       const isPlaying = !this.toneSynth.getIsPlaying();
       const currentFreq = this.scene.getSnapshot().hearingState.activeFrequency;
@@ -1783,26 +2072,20 @@ export class AppHUD {
       this.updateTonePlayButton(isPlaying);
     });
 
-    // Logarithmic Stimulus Frequency Slider (20 Hz to 20,000 Hz)
     this.hearingSlider.addEventListener('input', () => {
       const val = parseFloat(this.hearingSlider.value);
-      // Map linear slider [0, 1000] to logarithmic frequency [20, 20000] Hz
-      const freq = Math.round(20 * Math.pow(10, (3 * val) / 1000));
+      const freq = Math.round(20 * Math.pow(10, (val / 1000) * 3));
+      updateRangeProgress(this.hearingSlider);
       this.handleFrequencyChange(freq, false);
     });
 
-    // Standard Audiometric Octave Step Chips
     this.octaveChips.forEach((chip) => {
       chip.addEventListener('click', () => {
-        const freqStr = chip.getAttribute('data-octave');
-        if (freqStr) {
-          const freq = parseInt(freqStr, 10);
-          this.handleFrequencyChange(freq, true);
-        }
+        const freq = parseInt(chip.getAttribute('data-octave') || '1000', 10);
+        this.handleFrequencyChange(freq, true);
       });
     });
 
-    // Clinical Audiogram Drawer Toggle & Callbacks
     this.audiogramToggleBtn.addEventListener('click', () => {
       this.toggleAudiogramDrawer();
     });
@@ -1811,169 +2094,167 @@ export class AppHUD {
       this.audiogramToggleBtn.classList.remove('open');
       this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
       this.audiogramArrowEl.textContent = '▸';
-      this.updateMobileDrawerExclusivity();
-    });
-
-    this.audiogramDrawer.onPresetChange((presetId, lossSector) => {
-      this.scene.setHearingLossSector(lossSector, presetId);
+      if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+        this.setNoteState('compact', 'note');
+      }
     });
 
     this.audiogramDrawer.onFrequencySelect((freqHz) => {
       this.handleFrequencyChange(freqHz, true);
     });
 
-    // -------------------------------------------------------------------------
-    // Radiology Workbench Controls
-    // -------------------------------------------------------------------------
-    this.modeRadiologyBtn.addEventListener('click', () => {
-      this.switchLabMode('radiology');
+    this.audiogramDrawer.onPresetChange((presetId, lossSector) => {
+      this.scene.setHearingLossSector(lossSector, presetId);
     });
 
+    // 11. Radiology Workbench Listeners
     this.planeChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         const planeId = chip.getAttribute('data-plane') as RadiologyPlaneId;
         if (planeId) {
-          this.planeChips.forEach((c) => c.classList.toggle('active', c === chip));
           this.scene.setRadiologyPlane(planeId);
-          const p = RADIOLOGY_PLANES[planeId];
-          this.radiologyDepthSlider.min = String(Math.round(p.minDepthMm * 10));
-          this.radiologyDepthSlider.max = String(Math.round(p.maxDepthMm * 10));
-          this.radiologyDepthSlider.value = String(Math.round(p.defaultDepthMm * 10));
-          this.syncRadiologyDepthUI(p.defaultDepthMm);
+          this.syncRadiologyUI(this.scene.getRadiologyState());
         }
       });
     });
 
     this.radiologyDepthSlider.addEventListener('input', () => {
-      const val = parseInt(this.radiologyDepthSlider.value, 10);
-      const depthMm = val / 10.0;
+      const depthMm = parseFloat(this.radiologyDepthSlider.value) / 10;
+      updateRangeProgress(this.radiologyDepthSlider);
       this.scene.setRadiologyDepth(depthMm);
       this.syncRadiologyDepthUI(depthMm);
     });
 
     this.depthDecBtn.addEventListener('click', () => {
-      const current = this.scene.getSnapshot().radiologyState.sliceDepthMm;
-      const next = Math.round((current - 0.5) * 10) / 10;
+      const cur = this.scene.getRadiologyState().sliceDepthMm;
+      const next = Math.round((cur - 0.5) * 10) / 10;
       this.scene.setRadiologyDepth(next);
-      this.syncRadiologyDepthUI(next);
+      this.syncRadiologyDepthUI(this.scene.getRadiologyState().sliceDepthMm);
     });
 
     this.depthIncBtn.addEventListener('click', () => {
-      const current = this.scene.getSnapshot().radiologyState.sliceDepthMm;
-      const next = Math.round((current + 0.5) * 10) / 10;
+      const cur = this.scene.getRadiologyState().sliceDepthMm;
+      const next = Math.round((cur + 0.5) * 10) / 10;
       this.scene.setRadiologyDepth(next);
-      this.syncRadiologyDepthUI(next);
+      this.syncRadiologyDepthUI(this.scene.getRadiologyState().sliceDepthMm);
     });
 
     this.radiologyFlipBtn.addEventListener('click', () => {
-      const inverted = !this.scene.getSnapshot().radiologyState.clipInverted;
-      this.scene.setRadiologyClipInverted(inverted);
-      this.radiologyFlipBtn.classList.toggle('active', inverted);
+      const next = !this.scene.getRadiologyState().clipInverted;
+      this.scene.setRadiologyClipInverted(next);
+      this.radiologyFlipBtn.classList.toggle('active', next);
     });
 
     this.radiologyGuideBtn.addEventListener('click', () => {
-      const visible = !this.scene.getSnapshot().radiologyState.showPlaneHelper;
-      this.scene.setRadiologyPlaneHelperVisible(visible);
-      this.radiologyGuideBtn.classList.toggle('active', visible);
+      const next = !this.scene.getRadiologyState().showPlaneHelper;
+      this.scene.setRadiologyPlaneHelperVisible(next);
+      this.radiologyGuideBtn.classList.toggle('active', next);
     });
 
     this.radiologyScdsBtn.addEventListener('click', () => {
-      const active = !this.scene.getSnapshot().radiologyState.scdsActive;
-      this.scene.setSCDSActive(active);
-      this.radiologyScdsBtn.classList.toggle('active', active);
-      if (active) {
-        this.planeChips.forEach((c) =>
-          c.classList.toggle('active', c.getAttribute('data-plane') === 'poschl')
-        );
-        this.syncRadiologyDepthUI(1.2);
-        this.scene.selectStructure('ls_Hsapiens_Sa', false);
+      const next = !this.scene.getRadiologyState().scdsActive;
+      this.scene.setSCDSActive(next);
+      this.radiologyScdsBtn.classList.toggle('active', next);
+      if (this.audiogramDrawer) {
+        this.audiogramDrawer.setActivePreset(next ? 'conductive_scds' : 'normal');
       }
-      this.renderInspectorCard(this.scene.getSnapshot().selectedMesh);
+      if (this.ctSliceDrawer) {
+        const st = this.scene.getRadiologyState();
+        this.ctSliceDrawer.update(st.activePlane, st.sliceDepthMm, st.scdsActive, st.windowMode);
+      }
+      this.renderInspectorCard(this.scene.getSelectedMesh());
     });
 
     this.radiologyCtToggleBtn.addEventListener('click', () => {
       this.toggleCTDrawer();
     });
 
-    // -------------------------------------------------------------------------
-    // Vestibular & VOR Workbench Controls
-    // -------------------------------------------------------------------------
-    this.modeVestibularBtn.addEventListener('click', () => {
-      this.switchLabMode('vestibular');
+    this.ctSliceDrawer.onClose(() => {
+      this.radiologyCtToggleBtn.classList.remove('open');
+      this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
+      this.ctCardArrowEl.textContent = '▸';
+      if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+        this.setNoteState('compact', 'note');
+      }
+    });
+
+    this.ctSliceDrawer.onDepthChange((depthMm) => {
+      this.scene.setRadiologyDepth(depthMm);
+      this.syncRadiologyDepthUI(depthMm);
+    });
+
+    this.ctSliceDrawer.onWindowModeChange((mode) => {
+      this.scene.setCTWindowMode(mode);
+    });
+
+    // 12. Vestibular Workbench & Diagnostic Modality Listeners
+    this.vestSubnavTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const sub = tab.getAttribute('data-submode') as 'bppv' | 'caloric' | 'vhit';
+        if (sub) {
+          this.switchVestibularSubmode(sub);
+        }
+      });
     });
 
     this.vestProtocolChips.forEach((chip) => {
       chip.addEventListener('click', () => {
-        const maneuver = chip.getAttribute('data-maneuver') as ManeuverId;
-        if (maneuver) {
-          this.selectManeuver(maneuver);
+        const id = chip.getAttribute('data-maneuver') as ManeuverId;
+        if (id) {
+          this.selectManeuver(id);
         }
       });
     });
 
-    this.vestStepPrevBtn?.addEventListener('click', () => {
+    this.vestStepSlider.addEventListener('input', () => {
+      const idx = parseInt(this.vestStepSlider.value, 10);
+      updateRangeProgress(this.vestStepSlider);
+      this.pauseSequencer();
+      this.goToStep(idx);
+    });
+
+    this.vestStepPrevBtn.addEventListener('click', () => {
       this.pauseSequencer();
       this.stepManeuver(-1);
     });
 
-    this.vestStepNextBtn?.addEventListener('click', () => {
+    this.vestStepNextBtn.addEventListener('click', () => {
       this.pauseSequencer();
       this.stepManeuver(1);
     });
 
-    this.vestPlayBtn?.addEventListener('click', () => {
+    this.vestPlayBtn.addEventListener('click', () => {
       this.toggleSequencer();
     });
 
-    this.vestStepSlider?.addEventListener('input', () => {
-      this.pauseSequencer();
-      const step = parseInt(this.vestStepSlider.value, 10);
-      this.goToStep(step);
-    });
-
-    this.vestGyroToggleBtn?.addEventListener('click', () => {
-      this.toggleGyroFlyout();
-    });
-
-    this.gyroCloseBtn?.addEventListener('click', () => {
-      this.closeGyroFlyout();
-    });
-
-    const updateGyroFromSliders = () => {
-      this.pauseSequencer();
-      const yaw = parseFloat(this.gyroYawSlider.value);
-      const pitch = parseFloat(this.gyroPitchSlider.value);
-      const roll = parseFloat(this.gyroRollSlider.value);
-      this.gyroYawValEl.textContent = `${Math.round(yaw)}°`;
-      this.gyroPitchValEl.textContent = `${Math.round(pitch)}°`;
-      this.gyroRollValEl.textContent = `${Math.round(roll)}°`;
-      this.scene.setHeadOrientation(yaw, pitch, roll);
-      this.renderInspectorCard(this.scene.getSnapshot().selectedMesh);
-    };
-
-    this.gyroYawSlider?.addEventListener('input', updateGyroFromSliders);
-    this.gyroPitchSlider?.addEventListener('input', updateGyroFromSliders);
-    this.gyroRollSlider?.addEventListener('input', updateGyroFromSliders);
-
-    this.vestResetBtn?.addEventListener('click', () => {
+    this.vestResetBtn.addEventListener('click', () => {
       this.resetVestibular();
     });
 
-    this.vestVorToggleBtn?.addEventListener('click', () => {
+    this.vestGyroToggleBtn.addEventListener('click', () => {
+      this.toggleGyroFlyout();
+    });
+
+    this.gyroCloseBtn.addEventListener('click', () => {
+      this.closeGyroFlyout();
+    });
+
+    const handleGyroInput = () => {
+      const yaw = parseFloat(this.gyroYawSlider.value);
+      const pitch = parseFloat(this.gyroPitchSlider.value);
+      const roll = parseFloat(this.gyroRollSlider.value);
+      this.setHeadOrientationUI(yaw, pitch, roll);
+      this.scene.setHeadOrientation(yaw, pitch, roll);
+    };
+    this.gyroYawSlider.addEventListener('input', handleGyroInput);
+    this.gyroPitchSlider.addEventListener('input', handleGyroInput);
+    this.gyroRollSlider.addEventListener('input', handleGyroInput);
+
+    this.vestVorToggleBtn.addEventListener('click', () => {
       this.toggleVORDrawer('nystagmogram');
     });
 
-    // Vestibular Subnav Modality Tabs
-    this.vestSubnavTabs.forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const submode = tab.getAttribute('data-submode') as 'bppv' | 'caloric' | 'vhit';
-        if (submode) {
-          this.switchVestibularSubmode(submode);
-        }
-      });
-    });
-
-    // Caloric Testing Listeners
+    // Caloric Listeners
     this.caloricTempChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         const temp = chip.getAttribute('data-caloric-temp') as CaloricIrrigationType;
@@ -2007,22 +2288,27 @@ export class AppHUD {
     });
 
     this.caloricModalApplyBtn?.addEventListener('click', () => {
+      this.recalculateJongkees();
       this.closeJongkeesModal();
       this.openVORDrawer('caloric');
     });
 
-    this.caloricPresetChips.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const preset = btn.getAttribute('data-preset');
-        if (preset) {
-          this.loadJongkeesPreset(preset);
-        }
+    this.caloricJongkeesModal?.addEventListener('click', (ev) => {
+      if (ev.target === this.caloricJongkeesModal) {
+        this.closeJongkeesModal();
+      }
+    });
+
+    [this.jongkeesR44Input, this.jongkeesR30Input, this.jongkeesL44Input, this.jongkeesL30Input].forEach((inp) => {
+      inp?.addEventListener('input', () => {
+        this.recalculateJongkees();
       });
     });
 
-    [this.jongkeesR44Input, this.jongkeesR30Input, this.jongkeesL44Input, this.jongkeesL30Input].forEach((input) => {
-      input?.addEventListener('input', () => {
-        this.recalculateJongkees();
+    this.caloricPresetChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const preset = chip.getAttribute('data-preset') || 'normal';
+        this.loadJongkeesPreset(preset);
       });
     });
 
@@ -2073,34 +2359,55 @@ export class AppHUD {
       this.toggleVORDrawer('vhit');
     });
 
-    // -------------------------------------------------------------------------
-    // Surgical Suites Workbench Controls
-    // -------------------------------------------------------------------------
-    this.modeSurgicalBtn?.addEventListener('click', () => {
-      this.switchLabMode('surgical');
+    // VORDrawer Bi-directional Sync Callbacks
+    this.vorDrawer.onDiagnosticModeChange((mode) => {
+      if (mode === 'caloric' && this.vestSubmode !== 'caloric') {
+        this.switchVestibularSubmode('caloric');
+      } else if (mode === 'vhit' && this.vestSubmode !== 'vhit') {
+        this.switchVestibularSubmode('vhit');
+      } else if (mode === 'nystagmogram' && this.vestSubmode !== 'bppv') {
+        this.switchVestibularSubmode('bppv');
+      }
     });
 
+    this.vorDrawer.onAlexanderGazeChange((gaze) => {
+      this.selectCaloricAlexanderGaze(gaze);
+    });
+
+    this.vorDrawer.onClose(() => {
+      this.syncVORDrawerButtons(false);
+      if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+        this.setNoteState('compact', 'note');
+      }
+    });
+
+    // 13. Surgical Suite Listeners
     this.surgSubnavTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
-        const submode = tab.getAttribute('data-submode');
-        if (submode === 'ci') {
+        const sub = tab.getAttribute('data-submode');
+        if (sub === 'ci') {
           this.switchSurgicalProcedure('cochlear_implant');
-        } else if (submode === 'labyrinthectomy') {
+        } else if (sub === 'labyrinthectomy') {
           this.switchSurgicalProcedure('labyrinthectomy');
-        } else if (submode === 'neurectomy') {
+        } else if (sub === 'neurectomy') {
           this.switchSurgicalProcedure('neurectomy');
         }
       });
     });
 
-    const surgDrawerBtns = this.root.querySelectorAll<HTMLButtonElement>('.surg-drawer-toggle-btn');
-    surgDrawerBtns.forEach((btn) => {
+    this.root.querySelectorAll<HTMLButtonElement>('.surg-drawer-toggle-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.toggleSurgicalDrawer();
       });
     });
 
-    // CI Listeners
+    this.surgicalDrawer.onClose(() => {
+      this.syncSurgicalDrawerButtonUI(false);
+      if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+        this.setNoteState('compact', 'note');
+      }
+    });
+
     this.ciApproachChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         this.ciApproachChips.forEach((c) => c.classList.remove('active'));
@@ -2113,29 +2420,15 @@ export class AppHUD {
       chip.addEventListener('click', () => {
         this.ciArrayChips.forEach((c) => c.classList.remove('active'));
         chip.classList.add('active');
-        const arrayType = chip.getAttribute('data-array') as CIArrayType;
-        if (arrayType === 'perimodiolar') {
-          this.ciDepthSlider.max = '210';
-          if (parseInt(this.ciDepthSlider.value, 10) > 210) {
-            this.ciDepthSlider.value = '210';
-          }
-        } else {
-          this.ciDepthSlider.max = '280';
-        }
         this.applyCIParameters();
       });
     });
 
-    this.ciDepthSlider?.addEventListener('input', () => {
-      this.applyCIParameters();
-    });
-
-    this.ciPitchSlider?.addEventListener('input', () => {
-      this.applyCIParameters();
-    });
-
-    this.ciYawSlider?.addEventListener('input', () => {
-      this.applyCIParameters();
+    [this.ciDepthSlider, this.ciPitchSlider, this.ciYawSlider].forEach((slider) => {
+      slider?.addEventListener('input', () => {
+        updateRangeProgress(slider);
+        this.applyCIParameters();
+      });
     });
 
     this.ciAutoInsertBtn?.addEventListener('click', () => {
@@ -2147,10 +2440,12 @@ export class AppHUD {
       this.ciDepthSlider.value = '0';
       this.ciPitchSlider.value = '0';
       this.ciYawSlider.value = '0';
+      updateRangeProgress(this.ciDepthSlider);
+      updateRangeProgress(this.ciPitchSlider);
+      updateRangeProgress(this.ciYawSlider);
       this.applyCIParameters();
     });
 
-    // Labyrinthectomy Listeners
     this.labyStepChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         const step = parseInt(chip.getAttribute('data-laby-step') ?? '0', 10) as 0 | 1 | 2 | 3;
@@ -2163,6 +2458,7 @@ export class AppHUD {
     });
 
     this.labyCompSlider?.addEventListener('input', () => {
+      updateRangeProgress(this.labyCompSlider);
       const compHours = parseFloat(this.labyCompSlider.value);
       this.applyLabyrinthectomyParameters(compHours);
     });
@@ -2170,10 +2466,10 @@ export class AppHUD {
     this.labyAblateAllBtn?.addEventListener('click', () => {
       this.selectLabyrinthectomyStep(3);
       this.labyCompSlider.value = '0';
+      updateRangeProgress(this.labyCompSlider);
       this.applyLabyrinthectomyParameters(0);
     });
 
-    // Neurectomy Listeners
     this.neurectomyStepChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         const step = parseInt(chip.getAttribute('data-neurectomy-step') ?? '0', 10) as 0 | 1 | 2 | 3;
@@ -2190,6 +2486,7 @@ export class AppHUD {
     });
 
     this.neurectomyKoosSlider?.addEventListener('input', () => {
+      updateRangeProgress(this.neurectomyKoosSlider);
       const stage = parseInt(this.neurectomyKoosSlider.value, 10);
       const romanStages = ['0', 'I', 'II', 'III', 'IV'];
       this.neurectomyKoosValEl.textContent = `Stage ${romanStages[stage] ?? stage}`;
@@ -2203,7 +2500,204 @@ export class AppHUD {
   }
 
   // ===========================================================================
-  // SEARCH DROPDOWN
+  // SIDEBAR STATE MACHINE & 3D FRAMING SYNCHRONIZATION
+  // ===========================================================================
+  private closeAllLabDrawersSilently(): void {
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) this.closePartsDrawer();
+      if (this.audiogramDrawer?.getIsOpen()) this.closeAudiogramDrawer();
+      if (this.ctSliceDrawer?.getIsOpen()) this.closeCTDrawer();
+      if (this.vorDrawer?.getIsOpen()) this.closeVORDrawer();
+      if (this.surgicalDrawer?.getIsOpen()) this.closeSurgicalDrawer();
+    } finally {
+      this.isSwitchingDrawers = false;
+    }
+  }
+
+  private setNoteState(nextState: NoteState, nextTab?: SidebarTab): void {
+    this.noteState = nextState;
+    if (nextTab) {
+      this.sidebarTab = nextTab;
+    }
+    if (!this.isSwitchingDrawers && (this.noteState !== 'expanded' || this.sidebarTab !== 'lab')) {
+      this.closeAllLabDrawersSilently();
+    }
+    this.syncSidebarDOM();
+  }
+
+  private openLabTabForCurrentMode(): void {
+    const mode = this.scene ? this.scene.getSnapshot().labMode : 'anatomy';
+    if (mode === 'hearing') {
+      this.openAudiogramDrawer();
+    } else if (mode === 'radiology') {
+      this.openCTDrawer();
+    } else if (mode === 'vestibular') {
+      this.openVORDrawer();
+    } else if (mode === 'surgical') {
+      this.openSurgicalDrawer();
+    } else {
+      this.openPartsDrawer();
+    }
+  }
+
+  private syncSidebarDOM(): void {
+    if (!this.appShell || !this.noteSidebar) return;
+    const isExpanded = this.noteState === 'expanded';
+    const isCollapsed = this.noteState === 'collapsed';
+    const wide = isExpanded && this.sidebarTab === 'note' && Boolean(this.furtherReadDetails?.open);
+
+    this.appShell.setAttribute('data-note-state', this.noteState);
+    this.appShell.setAttribute('data-wide-read', String(wide));
+    this.noteSidebar.setAttribute('data-note-state', this.noteState);
+    this.noteSidebar.setAttribute('data-sidebar-tab', this.sidebarTab);
+    this.noteSidebar.setAttribute('data-wide-read', String(wide));
+
+    this.noteCollapsedPill.hidden = !isCollapsed;
+    this.noteCard.hidden = isCollapsed;
+    this.noteCompactBody.hidden = this.noteState !== 'compact';
+    this.noteScrollBody.hidden = !isExpanded;
+
+    this.sidebarPaneNote.hidden = !(isExpanded && this.sidebarTab === 'note');
+    this.sidebarPaneLab.hidden = !(isExpanded && this.sidebarTab === 'lab');
+
+    this.tabNoteBtn.classList.toggle('active', this.sidebarTab === 'note');
+    this.tabNoteBtn.setAttribute('aria-selected', String(this.sidebarTab === 'note'));
+    this.tabNoteBtn.tabIndex = this.sidebarTab === 'note' ? 0 : -1;
+
+    this.tabLabBtn.classList.toggle('active', this.sidebarTab === 'lab');
+    this.tabLabBtn.setAttribute('aria-selected', String(this.sidebarTab === 'lab'));
+    this.tabLabBtn.tabIndex = this.sidebarTab === 'lab' ? 0 : -1;
+
+    this.noteExpandToggleBtn.setAttribute('aria-expanded', String(isExpanded));
+    this.noteExpandToggleBtn.setAttribute(
+      'aria-label',
+      isExpanded ? 'Return note sidebar to compact size' : 'Expand note sidebar for full reading'
+    );
+
+    if (this.furtherReadHint) {
+      this.furtherReadHint.textContent = `Clinical Details · ${this.activeReadingDepth === 'detailed' ? 'Clinical' : 'Patient'}`;
+    }
+
+    if (isExpanded && this.sidebarTab === 'lab' && this.ctSliceDrawer?.getIsOpen()) {
+      requestAnimationFrame(() => {
+        this.ctSliceDrawer.drawSlice();
+        this.scheduleGeometrySync();
+      });
+    } else {
+      this.scheduleGeometrySync();
+    }
+  }
+
+  private updateStageFraming(): void {
+    if (!this.scene) return;
+    const vw = window.innerWidth;
+    if (this.noteState !== 'expanded') {
+      this.scene.setStageFraming(0, 0);
+      return;
+    }
+    if (vw <= 720) {
+      const sheetH = this.noteCard?.getBoundingClientRect().height || Math.round(window.innerHeight * 0.48);
+      this.scene.setStageFraming(0, Math.min(sheetH, window.innerHeight * 0.5));
+      return;
+    }
+    const wide = this.sidebarTab === 'note' && Boolean(this.furtherReadDetails?.open);
+    const targetSidebarW =
+      vw > 1080
+        ? wide
+          ? Math.min(476, vw - 32)
+          : 388
+        : wide
+          ? Math.min(432, vw - 28)
+          : Math.min(364, vw - 28);
+    const leftInset = targetSidebarW + 16;
+    this.scene.setStageFraming(vw > 1080 ? leftInset : leftInset * 0.85, 0);
+  }
+
+  private refreshPinKeepOutZones(): void {
+    this.stageWidthPx = this.canvasHost?.clientWidth || window.innerWidth;
+    this.keepOutZones.length = 0;
+    const targets: Array<HTMLElement | null> = [
+      this.headerEl,
+      this.noteState === 'collapsed' ? this.noteCollapsedPill : this.noteCard,
+      this.bottomBar,
+      this.isGyroFlyoutOpen() ? this.gyroFlyout : null,
+    ];
+    for (const el of targets) {
+      if (!el || el.hidden) continue;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      this.keepOutZones.push({
+        l: r.left - 12,
+        t: r.top - 12,
+        r: r.right + 12,
+        b: r.bottom + 12,
+      });
+    }
+  }
+
+  private scheduleGeometrySync(): void {
+    this.refreshPinKeepOutZones();
+    this.updateStageFraming();
+    if (!this.framingRafQueued) {
+      this.framingRafQueued = true;
+      requestAnimationFrame(() => {
+        this.framingRafQueued = false;
+        this.refreshPinKeepOutZones();
+        this.updateStageFraming();
+      });
+    }
+  }
+
+  private setLabelDensity(mode: LabelDensityMode): void {
+    this.activeLabelMode = mode;
+    this.scene?.setOverlays({ labelMode: mode });
+    this.toolLabelsBtn?.classList.toggle('active', mode !== 'off');
+    this.toolLabelsBtn?.setAttribute('aria-pressed', String(mode !== 'off'));
+    this.root.querySelectorAll<HTMLButtonElement>('[data-label-mode]').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-label-mode') === mode);
+    });
+    try {
+      localStorage.setItem(AppHUD.STORAGE_KEYS.labelMode, mode);
+    } catch {
+      // ignore
+    }
+  }
+
+  private syncBoneSliderUI(val: number): void {
+    const str = String(val);
+    const lbl = `${val}%`;
+    if (this.boneSlider && document.activeElement !== this.boneSlider) {
+      this.boneSlider.value = str;
+    }
+    if (this.boneValEl) this.boneValEl.textContent = lbl;
+    if (this.mobileBoneSlider && document.activeElement !== this.mobileBoneSlider) {
+      this.mobileBoneSlider.value = str;
+    }
+    if (this.mobileBoneValEl) this.mobileBoneValEl.textContent = lbl;
+    updateRangeProgress(this.boneSlider);
+    updateRangeProgress(this.mobileBoneSlider);
+  }
+
+  private syncExplodeSliderUI(val: number): void {
+    const str = String(val);
+    const lbl = `${val}%`;
+    if (this.explodeSlider && document.activeElement !== this.explodeSlider) {
+      this.explodeSlider.value = str;
+    }
+    if (this.explodeValEl) this.explodeValEl.textContent = lbl;
+    if (this.mobileExplodeSlider && document.activeElement !== this.mobileExplodeSlider) {
+      this.mobileExplodeSlider.value = str;
+    }
+    if (this.mobileExplodeValEl) this.mobileExplodeValEl.textContent = lbl;
+    updateRangeProgress(this.explodeSlider);
+    updateRangeProgress(this.mobileExplodeSlider);
+  }
+
+  // ===========================================================================
+  // SEARCH DROPDOWN & MODALS
   // ===========================================================================
   private renderSearchResults(query: string): void {
     if (!query) {
@@ -2246,6 +2740,7 @@ export class AppHUD {
         </div>
       `;
       this.searchDropdown.classList.add('open');
+      this.searchInput.setAttribute('aria-expanded', 'true');
       return;
     }
 
@@ -2268,19 +2763,21 @@ export class AppHUD {
       .join('');
 
     this.searchDropdown.classList.add('open');
+    this.searchInput.setAttribute('aria-expanded', 'true');
 
     const resultItems = this.searchDropdown.querySelectorAll<HTMLElement>('.search-result-item');
     resultItems.forEach((el) => {
       el.addEventListener('click', () => {
         const meshName = el.getAttribute('data-mesh');
         if (meshName) {
-          const struct = STRUCTURE_BY_MESH[meshName];
-          if (struct) {
-            this.searchInput.value = struct.shortLabel;
-            this.searchClearBtn.style.display = 'block';
+          this.scene.selectStructure(meshName, true);
+          const item = STRUCTURE_BY_MESH[meshName];
+          if (item) {
+            this.searchInput.value = item.shortLabel;
+            this.searchClearBtn.hidden = false;
+            this.searchClearBtn.style.display = 'inline-flex';
           }
           this.closeSearchDropdown();
-          this.scene.selectStructure(meshName, true);
         }
       });
     });
@@ -2288,40 +2785,131 @@ export class AppHUD {
 
   private closeSearchDropdown(): void {
     this.searchDropdown.classList.remove('open');
-  }
-
-  // ===========================================================================
-  // SETTINGS POPOVER & ABOUT MODAL
-  // ===========================================================================
-  private toggleSettingsPopover(): void {
-    this.settingsOpen = !this.settingsOpen;
-    this.settingsPopover.classList.toggle('open', this.settingsOpen);
-    this.settingsBtn.setAttribute('aria-expanded', this.settingsOpen ? 'true' : 'false');
+    this.searchInput.setAttribute('aria-expanded', 'false');
+    this.activeSearchIndex = -1;
   }
 
   private closeSettingsPopover(): void {
     this.settingsOpen = false;
-    this.settingsPopover.classList.remove('open');
-    this.settingsBtn.setAttribute('aria-expanded', 'false');
+    if (this.settingsPopover?.matches(':popover-open')) {
+      this.settingsPopover.hidePopover();
+    }
+    this.settingsBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  private async closeTopLayerDialog(dialog: HTMLDialogElement): Promise<void> {
+    if (!dialog.open || dialog.hasAttribute('data-closing')) return;
+    if (this.reducedMotionQuery.matches || supportsTopLayerExit()) {
+      dialog.close();
+      return;
+    }
+    dialog.setAttribute('data-closing', '');
+    const animations = dialog.getAnimations({ subtree: true });
+    await Promise.race([
+      Promise.allSettled(animations.map((a) => a.finished)),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
+    ]);
+    if (!dialog.hasAttribute('data-closing')) return;
+    dialog.removeAttribute('data-closing');
+    if (dialog.open) dialog.close();
   }
 
   private openAboutModal(): void {
+    if (this.settingsPopover?.matches(':popover-open')) {
+      this.settingsPopover.hidePopover();
+    }
+    const snap = this.scene?.getSnapshot();
+    if (snap) {
+      const sel = snap.selectedMesh ? STRUCTURE_BY_MESH[snap.selectedMesh] : null;
+      if (this.repActivePartEl) {
+        this.repActivePartEl.textContent = sel
+          ? `${sel.displayName} (${formatRAS(sel.centroidRAS)} mm)`
+          : 'Inner Ear Labyrinth';
+      }
+      if (this.repActiveModeEl) {
+        this.repActiveModeEl.textContent = MODE_LABELS[snap.labMode];
+      }
+    }
+    if (this.reportDialog) {
+      this.reportDialog.removeAttribute('data-closing');
+      if (!this.reportDialog.open) {
+        this.reportDialog.showModal();
+      }
+    }
     this.aboutModalOpen = true;
-    this.aboutModal.style.display = 'flex';
   }
 
   private closeAboutModal(): void {
     this.aboutModalOpen = false;
-    this.aboutModal.style.display = 'none';
+    if (this.reportDialog?.open) {
+      void this.closeTopLayerDialog(this.reportDialog);
+    }
   }
 
   // ===========================================================================
-  // PARTS DRAWER TOGGLE
+  // 5-DRAWER MUTUAL EXCLUSIVITY & INLINE LAB PANE CONTROLLERS
   // ===========================================================================
   private togglePartsDrawer(): void {
-    if (!this.partsDrawerOpen) {
-      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-        this.closeAudiogramDrawer();
+    this.closeVORDrawer();
+    if (this.partsDrawerOpen && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.closePartsDrawer();
+    } else {
+      this.openPartsDrawer();
+    }
+  }
+
+  private openPartsDrawer(): void {
+    this.isSwitchingDrawers = true;
+    try {
+      this.closeAudiogramDrawer();
+      this.closeCTDrawer();
+      this.closeVORDrawer();
+      this.closeSurgicalDrawer();
+      this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
+    }
+
+    this.partsDrawerOpen = true;
+    this.partsDrawer.classList.add('open');
+    this.partsToggleBtn.classList.add('open');
+    this.partsToggleBtn.setAttribute('aria-expanded', 'true');
+    const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
+    if (arrowEl) {
+      arrowEl.textContent = '▾';
+    }
+    this.setNoteState('expanded', 'lab');
+    this.renderPartsTree();
+  }
+
+  private closePartsDrawer(): void {
+    if (!this.partsDrawerOpen) return;
+    this.partsDrawerOpen = false;
+    this.partsDrawer.classList.remove('open');
+    this.partsToggleBtn.classList.remove('open');
+    this.partsToggleBtn.setAttribute('aria-expanded', 'false');
+    const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
+    if (arrowEl) {
+      arrowEl.textContent = '▸';
+    }
+    if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.setNoteState('compact', 'note');
+    }
+  }
+
+  private toggleAudiogramDrawer(): void {
+    if (this.audiogramDrawer.getIsOpen() && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.closeAudiogramDrawer();
+    } else {
+      this.openAudiogramDrawer();
+    }
+  }
+
+  private openAudiogramDrawer(): void {
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
       }
       if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
         this.closeCTDrawer();
@@ -2333,177 +2921,77 @@ export class AppHUD {
         this.closeSurgicalDrawer();
       }
       this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
     }
-    this.partsDrawerOpen = !this.partsDrawerOpen;
-    this.partsDrawer.classList.toggle('open', this.partsDrawerOpen);
-    this.partsToggleBtn.classList.toggle('open', this.partsDrawerOpen);
-    this.partsToggleBtn.setAttribute('aria-expanded', this.partsDrawerOpen ? 'true' : 'false');
-    const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
-    if (arrowEl) {
-      arrowEl.textContent = this.partsDrawerOpen ? '▾' : '▸';
-    }
-    this.updateMobileDrawerExclusivity();
-    try {
-      localStorage.setItem(AppHUD.STORAGE_KEYS.partsDrawerOpen, String(this.partsDrawerOpen));
-    } catch {
-      // ignore
-    }
-  }
 
-  private closePartsDrawer(): void {
-    this.partsDrawerOpen = false;
-    this.partsDrawer.classList.remove('open');
-    this.partsToggleBtn.classList.remove('open');
-    this.partsToggleBtn.setAttribute('aria-expanded', 'false');
-    this.updateMobileDrawerExclusivity();
-    const arrowEl = this.partsToggleBtn.querySelector('.toggle-arrow');
-    if (arrowEl) {
-      arrowEl.textContent = '▸';
-    }
-    try {
-      localStorage.setItem(AppHUD.STORAGE_KEYS.partsDrawerOpen, 'false');
-    } catch {
-      // ignore
-    }
-  }
-
-  private syncDockClearance(): void {
-    if (!this.bottomBar || typeof window === 'undefined') return;
-    const rect = this.bottomBar.getBoundingClientRect();
-    if (rect.height > 0 && window.innerHeight > 0) {
-      const clearancePx = Math.max(76, Math.ceil(window.innerHeight - rect.top + 10));
-      this.root.style.setProperty('--dock-clearance', `${clearancePx}px`);
-    }
-  }
-
-  private updateMobileDrawerExclusivity(): void {
-    this.syncDockClearance();
-    if (window.innerWidth <= 640) {
-      const anyDrawerOpen =
-        this.partsDrawerOpen ||
-        (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) ||
-        (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) ||
-        (this.vorDrawer && this.vorDrawer.getIsOpen()) ||
-        (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) ||
-        this.isGyroFlyoutOpen();
-      this.inspectorCard.classList.toggle('drawer-active', anyDrawerOpen);
-    } else {
-      this.inspectorCard.classList.remove('drawer-active');
-    }
-  }
-
-  // ===========================================================================
-  // AUDIOGRAM DRAWER TOGGLE & HEARING LAB HELPERS
-  // ===========================================================================
-  private toggleAudiogramDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
-    const isOpen = this.audiogramDrawer.toggle();
-    this.audiogramToggleBtn.classList.toggle('open', isOpen);
-    this.audiogramToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    this.audiogramArrowEl.textContent = isOpen ? '▾' : '▸';
-    this.updateMobileDrawerExclusivity();
-  }
-
-  private openAudiogramDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
+    this.setNoteState('expanded', 'lab');
     this.audiogramDrawer.open();
     this.audiogramToggleBtn.classList.add('open');
     this.audiogramToggleBtn.setAttribute('aria-expanded', 'true');
     this.audiogramArrowEl.textContent = '▾';
-    this.updateMobileDrawerExclusivity();
   }
 
   private closeAudiogramDrawer(): void {
-    this.audiogramDrawer.close();
+    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+      this.audiogramDrawer.close();
+    }
     this.audiogramToggleBtn.classList.remove('open');
     this.audiogramToggleBtn.setAttribute('aria-expanded', 'false');
     this.audiogramArrowEl.textContent = '▸';
-    this.updateMobileDrawerExclusivity();
+    if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.setNoteState('compact', 'note');
+    }
   }
 
-  // ===========================================================================
-  // 2D CT MPR DRAWER TOGGLE & RADIOLOGY WORKBENCH HELPERS
-  // ===========================================================================
   private toggleCTDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    if (this.ctSliceDrawer.getIsOpen() && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.closeCTDrawer();
+    } else {
+      this.openCTDrawer();
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
-    this.ctSliceDrawer.toggle();
-    const isOpen = this.ctSliceDrawer.getIsOpen();
-    this.radiologyCtToggleBtn.classList.toggle('open', isOpen);
-    this.radiologyCtToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    this.ctCardArrowEl.textContent = isOpen ? '▾' : '▸';
-    this.updateMobileDrawerExclusivity();
   }
 
   public openCTDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+        this.closeSurgicalDrawer();
+      }
+      this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
+
+    this.setNoteState('expanded', 'lab');
     this.ctSliceDrawer.open();
     this.radiologyCtToggleBtn.classList.add('open');
     this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'true');
     this.ctCardArrowEl.textContent = '▾';
-    this.updateMobileDrawerExclusivity();
+    requestAnimationFrame(() => this.ctSliceDrawer.drawSlice());
   }
 
   private closeCTDrawer(): void {
     if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
       this.ctSliceDrawer.close();
-      this.radiologyCtToggleBtn.classList.remove('open');
-      this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
-      this.ctCardArrowEl.textContent = '▸';
-      this.updateMobileDrawerExclusivity();
+    }
+    this.radiologyCtToggleBtn.classList.remove('open');
+    this.radiologyCtToggleBtn.setAttribute('aria-expanded', 'false');
+    this.ctCardArrowEl.textContent = '▸';
+    if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.setNoteState('compact', 'note');
     }
   }
 
-  // ===========================================================================
-  // 3D VOR & CLINICAL VNG EYE AVATAR DRAWER TOGGLE
-  // ===========================================================================
   private syncVORDrawerButtons(isOpen: boolean): void {
     const btns = [this.vestVorToggleBtn, this.caloricVorToggleBtn, this.vhitVorToggleBtn];
     for (const b of btns) {
@@ -2521,116 +3009,99 @@ export class AppHUD {
   }
 
   private toggleVORDrawer(targetMode?: 'nystagmogram' | 'caloric' | 'vhit'): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
-    }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
     const mode = targetMode || (this.vestSubmode === 'bppv' ? 'nystagmogram' : this.vestSubmode);
-    const isOpen = this.vorDrawer.getIsOpen();
+    const isOpen = this.vorDrawer.getIsOpen() && this.noteState === 'expanded' && this.sidebarTab === 'lab';
 
     if (!isOpen) {
-      this.vorDrawer.setDiagnosticViewMode(mode);
-      this.vorDrawer.open();
+      this.openVORDrawer(mode);
     } else {
       const currentMode = this.vorDrawer.getDiagnosticViewMode();
       if (mode !== currentMode) {
         this.vorDrawer.setDiagnosticViewMode(mode);
+        this.syncVORDrawerButtons(true);
       } else {
-        this.vorDrawer.close();
+        this.closeVORDrawer();
       }
     }
-    const finalIsOpen = this.vorDrawer.getIsOpen();
-    this.syncVORDrawerButtons(finalIsOpen);
-    this.updateMobileDrawerExclusivity();
   }
 
   private openVORDrawer(targetMode?: 'nystagmogram' | 'caloric' | 'vhit'): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
+      if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+        this.closeSurgicalDrawer();
+      }
+      this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
-    }
-    this.closeGyroFlyout();
+
     const mode = targetMode || (this.vestSubmode === 'bppv' ? 'nystagmogram' : this.vestSubmode);
+    this.setNoteState('expanded', 'lab');
     this.vorDrawer.setDiagnosticViewMode(mode);
     this.vorDrawer.open();
     this.syncVORDrawerButtons(true);
-    this.updateMobileDrawerExclusivity();
   }
 
   private closeVORDrawer(): void {
     if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
       this.vorDrawer.close();
-      this.syncVORDrawerButtons(false);
-      this.updateMobileDrawerExclusivity();
+    }
+    this.syncVORDrawerButtons(false);
+    if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.setNoteState('compact', 'note');
     }
   }
 
-  // ===========================================================================
-  // SURGICAL WORKBENCH & MONITOR DRAWER TOGGLE
-  // ===========================================================================
   private toggleSurgicalDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    if (this.surgicalDrawer.getIsOpen() && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.closeSurgicalDrawer();
+    } else {
+      this.openSurgicalDrawer();
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    this.closeGyroFlyout();
-
-    this.surgicalDrawer.toggle();
-    const isOpen = this.surgicalDrawer.getIsOpen();
-    this.syncSurgicalDrawerButtonUI(isOpen);
-    this.updateMobileDrawerExclusivity();
   }
 
   private openSurgicalDrawer(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    this.closeGyroFlyout();
 
+    this.setNoteState('expanded', 'lab');
     this.surgicalDrawer.open();
     this.syncSurgicalDrawerButtonUI(true);
-    this.updateMobileDrawerExclusivity();
   }
 
   private closeSurgicalDrawer(): void {
     if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
       this.surgicalDrawer.close();
-      this.syncSurgicalDrawerButtonUI(false);
-      this.updateMobileDrawerExclusivity();
+    }
+    this.syncSurgicalDrawerButtonUI(false);
+    if (!this.isSwitchingDrawers && this.noteState === 'expanded' && this.sidebarTab === 'lab') {
+      this.setNoteState('compact', 'note');
     }
   }
 
@@ -2646,6 +3117,18 @@ export class AppHUD {
     });
   }
 
+  private syncDockClearance(): void {
+    if (!this.bottomBar || typeof window === 'undefined') return;
+    const rect = this.bottomBar.getBoundingClientRect();
+    if (rect.height > 0 && window.innerHeight > 0) {
+      const clearancePx = Math.max(76, Math.ceil(window.innerHeight - rect.top + 10));
+      this.appShell?.style.setProperty('--dock-clearance', `${clearancePx}px`);
+    }
+  }
+
+  // ===========================================================================
+  // RADIOLOGY & CLINICAL MODE SWITCHER
+  // ===========================================================================
   private syncRadiologyDepthUI(depthMm: number): void {
     const snap = this.scene.getSnapshot();
     const planeId = snap.radiologyState.activePlane;
@@ -2655,6 +3138,7 @@ export class AppHUD {
     this.radiologyLandmarkBadgeEl.textContent = lm.label;
     if (document.activeElement !== this.radiologyDepthSlider) {
       this.radiologyDepthSlider.value = String(Math.round(depthMm * 10));
+      updateRangeProgress(this.radiologyDepthSlider);
     }
     if (this.ctSliceDrawer) {
       this.ctSliceDrawer.update(
@@ -2687,219 +3171,106 @@ export class AppHUD {
       this.scene.setLabyrinthLaterality('right');
     }
 
+    if (this.appShell) {
+      this.appShell.setAttribute('data-mode', mode);
+    }
+    if (this.repActiveModeEl) {
+      this.repActiveModeEl.textContent = MODE_LABELS[mode];
+    }
+    const labLabel = MODE_LAB_TAB_LABELS[mode];
+    if (this.tabLabBtn) this.tabLabBtn.textContent = labLabel;
+    if (this.noteLabShortcutBtn) this.noteLabShortcutBtn.textContent = labLabel;
+
+    this.modePills.forEach((pill) => {
+      const active = pill.dataset.mode === mode;
+      pill.classList.toggle('active', active);
+      pill.setAttribute('aria-selected', String(active));
+      pill.tabIndex = active ? 0 : -1;
+      if (active) {
+        pill.scrollIntoView({
+          behavior: this.reducedMotionQuery.matches ? 'auto' : 'smooth',
+          inline: 'nearest',
+          block: 'nearest',
+        });
+      }
+    });
+
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) this.closePartsDrawer();
+      if (this.audiogramDrawer?.getIsOpen()) this.closeAudiogramDrawer();
+      if (this.ctSliceDrawer?.getIsOpen()) this.closeCTDrawer();
+      if (this.vorDrawer?.getIsOpen()) this.closeVORDrawer();
+      if (this.surgicalDrawer?.getIsOpen()) this.closeSurgicalDrawer();
+      this.closeGyroFlyout();
+    } finally {
+      this.isSwitchingDrawers = false;
+    }
+
+    if (mode !== 'surgical') {
+      this.stopCIAutoInsert();
+      this.toneSynth.stopDrill();
+      this.toneSynth.stopEMGAlarm();
+    }
+    if (mode !== 'vestibular') {
+      this.stopCaloricIrrigation();
+      this.pauseSequencer();
+    }
+    if (mode !== 'hearing' && this.toneSynth.getIsPlaying()) {
+      this.toneSynth.pause();
+      this.scene.setHearingPlayback(false);
+      this.updateTonePlayButton(false);
+    }
+
     if (mode === 'surgical') {
       this.stopCaloricIrrigation();
-      if (this.partsDrawerOpen) {
-        this.closePartsDrawer();
-      }
-      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-        this.closeAudiogramDrawer();
-      }
-      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-        this.closeCTDrawer();
-      }
-      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-        this.closeVORDrawer();
-      }
-      this.closeGyroFlyout();
-      this.pauseSequencer();
-
-      if (this.toneSynth.getIsPlaying()) {
-        this.toneSynth.pause();
-        this.scene.setHearingPlayback(false);
-        this.updateTonePlayButton(false);
-      }
-      this.stopCaloricIrrigation();
-      this.scene.setLabMode('surgical');
-      this.modeAnatomyBtn.classList.remove('active');
-      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
-      this.modeHearingBtn.classList.remove('active');
-      this.modeHearingBtn.setAttribute('aria-selected', 'false');
-      this.modeRadiologyBtn.classList.remove('active');
-      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
-      this.modeVestibularBtn.classList.remove('active');
-      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
-      this.modeSurgicalBtn.classList.add('active');
-      this.modeSurgicalBtn.setAttribute('aria-selected', 'true');
-
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
       this.surgicalDockContent.style.display = 'flex';
-
+      this.scene.setLabMode('surgical');
       this.syncSurgicalUI();
       this.renderInspectorCard(this.scene.getSelectedMesh());
     } else if (mode === 'vestibular') {
-      this.closeSurgicalDrawer();
-      this.stopCIAutoInsert();
-      this.toneSynth.stopDrill();
-      this.toneSynth.stopEMGAlarm();
-
-      if (this.partsDrawerOpen) {
-        this.closePartsDrawer();
-      }
-      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-        this.closeAudiogramDrawer();
-      }
-      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-        this.closeCTDrawer();
-      }
-      this.closeGyroFlyout();
-      if (this.toneSynth.getIsPlaying()) {
-        this.toneSynth.pause();
-        this.scene.setHearingPlayback(false);
-        this.updateTonePlayButton(false);
-      }
-      this.scene.setLabMode('vestibular');
-      this.modeAnatomyBtn.classList.remove('active');
-      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
-      this.modeHearingBtn.classList.remove('active');
-      this.modeHearingBtn.setAttribute('aria-selected', 'false');
-      this.modeRadiologyBtn.classList.remove('active');
-      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
-      this.modeSurgicalBtn.classList.remove('active');
-      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
-      this.modeVestibularBtn.classList.add('active');
-      this.modeVestibularBtn.setAttribute('aria-selected', 'true');
-
+      this.pauseSequencer();
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.surgicalDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'flex';
-
-      const curr = this.scene.getSelectedMesh();
-      if (!curr || curr === 'mesh_david_cochlea' || curr.includes('segT2')) {
-        this.scene.selectStructure('ls_Hsapiens_Sp', false);
-      }
-
+      this.scene.setLabMode('vestibular');
       this.syncVestibularUI();
       this.renderInspectorCard(this.scene.getSelectedMesh());
     } else if (mode === 'radiology') {
-      this.closeSurgicalDrawer();
-      this.stopCIAutoInsert();
-      this.toneSynth.stopDrill();
-      this.toneSynth.stopEMGAlarm();
-
-      this.stopCaloricIrrigation();
-      if (this.partsDrawerOpen) {
-        this.closePartsDrawer();
-      }
-      if (this.audiogramDrawer.getIsOpen()) {
-        this.closeAudiogramDrawer();
-      }
-      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-        this.closeVORDrawer();
-      }
-      this.closeGyroFlyout();
-      this.pauseSequencer();
-
-      if (this.toneSynth.getIsPlaying()) {
-        this.toneSynth.pause();
-        this.scene.setHearingPlayback(false);
-        this.updateTonePlayButton(false);
-      }
-      this.scene.setLabMode('radiology');
-      this.modeAnatomyBtn.classList.remove('active');
-      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
-      this.modeHearingBtn.classList.remove('active');
-      this.modeHearingBtn.setAttribute('aria-selected', 'false');
-      this.modeVestibularBtn.classList.remove('active');
-      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
-      this.modeSurgicalBtn.classList.remove('active');
-      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
-      this.modeRadiologyBtn.classList.add('active');
-      this.modeRadiologyBtn.setAttribute('aria-selected', 'true');
-
       this.anatomyDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
       this.surgicalDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'flex';
-
-      const snap = this.scene.getSnapshot();
-      this.syncRadiologyUI(snap.radiologyState);
+      this.scene.setLabMode('radiology');
+      this.syncRadiologyUI(this.scene.getSnapshot().radiologyState);
     } else if (mode === 'hearing') {
-      this.closeSurgicalDrawer();
-      this.stopCIAutoInsert();
-      this.toneSynth.stopDrill();
-      this.toneSynth.stopEMGAlarm();
-
-      this.stopCaloricIrrigation();
-      if (this.partsDrawerOpen) {
-        this.closePartsDrawer();
-      }
-      if (this.ctSliceDrawer.getIsOpen()) {
-        this.closeCTDrawer();
-      }
-      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-        this.closeVORDrawer();
-      }
-      this.closeGyroFlyout();
-      this.pauseSequencer();
-
-      this.scene.setLabMode('hearing');
-      this.modeAnatomyBtn.classList.remove('active');
-      this.modeAnatomyBtn.setAttribute('aria-selected', 'false');
-      this.modeRadiologyBtn.classList.remove('active');
-      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
-      this.modeVestibularBtn.classList.remove('active');
-      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
-      this.modeSurgicalBtn.classList.remove('active');
-      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
-      this.modeHearingBtn.classList.add('active');
-      this.modeHearingBtn.setAttribute('aria-selected', 'true');
-
       this.anatomyDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
       this.surgicalDockContent.style.display = 'none';
       this.hearingDockContent.style.display = 'flex';
-
-      const snap = this.scene.getSnapshot();
-      this.syncFrequencyUI(snap.hearingState.activeFrequency, true);
+      this.scene.setLabMode('hearing');
+      this.syncFrequencyUI(this.scene.getSnapshot().hearingState.activeFrequency, true);
     } else {
-      this.closeSurgicalDrawer();
-      this.stopCIAutoInsert();
-      this.toneSynth.stopDrill();
-      this.toneSynth.stopEMGAlarm();
-
-      this.stopCaloricIrrigation();
-      if (this.audiogramDrawer.getIsOpen()) {
-        this.closeAudiogramDrawer();
-      }
-      if (this.ctSliceDrawer.getIsOpen()) {
-        this.closeCTDrawer();
-      }
-      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-        this.closeVORDrawer();
-      }
-      this.closeGyroFlyout();
-      this.pauseSequencer();
-
-      if (this.toneSynth.getIsPlaying()) {
-        this.toneSynth.pause();
-        this.scene.setHearingPlayback(false);
-        this.updateTonePlayButton(false);
-      }
-      this.scene.setLabMode('anatomy');
-      this.modeHearingBtn.classList.remove('active');
-      this.modeHearingBtn.setAttribute('aria-selected', 'false');
-      this.modeRadiologyBtn.classList.remove('active');
-      this.modeRadiologyBtn.setAttribute('aria-selected', 'false');
-      this.modeVestibularBtn.classList.remove('active');
-      this.modeVestibularBtn.setAttribute('aria-selected', 'false');
-      this.modeSurgicalBtn.classList.remove('active');
-      this.modeSurgicalBtn.setAttribute('aria-selected', 'false');
-      this.modeAnatomyBtn.classList.add('active');
-      this.modeAnatomyBtn.setAttribute('aria-selected', 'true');
-
       this.hearingDockContent.style.display = 'none';
       this.radiologyDockContent.style.display = 'none';
       this.vestibularDockContent.style.display = 'none';
       this.surgicalDockContent.style.display = 'none';
       this.anatomyDockContent.style.display = 'flex';
+      this.scene.setLabMode('anatomy');
+    }
+
+    if (this.noteState === 'expanded') {
+      this.setNoteState('expanded', 'note');
+    } else {
+      this.setNoteState('compact', 'note');
     }
     this.syncDockClearance();
   }
@@ -2914,18 +3285,39 @@ export class AppHUD {
       labyrinthectomy: 'labyrinthectomy',
       neurectomy: 'neurectomy',
     };
-    const submode = submodeMap[proc];
+    const sub = submodeMap[proc];
 
     this.surgSubnavTabs.forEach((tab) => {
-      const match = tab.getAttribute('data-submode') === submode;
-      tab.classList.toggle('active', match);
+      const isTarget = tab.getAttribute('data-submode') === sub;
+      tab.classList.toggle('active', isTarget);
+      tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
     });
 
-    this.surgSubviews.forEach((subview, key) => {
-      subview.style.display = key === submode ? 'flex' : 'none';
+    this.surgSubviews.forEach((el, key) => {
+      el.style.display = key === sub ? 'flex' : 'none';
     });
+
+    if (proc !== 'cochlear_implant') {
+      this.stopCIAutoInsert();
+    }
+    if (proc !== 'labyrinthectomy') {
+      this.toneSynth.stopDrill();
+    }
+    if (proc !== 'neurectomy') {
+      this.toneSynth.stopEMGAlarm();
+    }
 
     this.scene.setSurgicalProcedure(proc);
+    this.scene.flyToSurgicalProcedure(proc);
+
+    if (proc === 'cochlear_implant') {
+      this.scene.selectStructure('mesh_david_cochlea', false);
+    } else if (proc === 'labyrinthectomy') {
+      this.scene.selectStructure('ls_Hsapiens_Sl', false);
+    } else if (proc === 'neurectomy') {
+      this.scene.selectStructure('ls_Hsapiens_Sv', false);
+    }
+
     this.syncSurgicalUI();
     this.renderInspectorCard(this.scene.getSelectedMesh());
     this.syncDockClearance();
@@ -3001,6 +3393,7 @@ export class AppHUD {
       }
       currentVal = Math.min(maxVal, currentVal + 1);
       this.ciDepthSlider.value = String(currentVal);
+      updateRangeProgress(this.ciDepthSlider);
       this.applyCIParameters();
     }, 200);
   }
@@ -3150,7 +3543,6 @@ export class AppHUD {
       eng.setManeuver(maneuverId);
     }
 
-    // Auto-select corresponding 3D canal mesh
     const targetCanal = eng?.getCanal() || 'posterior';
     if (targetCanal === 'posterior') {
       this.scene.selectStructure('ls_Hsapiens_Sp', false);
@@ -3172,6 +3564,7 @@ export class AppHUD {
     const clamped = Math.max(0, Math.min(steps.length - 1, stepIdx));
     this.currentStepIdx = clamped;
     this.vestStepSlider.value = String(clamped);
+    updateRangeProgress(this.vestStepSlider);
 
     const eng = this.scene.getVestibularEngine();
     if (eng) {
@@ -3207,8 +3600,8 @@ export class AppHUD {
   }
 
   private startSequencer(): void {
-    const steps = MANEUVER_PRESETS[this.activeManeuverId] || [];
-    if (this.currentStepIdx >= steps.length - 1 && this.remainingHoldSec <= 0) {
+    const initialSteps = MANEUVER_PRESETS[this.activeManeuverId] || [];
+    if (this.currentStepIdx >= initialSteps.length - 1 && this.remainingHoldSec <= 0) {
       this.goToStep(0);
     }
 
@@ -3266,26 +3659,34 @@ export class AppHUD {
   }
 
   private openGyroFlyout(): void {
-    if (this.partsDrawerOpen) {
-      this.closePartsDrawer();
+    this.isSwitchingDrawers = true;
+    try {
+      if (this.partsDrawerOpen) {
+        this.closePartsDrawer();
+      }
+      if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
+        this.closeAudiogramDrawer();
+      }
+      if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
+        this.closeCTDrawer();
+      }
+      if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
+        this.closeVORDrawer();
+      }
+      if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
+        this.closeSurgicalDrawer();
+      }
+    } finally {
+      this.isSwitchingDrawers = false;
     }
-    if (this.audiogramDrawer && this.audiogramDrawer.getIsOpen()) {
-      this.closeAudiogramDrawer();
-    }
-    if (this.ctSliceDrawer && this.ctSliceDrawer.getIsOpen()) {
-      this.closeCTDrawer();
-    }
-    if (this.vorDrawer && this.vorDrawer.getIsOpen()) {
-      this.closeVORDrawer();
-    }
-    if (this.surgicalDrawer && this.surgicalDrawer.getIsOpen()) {
-      this.closeSurgicalDrawer();
+    if (this.noteState === 'expanded') {
+      this.setNoteState('compact', 'note');
     }
     this.gyroFlyout.classList.add('open');
     this.gyroFlyout.style.display = 'flex';
     this.vestGyroToggleBtn.classList.add('active');
     this.vestGyroToggleBtn.setAttribute('aria-expanded', 'true');
-    this.updateMobileDrawerExclusivity();
+    this.scheduleGeometrySync();
   }
 
   private closeGyroFlyout(): void {
@@ -3297,13 +3698,16 @@ export class AppHUD {
       this.vestGyroToggleBtn.classList.remove('active');
       this.vestGyroToggleBtn.setAttribute('aria-expanded', 'false');
     }
-    this.updateMobileDrawerExclusivity();
+    this.scheduleGeometrySync();
   }
 
   private setHeadOrientationUI(yaw: number, pitch: number, roll: number): void {
     this.gyroYawSlider.value = String(yaw);
     this.gyroPitchSlider.value = String(pitch);
     this.gyroRollSlider.value = String(roll);
+    updateRangeProgress(this.gyroYawSlider);
+    updateRangeProgress(this.gyroPitchSlider);
+    updateRangeProgress(this.gyroRollSlider);
     this.gyroYawValEl.textContent = `${Math.round(yaw)}°`;
     this.gyroPitchValEl.textContent = `${Math.round(pitch)}°`;
     this.gyroRollValEl.textContent = `${Math.round(roll)}°`;
@@ -3322,19 +3726,16 @@ export class AppHUD {
   // ===========================================================================
   // DIAGNOSTIC VESTIBULAR MODALITY METHODS (Caloric COWS & vHIT)
   // ===========================================================================
-
   public switchVestibularSubmode(submode: 'bppv' | 'caloric' | 'vhit'): void {
     this.vestSubmode = submode;
     this.scene.setVestibularSubmode(submode);
 
-    // Update subnav tabs
     this.vestSubnavTabs.forEach((tab) => {
       const isTarget = tab.getAttribute('data-submode') === submode;
       tab.classList.toggle('active', isTarget);
       tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
     });
 
-    // Show/hide subviews
     if (this.vestBppvSubview) this.vestBppvSubview.style.display = submode === 'bppv' ? 'flex' : 'none';
     if (this.vestCaloricSubview) this.vestCaloricSubview.style.display = submode === 'caloric' ? 'flex' : 'none';
     if (this.vestVhitSubview) this.vestVhitSubview.style.display = submode === 'vhit' ? 'flex' : 'none';
@@ -3360,7 +3761,6 @@ export class AppHUD {
       this.vorDrawer.setDiagnosticViewMode('vhit');
       this.updateVHITReadout();
     } else {
-      // bppv
       this.stopCaloricIrrigation();
       this.caloricElapsedSec = 0;
       this.scene.setLabyrinthLaterality('right');
@@ -3475,21 +3875,15 @@ export class AppHUD {
         beatSign
       );
 
-      // Update shader uniforms on horizontal canal
       this.scene.setCaloricUniforms(
         true,
         conv.deltaT,
         Math.min(1.0, this.caloricElapsedSec / 40.0),
         this.caloricElapsedSec
       );
-
-      // Overlay live caloric convection onto 3D scene vestibular telemetry
       this.scene.setCaloricSimulationState(true, conv, alex.modulatedSPV);
-
-      // Update active irrigation in VORDrawer's Caloric Butterfly plot
       this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, alex.modulatedSPV);
 
-      // Update badges
       if (this.caloricTimerBadgeEl) {
         this.caloricTimerBadgeEl.textContent = `⏱️ ${this.caloricElapsedSec.toFixed(1)}s / 40s`;
       }
@@ -3524,7 +3918,6 @@ export class AppHUD {
       this.caloricTimerBadgeEl.textContent = '⏱️ 40.0s / 40s (Complete)';
     }
 
-    // Automatically link peak response to the Jongkees Bithermal Matrix
     const deltaTIrr =
       this.activeCaloricTemp === 'R44' || this.activeCaloricTemp === 'L44'
         ? 7.0
@@ -3561,9 +3954,9 @@ export class AppHUD {
     if (this.caloricPlayIconEl) {
       this.caloricPlayIconEl.textContent = '▶';
     }
-    this.scene.setCaloricUniforms(false, 0, 0, 0);
-    this.scene.setCaloricSimulationState(false, null);
-    this.vorDrawer.setCaloricActiveIrrigation(null, 0);
+    this.scene?.setCaloricUniforms(false, 0, 0, 0);
+    this.scene?.setCaloricSimulationState(false, null);
+    this.vorDrawer?.setCaloricActiveIrrigation(null, 0);
   }
 
   public alignCaloricPosture(): void {
@@ -3587,7 +3980,6 @@ export class AppHUD {
         : -33.0;
     const ear = this.activeCaloricTemp.startsWith('L') ? 'left' : 'right';
 
-    // If idle (t=0), compute against peak response (40s) so clinical degree shows anticipated degree
     const evalSec = this.caloricElapsedSec > 0 ? this.caloricElapsedSec : 40.0;
     const conv = computeCaloricConvection(deltaTIrr, evalSec, ear);
     const beatSign =
@@ -3767,7 +4159,6 @@ export class AppHUD {
       this.vhitThrustBtn.classList.add('impulsing');
     }
 
-    // 1. Deliver 3D animated head impulse
     this.scene.triggerVHITThrust(this.vhitPair, this.vhitDirection, () => {
       if (this.vhitThrustBtn) {
         this.vhitThrustBtn.disabled = false;
@@ -3775,11 +4166,9 @@ export class AppHUD {
       }
     });
 
-    // 2. Switch drawer to vhit mode and simulate trial
     this.vorDrawer.setDiagnosticViewMode('vhit');
     this.updateVHITReadout();
 
-    // 3. Ensure VOR Drawer is open so user sees the high-speed trace immediately
     if (!this.vorDrawer.getIsOpen()) {
       this.openVORDrawer();
     }
@@ -3804,6 +4193,7 @@ export class AppHUD {
     if (updateSlider && document.activeElement !== this.hearingSlider) {
       const val = Math.round((Math.log10(Math.max(20, freq) / 20) / 3) * 1000);
       this.hearingSlider.value = String(val);
+      updateRangeProgress(this.hearingSlider);
     }
 
     this.octaveChips.forEach((chip) => {
@@ -3821,13 +4211,11 @@ export class AppHUD {
   private handleLiveVestibularTelemetry(telem: VestibularTelemetryState): void {
     if (!telem) return;
 
-    // 1. Update live clearance on bottom dock badge in BPPV mode
     if (this.vestClearanceBadgeEl && this.vestSubmode === 'bppv') {
       const clearanceVal = typeof telem.clearancePercent === 'number' ? telem.clearancePercent : 0;
       this.vestClearanceBadgeEl.textContent = `${clearanceVal.toFixed(0)}% Cleared`;
     }
 
-    // 2. If Floating Inspector Card is displaying a vestibular structure, update CN VIII gauge & status
     if (this.cachedCn8Val && this.cachedCn8BarFill) {
       const firingRate = typeof telem.afferentSpikesPerSec === 'number' ? telem.afferentSpikesPerSec : 90;
       const clampedRate = Math.max(10, Math.min(310, firingRate));
@@ -3881,11 +4269,9 @@ export class AppHUD {
         } else if (this.vestSubmode === 'caloric') {
           this.cachedVestStatusBadge.textContent = telem.patientSensation || 'Caloric Convection Active';
           const horizSpv = telem.slowPhaseVelocityDegPerSec?.horizontal ?? 0;
-          this.cachedVestStatusBadge.className = horizSpv !== 0
-            ? 'vest-status-badge sensation-spinning'
-            : 'vest-status-badge sensation-calm';
+          this.cachedVestStatusBadge.className =
+            horizSpv !== 0 ? 'vest-status-badge sensation-spinning' : 'vest-status-badge sensation-calm';
         } else {
-          // vHIT
           this.cachedVestStatusBadge.textContent = telem.patientSensation || 'Target Fixed (Visual Fixation)';
           this.cachedVestStatusBadge.className = telem.fastPhaseBeatDirection.includes('Saccade')
             ? 'vest-status-badge sensation-spinning'
@@ -3896,61 +4282,95 @@ export class AppHUD {
   }
 
   // ===========================================================================
-  // FLOATING PART INSPECTOR CARD
+  // UNIFIED SPECIMEN NOTE CARD RENDER (Zero Content Loss, Compact vs Expanded)
   // ===========================================================================
   private renderInspectorCard(selectedMesh: string | null): void {
+    this.cachedCn8Val = null;
+    this.cachedCn8BarFill = null;
+    this.cachedEwaldText = null;
+    this.cachedVestClearancePrefix = null;
+    this.cachedVestClearanceVal = null;
+    this.cachedVestStatusBadge = null;
+
     if (!selectedMesh) {
-      this.cachedCn8Val = null;
-      this.cachedCn8BarFill = null;
-      this.cachedEwaldText = null;
-      this.cachedVestClearancePrefix = null;
-      this.cachedVestClearanceVal = null;
-      this.cachedVestStatusBadge = null;
-      this.inspectorCard.classList.remove('visible');
-      this.inspectorCard.innerHTML = `
-        <div class="inspector-hint">
-          <span class="hint-icon">👆</span>
-          <p>Click any inner ear structure in 3D or search above to inspect.</p>
-        </div>
-      `;
+      this.noteSystemDot.style.backgroundColor = 'var(--accent-primary)';
+      this.notePillDot.style.backgroundColor = 'var(--accent-primary)';
+      this.noteSystemLabel.textContent = 'Inner Ear Atlas';
+      this.notePillLabel.textContent = 'Labyrinth · Open Note';
+      this.noteTitleEl.textContent = 'Inner Ear Labyrinth';
+      this.noteCompactLead.textContent = 'Click any inner ear structure in 3D or search above to inspect stereotaxic anatomy.';
+      this.noteLeadProse.textContent = 'Select any structure in the 27-part IE-Map v1.0.0 labyrinth to view RAS morphometry, fluid compartments, and clinical notes.';
+      this.inspFluidEl.textContent = 'Endolymph & Perilymph';
+      this.inspMetricKeyEl.textContent = 'Ontology';
+      this.inspMetricValEl.textContent = '27 Anatomical Structures';
+      this.noteContextBoxes.innerHTML = '';
+      this.inspDeepProse.textContent = 'CANONICAL RAS frame centered near labyrinth centroid [4.5, 1.4, 0.5] mm.';
+      this.inspLatinEl.textContent = 'Labyrinthus osseus et membranaceus';
+      this.inspInnervationEl.textContent = 'Vestibulocochlear nerve (CN VIII)';
+      this.inspMorphometryEl.textContent = '20 mm rostrocaudal span';
+      this.inspRasChipEl.textContent = '[+4.5, +1.4, +0.5] mm';
+      this.inspPearlEl.textContent = 'Select a structure to highlight clinical correlations.';
+      if (this.repActivePartEl) this.repActivePartEl.textContent = 'Inner Ear Labyrinth';
       return;
     }
 
     const item = STRUCTURE_BY_MESH[selectedMesh];
-    if (!item) {
-      this.cachedCn8Val = null;
-      this.cachedCn8BarFill = null;
-      this.cachedEwaldText = null;
-      this.cachedVestClearancePrefix = null;
-      this.cachedVestClearanceVal = null;
-      this.cachedVestStatusBadge = null;
-      this.inspectorCard.classList.remove('visible');
-      return;
-    }
+    if (!item) return;
 
-    const prevMesh = this.inspectorCard.getAttribute('data-active-mesh');
+    const prevMesh = this.noteCard.getAttribute('data-active-mesh');
     if (prevMesh !== selectedMesh) {
-      this.inspectorCard.scrollTop = 0;
-      this.inspectorCard.setAttribute('data-active-mesh', selectedMesh);
+      if (this.noteScrollBody) this.noteScrollBody.scrollTop = 0;
+      this.noteCard.setAttribute('data-active-mesh', selectedMesh);
     }
 
     const groupMeta = SYSTEM_GROUPS[item.systemGroup];
     const snap = this.scene.getSnapshot();
     const isIsolated = snap.isIsolated;
 
-    const summaryText =
-      this.activeReadingDepth === 'detailed'
-        ? item.physiologicalFunction
-        : item.patientSummary;
+    this.noteSystemDot.style.backgroundColor = item.colorHex;
+    this.notePillDot.style.backgroundColor = item.colorHex;
+    this.noteSystemLabel.textContent = groupMeta?.shortTitle ?? 'Structure';
+    this.notePillLabel.textContent = `${item.shortLabel} · Open Note`;
+    this.noteTitleEl.textContent = formatStructureHeadline(item);
+    this.noteCompactLead.textContent = getCompactNoteSentence(item);
+
+    if (this.activeReadingDepth === 'detailed') {
+      this.noteLeadProse.textContent = item.physiologicalFunction;
+      this.inspDeepProse.textContent = item.patientSummary;
+    } else {
+      this.noteLeadProse.textContent = item.patientSummary;
+      this.inspDeepProse.textContent = item.physiologicalFunction;
+    }
+
+    this.inspFluidEl.textContent = compactFluidLabel(item.fluidCompartment);
+    const primaryMetric = getStructurePrimaryMetric(item);
+    this.inspMetricKeyEl.textContent = primaryMetric.label;
+    this.inspMetricValEl.textContent = primaryMetric.value;
+
+    this.inspLatinEl.textContent = `${item.latinName} · ${item.subGroup}`;
+    this.inspInnervationEl.textContent = item.innervation;
+    this.inspMorphometryEl.textContent = item.morphometry;
+    this.inspRasChipEl.textContent = `${formatRAS(item.centroidRAS)} mm · ${item.meshName}`;
+    this.inspPearlEl.textContent = item.clinicalPearl;
+    if (this.furtherReadHint) {
+      this.furtherReadHint.textContent = `Clinical Details · ${this.activeReadingDepth === 'detailed' ? 'Clinical' : 'Patient'}`;
+    }
+
+    if (this.btnIsolate) {
+      this.btnIsolate.textContent = isIsolated ? 'Show All Parts' : 'Isolate Part';
+      this.btnIsolate.classList.toggle('active', isIsolated);
+    }
+    if (this.repActivePartEl) {
+      this.repActivePartEl.textContent = `${item.displayName} (${formatRAS(item.centroidRAS)} mm)`;
+    }
 
     const showSCDSBox =
       (snap.radiologyState.scdsActive && snap.labMode === 'radiology') ||
       (snap.radiologyState.scdsActive && item.meshName === 'ls_Hsapiens_Sa') ||
       (snap.labMode === 'radiology' && (item.meshName === 'ls_Hsapiens_Sa' || item.meshName === 'segT2_th1.07_Otsu'));
 
-    const isSurgicalMode = snap.labMode === 'surgical';
     let surgBoxHtml = '';
-    if (isSurgicalMode) {
+    if (snap.labMode === 'surgical') {
       const surgState = this.scene.getSurgicalState();
       let badgeHtml = '<span class="surg-safety-badge safe">SAFE</span>';
       let title = 'Cochlear Implant Suite';
@@ -3975,9 +4395,10 @@ export class AppHUD {
       } else if (surgState.activeProcedure === 'labyrinthectomy') {
         title = 'Transmastoid Labyrinthectomy';
         const laby = surgState.labyState;
-        badgeHtml = laby.step === 3
-          ? '<span class="surg-safety-badge warning">DEAFFERENTATED</span>'
-          : '<span class="surg-safety-badge safe">RESECTION IN PROGRESS</span>';
+        badgeHtml =
+          laby.step === 3
+            ? '<span class="surg-safety-badge warning">DEAFFERENTATED</span>'
+            : '<span class="surg-safety-badge safe">RESECTION IN PROGRESS</span>';
         metricsHtml = `
           <div>Step: <strong>${laby.step + 1} / 4</strong></div>
           <div>Drill: <strong>${laby.isDrillActive ? '70k RPM' : 'OFF'}</strong></div>
@@ -3999,32 +4420,32 @@ export class AppHUD {
           <div>ABR Wave V: <strong>${neu.abrWaveVLatencyMs.toFixed(2)} ms</strong></div>
           <div>Latency Shift: <strong>+${latencyShift.toFixed(2)} ms</strong></div>
           <div>Facial EMG: <strong>${neu.facialEMGVoltageMicroVolts.toFixed(0)} μV</strong></div>
-          <div>Koos Tumor: <strong>Stage ${neu.koosStage}</strong></div>
+          <div>Koos Stage: <strong>Grade ${neu.koosStage}</strong></div>
         `;
       }
 
       surgBoxHtml = `
         <div class="surgical-inspector-box">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong style="font-size: 11px; color: #e2e8f0;">🔬 ${title}</strong>
+          <div class="electrophys-header">
+            <span class="ep-icon">🔬</span>
+            <span class="ep-title">${title}</span>
             ${badgeHtml}
           </div>
           <div class="surg-metrics-grid">
             ${metricsHtml}
           </div>
-          <button type="button" class="surg-inspector-monitor-btn" id="surg-inspector-monitor-btn">
-            🔬 Open Surgical Monitor
+          <button type="button" class="surg-inspector-monitor-btn" id="surg-view-monitor-btn">
+            🔬 Open Surgical Telemetry &amp; Lumen Drawer
           </button>
         </div>
       `;
     }
 
-    const isVestibularMode = snap.labMode === 'vestibular';
     const isVestibularPart =
       item.systemGroup === 'semicircular_ducts' ||
       item.systemGroup === 'ampullae_cupulae' ||
       item.systemGroup === 'otolith_vestibule';
-    const showVestibularBox = isVestibularMode || isVestibularPart;
+    const showVestibularBox = snap.labMode === 'vestibular' || isVestibularPart;
 
     let vestBoxHtml = '';
     if (showVestibularBox) {
@@ -4056,10 +4477,6 @@ export class AppHUD {
         canalTitle = 'Anterior (Superior) Semicircular Canal';
         canalPlane = 'RALP Plane — 45° Oblique · CN VIII Superior Division';
         ewaldLaw = "Ewald's 3rd Law: Ampullofugal flow excites anterior canal";
-      } else {
-        canalTitle = 'Posterior Semicircular Canal';
-        canalPlane = 'LARP Plane — 45° Oblique · CN VIII Inferior Division';
-        ewaldLaw = "Ewald's 3rd Law: Ampullofugal flow excites posterior canal";
       }
 
       let firingRate = typeof telem?.afferentSpikesPerSec === 'number' ? telem.afferentSpikesPerSec : 90;
@@ -4067,7 +4484,6 @@ export class AppHUD {
         ewaldLaw = telem.ewaldLawActive;
       }
 
-      // If Caloric Irrigation is active, reflect caloric excitation / inhibition on CN VIII
       const caloricSim = this.scene.getCaloricSimulationState();
       if (this.isCaloricIrrigating && caloricSim && caloricSim.active) {
         firingRate = caloricSim.afferentFiringRate;
@@ -4137,7 +4553,13 @@ export class AppHUD {
                 ${sensationText}
               </div>
               <div class="vest-clearance-pill">
-                ${this.vestSubmode === 'bppv' ? `<span class="vest-clearance-prefix">Clearance: </span><strong class="vest-clearance-val">${clearancePercent.toFixed(0)}%</strong>` : this.vestSubmode === 'caloric' ? `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">COWS Caloric</strong>` : `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">vHIT (CN VIII)</strong>`}
+                ${
+                  this.vestSubmode === 'bppv'
+                    ? `<span class="vest-clearance-prefix">Clearance: </span><strong class="vest-clearance-val">${clearancePercent.toFixed(0)}%</strong>`
+                    : this.vestSubmode === 'caloric'
+                    ? `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">COWS Caloric</strong>`
+                    : `<span class="vest-clearance-prefix">Modality: </span><strong class="vest-clearance-val">vHIT (CN VIII)</strong>`
+                }
               </div>
             </div>
 
@@ -4162,23 +4584,9 @@ export class AppHUD {
       `;
     }
 
-    this.inspectorCard.innerHTML = `
-      <div class="inspector-header">
-        <span class="system-badge" style="background: ${groupMeta?.accentHex ?? '#52dcf2'}22; color: ${groupMeta?.accentHex ?? '#52dcf2'}; border-color: ${groupMeta?.accentHex ?? '#52dcf2'}66;">
-          ${groupMeta?.shortTitle ?? 'Structure'}
-        </span>
-        <div class="inspector-header-controls">
-          <button type="button" class="inspector-minimize-btn" id="inspector-minimize-btn" title="Minimize / expand card" aria-label="Minimize inspector">─</button>
-          <button type="button" class="inspector-close-btn" id="inspector-close-btn" aria-label="Deselect structure">✕</button>
-        </div>
-      </div>
-
-      <h2 class="inspector-title">${item.displayName}</h2>
-      <div class="inspector-latin">${item.latinName}</div>
-
-      ${
-        item.endocochlearPotential || item.characteristicFrequencyRange || item.ionicComposition
-          ? `
+    const electroBoxHtml =
+      item.endocochlearPotential || item.characteristicFrequencyRange || item.ionicComposition
+        ? `
         <div class="electrophys-box">
           <div class="electrophys-header">
             <span class="ep-icon">⚡</span>
@@ -4218,12 +4626,10 @@ export class AppHUD {
           </div>
         </div>
       `
-          : ''
-      }
+        : '';
 
-       ${
-        showSCDSBox
-          ? `
+    const scdsBoxHtml = showSCDSBox
+      ? `
         <div class="scds-biomechanics-box">
           <div class="scds-box-header">
             <span class="scds-icon">⚡</span>
@@ -4255,175 +4661,80 @@ export class AppHUD {
               <p class="triad-desc">${SCDS_PARAMETERS.triad.autophony}</p>
             </div>
           </div>
-          <div class="scds-box-actions">
-             <button type="button" class="scds-audiogram-btn" id="scds-view-audiogram-btn">
-               📊 View SCDS Audiogram (Air-Bone Gap)
-             </button>
-           </div>
-         </div>
-       `
-           : ''
-       }
+          <button type="button" class="scds-audiogram-btn" id="scds-view-audiogram-btn">
+            📊 View Classic SSCD Conductive Audiogram Profile
+          </button>
+        </div>
+      `
+      : '';
 
-       ${
-         showVestibularBox
-           ? vestBoxHtml
-           : ''
-       }
+    this.noteContextBoxes.innerHTML = `${surgBoxHtml}${vestBoxHtml}${electroBoxHtml}${scdsBoxHtml}`;
 
-       ${
-         isSurgicalMode
-           ? surgBoxHtml
-           : ''
-       }
+    this.cachedCn8Val = this.noteContextBoxes.querySelector('.cn8-val') as HTMLElement | null;
+    this.cachedCn8BarFill = this.noteContextBoxes.querySelector('.cn8-bar-fill') as HTMLElement | null;
+    this.cachedEwaldText = this.noteContextBoxes.querySelector('.ewald-text') as HTMLElement | null;
+    this.cachedVestClearancePrefix = this.noteContextBoxes.querySelector('.vest-clearance-prefix') as HTMLElement | null;
+    this.cachedVestClearanceVal = this.noteContextBoxes.querySelector('.vest-clearance-val') as HTMLElement | null;
+    this.cachedVestStatusBadge = this.noteContextBoxes.querySelector('.vest-status-badge') as HTMLElement | null;
 
-       <p class="inspector-summary">${summaryText}</p>
-
-       <div class="inspector-actions">
-         <button type="button" class="btn-action ${isIsolated ? 'active' : ''}" id="btn-isolate">
-           ${isIsolated ? '👁️ Show All Parts' : '🎯 Isolate Part'}
-         </button>
-         <button type="button" class="btn-action" id="btn-reset-view">
-           ↺ Reset View
-         </button>
-       </div>
-
-       <!-- Expandable Medical Details Accordion -->
-       <div class="accordion-section">
-         <button
-           type="button"
-           class="accordion-header ${this.medDetailsAccordionExpanded ? 'open' : ''}"
-           id="accordion-toggle-btn"
-           aria-expanded="${this.medDetailsAccordionExpanded ? 'true' : 'false'}"
-         >
-           <span class="acc-title">Medical Details</span>
-           <span class="acc-chevron">${this.medDetailsAccordionExpanded ? '▾' : '▸'}</span>
-         </button>
-         <div class="accordion-content ${this.medDetailsAccordionExpanded ? 'open' : ''}" id="accordion-content">
-           <div class="detail-row">
-             <span class="detail-label">Latin Term:</span>
-             <span class="detail-val"><em>${item.latinName}</em></span>
-           </div>
-           <div class="detail-row">
-             <span class="detail-label">Innervation:</span>
-             <span class="detail-val">${item.innervation}</span>
-           </div>
-           <div class="detail-row">
-             <span class="detail-label">Fluid Compartment:</span>
-             <span class="detail-val">${item.fluidCompartment}</span>
-           </div>
-           <div class="detail-row">
-             <span class="detail-label">Dimensions / Shape:</span>
-             <span class="detail-val">${item.morphometry}</span>
-           </div>
-           <div class="detail-row clinical-row">
-             <span class="detail-label">Clinical Pearl:</span>
-             <span class="detail-val">${item.clinicalPearl}</span>
-           </div>
-         </div>
-       </div>
-     `;
-
-     this.inspectorCard.classList.add('visible');
-
-     // Attach inspector button handlers
-     const minimizeBtn = this.inspectorCard.querySelector('#inspector-minimize-btn') as HTMLButtonElement;
-     minimizeBtn?.addEventListener('click', (ev) => {
-       ev.stopPropagation();
-       this.inspectorCard.classList.toggle('minimized');
-       minimizeBtn.textContent = this.inspectorCard.classList.contains('minimized') ? '▢' : '─';
-     });
-
-     const closeBtn = this.inspectorCard.querySelector('#inspector-close-btn') as HTMLButtonElement;
-     closeBtn?.addEventListener('click', () => {
-       this.searchInput.value = '';
-       this.searchClearBtn.style.display = 'none';
-       this.scene.selectStructure(null);
-     });
-
-     const isolateBtn = this.inspectorCard.querySelector('#btn-isolate') as HTMLButtonElement;
-     isolateBtn?.addEventListener('click', () => {
-       if (snap.isIsolated) {
-         this.scene.restoreAllVisibility();
-       } else {
-         this.scene.isolateSelected();
-       }
-     });
-
-     const resetBtn = this.inspectorCard.querySelector('#btn-reset-view') as HTMLButtonElement;
-     resetBtn?.addEventListener('click', () => {
-       this.searchInput.value = '';
-       this.searchClearBtn.style.display = 'none';
-       this.scene.resetView();
-     });
-
-     const scdsAudiogramBtn = this.inspectorCard.querySelector('#scds-view-audiogram-btn') as HTMLButtonElement;
-     scdsAudiogramBtn?.addEventListener('click', () => {
-       this.switchLabMode('hearing');
-       this.openAudiogramDrawer();
-       this.audiogramDrawer.setActivePreset('scds');
-     });
-
-     const vestViewVorBtn = this.inspectorCard.querySelector('#vest-view-vor-btn') as HTMLButtonElement;
-     vestViewVorBtn?.addEventListener('click', () => {
-       if (this.scene.getSnapshot().labMode !== 'vestibular') {
-         this.switchLabMode('vestibular');
-       }
-       this.openVORDrawer();
-     });
-
-     const surgMonitorBtn = this.inspectorCard.querySelector('#surg-inspector-monitor-btn') as HTMLButtonElement;
-     surgMonitorBtn?.addEventListener('click', () => {
-       this.openSurgicalDrawer();
-     });
-
-    const accordionBtn = this.inspectorCard.querySelector('#accordion-toggle-btn') as HTMLButtonElement;
-    accordionBtn?.addEventListener('click', () => {
-      this.medDetailsAccordionExpanded = !this.medDetailsAccordionExpanded;
-      const content = this.inspectorCard.querySelector('#accordion-content');
-      const chevron = this.inspectorCard.querySelector('.acc-chevron');
-      if (content && chevron) {
-        content.classList.toggle('open', this.medDetailsAccordionExpanded);
-        accordionBtn.classList.toggle('open', this.medDetailsAccordionExpanded);
-        accordionBtn.setAttribute('aria-expanded', this.medDetailsAccordionExpanded ? 'true' : 'false');
-        chevron.textContent = this.medDetailsAccordionExpanded ? '▾' : '▸';
+    const surgMonitorBtn = this.noteContextBoxes.querySelector('#surg-view-monitor-btn');
+    surgMonitorBtn?.addEventListener('click', () => {
+      if (snap.labMode !== 'surgical') {
+        this.switchLabMode('surgical');
       }
-      try {
-        localStorage.setItem(AppHUD.STORAGE_KEYS.medDetailsOpen, String(this.medDetailsAccordionExpanded));
-      } catch {
-        // ignore
-      }
+      this.openSurgicalDrawer();
     });
 
-    this.cachedCn8Val = this.inspectorCard.querySelector('.cn8-val');
-    this.cachedCn8BarFill = this.inspectorCard.querySelector('.cn8-bar-fill');
-    this.cachedEwaldText = this.inspectorCard.querySelector('.ewald-text');
-    this.cachedVestClearancePrefix = this.inspectorCard.querySelector('.vest-clearance-prefix');
-    this.cachedVestClearanceVal = this.inspectorCard.querySelector('.vest-clearance-val');
-    this.cachedVestStatusBadge = this.inspectorCard.querySelector('.vest-status-badge');
+    const vestViewVorBtn = this.noteContextBoxes.querySelector('#vest-view-vor-btn');
+    vestViewVorBtn?.addEventListener('click', () => {
+      if (snap.labMode !== 'vestibular') {
+        this.switchLabMode('vestibular');
+      }
+      this.openVORDrawer();
+    });
+
+    const scdsAudioBtn = this.noteContextBoxes.querySelector('#scds-view-audiogram-btn');
+    scdsAudioBtn?.addEventListener('click', () => {
+      this.switchLabMode('hearing');
+      this.audiogramDrawer.setActivePreset('conductive_scds');
+      this.openAudiogramDrawer();
+    });
+
+    this.scheduleGeometrySync();
   }
 
   // ===========================================================================
-  // ALL 27 PARTS DRAWER RENDER
+  // PARTS TREE RENDER (Inside #sidebar-pane-lab)
   // ===========================================================================
   private renderPartsTree(): void {
-    const treeBody = this.root.querySelector('#parts-tree-body') as HTMLElement;
+    const treeBody = this.partsDrawer?.querySelector('#parts-tree-body') as HTMLElement | null;
     if (!treeBody) return;
 
-    const groups: SystemGroupId[] = [
+    const allGroups: SystemGroupId[] = [
+      'cochlear_system',
       'semicircular_ducts',
       'ampullae_cupulae',
       'otolith_vestibule',
-      'cochlear_system',
       'bony_capsule',
     ];
+    const groups = this.partsSystemFilter === 'all' ? allGroups : [this.partsSystemFilter];
+    const q = this.partsSearchQuery;
+    const snap = this.scene ? this.scene.getSnapshot() : null;
 
     treeBody.innerHTML = groups
       .map((groupId) => {
         const groupMeta = SYSTEM_GROUPS[groupId];
-        const groupItems = IEMAP_STRUCTURES.filter((item) => item.systemGroup === groupId);
+        const groupItems = IEMAP_STRUCTURES.filter((item) => {
+          if (item.systemGroup !== groupId) return false;
+          if (!q) return true;
+          return (
+            item.displayName.toLowerCase().includes(q) ||
+            item.latinName.toLowerCase().includes(q) ||
+            item.shortLabel.toLowerCase().includes(q)
+          );
+        });
+        if (groupItems.length === 0) return '';
 
-        const snap = this.scene ? this.scene.getSnapshot() : null;
         const rowsHtml = groupItems
           .map((item) => {
             const isHidden = snap ? snap.visibilityMap[item.meshName] === 'hidden' : false;
@@ -4462,7 +4773,6 @@ export class AppHUD {
       })
       .join('');
 
-    // Attach row click and eye click handlers
     const eyeBtns = treeBody.querySelectorAll<HTMLButtonElement>('[data-eye-mesh]');
     eyeBtns.forEach((btn) => {
       btn.addEventListener('click', (ev) => {
@@ -4481,7 +4791,7 @@ export class AppHUD {
       row.addEventListener('click', () => {
         const meshName = row.getAttribute('data-mesh');
         if (meshName) {
-          if (window.innerWidth <= 640) {
+          if (window.innerWidth <= 720) {
             this.closePartsDrawer();
           }
           this.scene.selectStructure(meshName, true);
@@ -4494,11 +4804,14 @@ export class AppHUD {
     if (meshName !== this.lastRenderedMesh) {
       this.lastRenderedMesh = meshName;
       this.renderInspectorCard(meshName);
+      if (this.noteState === 'collapsed') {
+        this.setNoteState('compact');
+      }
     }
   }
 
   // ===========================================================================
-  // 3D PROJECTED PINS RENDER (Full-Screen Overlay)
+  // 3D PROJECTED PINS RENDER (Zero-GC Keep-Out Zone Decluttering)
   // ===========================================================================
   private renderProjectedPins(pins: ProjectedPin2D[]): void {
     const activeIds = this.activePinIdSet;
@@ -4508,123 +4821,199 @@ export class AppHUD {
     }
     const selectedMesh = this.scene.getSelectedMesh();
 
-    // Remove pins that disappeared
     for (const [id, el] of this.pinElements.entries()) {
       if (!activeIds.has(id)) {
         el.remove();
         this.pinElements.delete(id);
+        this.pinHalfWidths.delete(id);
       }
     }
 
-    // Update or create pins
-    for (let i = 0; i < pins.length; i++) {
-      const pin = pins[i];
-      let el = this.pinElements.get(pin.id);
-      if (!el) {
-        const pinEl = document.createElement('div');
-        el = pinEl;
-        pinEl.className = 'projected-pin';
-        pinEl.id = `pin-${pin.id}`;
-        pinEl.innerHTML = `
-          <span class="pin-dot" style="background: ${pin.colorHex};"></span>
-          <span class="pin-text">${pin.label}</span>
-        `;
-        let pointerDownX = 0;
-        let pointerDownY = 0;
-        let pointerMoved = false;
-        let activePointerId: number | null = null;
+    const vw = this.stageWidthPx || window.innerWidth;
+    let placedCount = 0;
 
-        const forwardEvent = (type: string, ev: PointerEvent) => {
-          const canvas = this.scene.getDomElement();
-          if (!canvas) return;
-          const synth = new PointerEvent(type, {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            pointerId: ev.pointerId,
-            pointerType: ev.pointerType,
-            clientX: ev.clientX,
-            clientY: ev.clientY,
-            screenX: ev.screenX,
-            screenY: ev.screenY,
-            button: ev.button,
-            buttons: ev.buttons,
-            ctrlKey: ev.ctrlKey,
-            shiftKey: ev.shiftKey,
-            altKey: ev.altKey,
-            metaKey: ev.metaKey,
-            isPrimary: ev.isPrimary,
-          });
-          Object.defineProperty(synth, 'pageX', { value: ev.pageX ?? ev.clientX });
-          Object.defineProperty(synth, 'pageY', { value: ev.pageY ?? ev.clientY });
-          canvas.dispatchEvent(synth);
-        };
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < pins.length; i++) {
+        const pin = pins[i];
+        const isSelected = selectedMesh === pin.meshName;
+        if ((pass === 0) !== isSelected) continue;
 
-        pinEl.addEventListener('pointerdown', (ev) => {
-          pointerDownX = ev.clientX;
-          pointerDownY = ev.clientY;
-          pointerMoved = false;
-          activePointerId = ev.pointerId;
-          try {
-            pinEl.setPointerCapture(ev.pointerId);
-          } catch {
-            // ignore if pointer capture not supported
-          }
-          if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
-            forwardEvent('pointerdown', ev);
-          }
-        });
+        let el = this.pinElements.get(pin.id);
+        if (!el) {
+          const pinEl = document.createElement('div');
+          el = pinEl;
+          pinEl.className = 'projected-pin';
+          pinEl.id = `pin-${pin.id}`;
+          pinEl.innerHTML = `
+            <span class="pin-dot" style="background: ${pin.colorHex};"></span>
+            <span class="pin-text">${pin.label}</span>
+          `;
+          let pointerDownX = 0;
+          let pointerDownY = 0;
+          let pointerMoved = false;
+          let activePointerId: number | null = null;
 
-        pinEl.addEventListener('pointermove', (ev) => {
-          if (activePointerId === ev.pointerId) {
-            if (Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY) > 6) {
-              pointerMoved = true;
-            }
-            if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
-              forwardEvent('pointermove', ev);
-            }
-          }
-        });
+          const forwardEvent = (type: string, ev: PointerEvent) => {
+            const canvas = this.scene.getDomElement();
+            if (!canvas) return;
+            const synth = new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              pointerId: ev.pointerId,
+              pointerType: ev.pointerType,
+              clientX: ev.clientX,
+              clientY: ev.clientY,
+              screenX: ev.screenX,
+              screenY: ev.screenY,
+              button: ev.button,
+              buttons: ev.buttons,
+              ctrlKey: ev.ctrlKey,
+              shiftKey: ev.shiftKey,
+              altKey: ev.altKey,
+              metaKey: ev.metaKey,
+            });
+            canvas.dispatchEvent(synth);
+          };
 
-        const handlePointerEnd = (ev: PointerEvent) => {
-          if (activePointerId === ev.pointerId) {
-            activePointerId = null;
+          pinEl.addEventListener('pointerdown', (ev) => {
+            ev.stopPropagation();
+            pointerDownX = ev.clientX;
+            pointerDownY = ev.clientY;
+            pointerMoved = false;
+            activePointerId = ev.pointerId;
             try {
-              if (pinEl.hasPointerCapture(ev.pointerId)) {
-                pinEl.releasePointerCapture(ev.pointerId);
-              }
+              pinEl.setPointerCapture(ev.pointerId);
             } catch {
               // ignore
             }
-            if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
-              forwardEvent(ev.type === 'pointercancel' ? 'pointercancel' : 'pointerup', ev);
+            forwardEvent('pointerdown', ev);
+          });
+
+          pinEl.addEventListener('pointermove', (ev) => {
+            if (activePointerId === ev.pointerId) {
+              const dist = Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY);
+              if (dist > 6) {
+                pointerMoved = true;
+              }
+              forwardEvent('pointermove', ev);
+            }
+          });
+
+          const endPointer = (ev: PointerEvent, type: 'pointerup' | 'pointercancel') => {
+            if (activePointerId === ev.pointerId) {
+              activePointerId = null;
+              try {
+                if (pinEl.hasPointerCapture(ev.pointerId)) {
+                  pinEl.releasePointerCapture(ev.pointerId);
+                }
+              } catch {
+                // ignore
+              }
+              forwardEvent(type, ev);
+              if (type === 'pointerup' && !pointerMoved) {
+                this.scene.selectStructure(pin.meshName, true);
+              }
+            }
+          };
+
+          pinEl.addEventListener('pointerup', (ev) => {
+            ev.stopPropagation();
+            endPointer(ev, 'pointerup');
+          });
+
+          pinEl.addEventListener('pointercancel', (ev) => {
+            ev.stopPropagation();
+            endPointer(ev, 'pointercancel');
+          });
+
+          pinEl.addEventListener('wheel', (ev) => {
+            const canvas = this.scene.getDomElement();
+            if (!canvas) return;
+            canvas.dispatchEvent(
+              new WheelEvent('wheel', {
+                bubbles: true,
+                cancelable: true,
+                deltaX: ev.deltaX,
+                deltaY: ev.deltaY,
+                deltaZ: ev.deltaZ,
+                deltaMode: ev.deltaMode,
+                clientX: ev.clientX,
+                clientY: ev.clientY,
+              })
+            );
+          }, { passive: true });
+
+          this.pinsLayer.appendChild(pinEl);
+          this.pinElements.set(pin.id, pinEl);
+          this.pinHalfWidths.set(pin.id, Math.ceil(pinEl.getBoundingClientRect().width * 0.5) || Math.ceil(pin.label.length * 4.2 + 22));
+        }
+
+        if (!pin.visible) {
+          el.style.display = 'none';
+          continue;
+        }
+
+        const knownHalfW = this.pinHalfWidths.get(pin.id) || Math.ceil(pin.label.length * 4.2 + 22);
+        const clampedX = Math.max(knownHalfW + 10, Math.min(vw - knownHalfW - 10, pin.screenX));
+
+        let blocked = false;
+        for (let z = 0; z < this.keepOutZones.length; z++) {
+          const box = this.keepOutZones[z];
+          if (
+            clampedX + knownHalfW > box.l &&
+            clampedX - knownHalfW < box.r &&
+            pin.screenY + 14 > box.t &&
+            pin.screenY - 14 < box.b
+          ) {
+            blocked = true;
+            break;
+          }
+        }
+
+        if (!blocked) {
+          for (let k = 0; k < placedCount; k++) {
+            const off = k * 4;
+            if (
+              clampedX + knownHalfW + 8 > this.placedPinRects[off] &&
+              clampedX - knownHalfW - 8 < this.placedPinRects[off + 2] &&
+              pin.screenY + 14 > this.placedPinRects[off + 1] &&
+              pin.screenY - 14 < this.placedPinRects[off + 3]
+            ) {
+              blocked = true;
+              break;
             }
           }
-        };
+        }
 
-        pinEl.addEventListener('pointerup', handlePointerEnd);
-        pinEl.addEventListener('pointercancel', handlePointerEnd);
+        if (blocked) {
+          el.style.display = 'none';
+          continue;
+        }
 
-        pinEl.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          if (pointerMoved) return;
-          this.scene.selectStructure(pin.meshName, true);
-        });
-        this.pinsLayer.appendChild(pinEl);
-        this.pinElements.set(pin.id, pinEl);
+        el.style.display = 'flex';
+        const measuredHalfW = this.pinHalfWidths.get(pin.id) || knownHalfW;
+        const finalX = Math.max(measuredHalfW + 10, Math.min(vw - measuredHalfW - 10, pin.screenX));
+
+        if (placedCount * 4 + 3 < this.placedPinRects.length) {
+          const rOff = placedCount * 4;
+          this.placedPinRects[rOff] = finalX - measuredHalfW;
+          this.placedPinRects[rOff + 1] = pin.screenY - 14;
+          this.placedPinRects[rOff + 2] = finalX + measuredHalfW;
+          this.placedPinRects[rOff + 3] = pin.screenY + 14;
+          placedCount++;
+        }
+
+        el.style.transform = `translate(${Math.round(finalX)}px, ${Math.round(pin.screenY)}px) translate(-50%, -50%)`;
+        el.classList.toggle('selected-pin', isSelected);
       }
-
-      el.style.transform = `translate(${Math.round(pin.screenX)}px, ${Math.round(pin.screenY)}px) translate(-50%, -50%)`;
-      el.style.display = pin.visible ? 'flex' : 'none';
-      el.classList.toggle('selected-pin', selectedMesh === pin.meshName);
     }
   }
 
   // ===========================================================================
-  // REACTIVE STATE RENDER
+  // REACTIVE SCENE STATE RENDER
   // ===========================================================================
   private renderState(snap: LabSceneSnapshot): void {
-    // 1. Loading Overlay
     if (snap.isLoaded) {
       this.loadingOverlay.classList.add('fade-out');
       this.loadingOverlay.style.display = 'none';
@@ -4636,22 +5025,17 @@ export class AppHUD {
       this.loadingOverlay.setAttribute('aria-valuenow', String(snap.loadingProgress));
     }
 
-    // 2. Sliders
-    if (document.activeElement !== this.boneSlider) {
-      this.boneSlider.value = String(snap.bonyPeelPercent);
-      this.boneValEl.textContent = `${snap.bonyPeelPercent}%`;
+    if (document.activeElement !== this.boneSlider && document.activeElement !== this.mobileBoneSlider) {
+      this.syncBoneSliderUI(snap.bonyPeelPercent);
     }
-    if (document.activeElement !== this.explodeSlider) {
-      this.explodeSlider.value = String(snap.explodePercent);
-      this.explodeValEl.textContent = `${snap.explodePercent}%`;
+    if (document.activeElement !== this.explodeSlider && document.activeElement !== this.mobileExplodeSlider) {
+      this.syncExplodeSliderUI(snap.explodePercent);
     }
 
-    // 3. Preset Buttons Active Indicator
     this.presetButtons.forEach((btn, presetId) => {
       btn.classList.toggle('active', snap.activePresetId === presetId);
     });
 
-    // 4. Floating Inspector Card & Search Sync (render only when relevant properties change to prevent scroll jump)
     if (
       snap.selectedMesh !== this.lastRenderedMesh ||
       snap.readingDepth !== this.lastRenderedDepth
@@ -4661,29 +5045,28 @@ export class AppHUD {
       this.lastRenderedIsolated = snap.isIsolated;
       this.renderInspectorCard(snap.selectedMesh);
 
-      // Keep search bar in sync with selected structure
       if (document.activeElement !== this.searchInput) {
         if (snap.selectedMesh) {
           const struct = STRUCTURE_BY_MESH[snap.selectedMesh];
           if (struct) {
             this.searchInput.value = struct.shortLabel;
-            this.searchClearBtn.style.display = 'block';
+            this.searchClearBtn.hidden = false;
+            this.searchClearBtn.style.display = 'inline-flex';
           }
         } else {
           this.searchInput.value = '';
+          this.searchClearBtn.hidden = true;
           this.searchClearBtn.style.display = 'none';
         }
       }
     } else if (snap.isIsolated !== this.lastRenderedIsolated) {
       this.lastRenderedIsolated = snap.isIsolated;
-      const isolateBtn = this.inspectorCard.querySelector('#btn-isolate');
-      if (isolateBtn) {
-        isolateBtn.textContent = snap.isIsolated ? '👁️ Show All Parts' : '🎯 Isolate Part';
-        isolateBtn.classList.toggle('active', snap.isIsolated);
+      if (this.btnIsolate) {
+        this.btnIsolate.textContent = snap.isIsolated ? 'Show All Parts' : 'Isolate Part';
+        this.btnIsolate.classList.toggle('active', snap.isIsolated);
       }
     }
 
-    // 5. Update Parts Drawer Row States (highlight selected, eye icons)
     const partRows = this.root.querySelectorAll<HTMLElement>('.part-row');
     partRows.forEach((row) => {
       const mesh = row.getAttribute('data-mesh');
@@ -4699,16 +5082,20 @@ export class AppHUD {
       }
     });
 
-    // 6. Lab Mode Switcher & Hearing State Synchronization
     if (snap.labMode !== this.lastRenderedLabMode) {
       this.lastRenderedLabMode = snap.labMode;
-      const isHearing = snap.labMode === 'hearing';
-      this.modeAnatomyBtn.classList.toggle('active', !isHearing);
-      this.modeAnatomyBtn.setAttribute('aria-selected', !isHearing ? 'true' : 'false');
-      this.modeHearingBtn.classList.toggle('active', isHearing);
-      this.modeHearingBtn.setAttribute('aria-selected', isHearing ? 'true' : 'false');
-      this.anatomyDockContent.style.display = isHearing ? 'none' : 'flex';
-      this.hearingDockContent.style.display = isHearing ? 'flex' : 'none';
+      this.appShell?.setAttribute('data-mode', snap.labMode);
+      this.modePills.forEach((pill) => {
+        const active = pill.dataset.mode === snap.labMode;
+        pill.classList.toggle('active', active);
+        pill.setAttribute('aria-selected', String(active));
+        pill.tabIndex = active ? 0 : -1;
+      });
+      this.anatomyDockContent.style.display = snap.labMode === 'anatomy' ? 'flex' : 'none';
+      this.hearingDockContent.style.display = snap.labMode === 'hearing' ? 'flex' : 'none';
+      this.radiologyDockContent.style.display = snap.labMode === 'radiology' ? 'flex' : 'none';
+      this.vestibularDockContent.style.display = snap.labMode === 'vestibular' ? 'flex' : 'none';
+      this.surgicalDockContent.style.display = snap.labMode === 'surgical' ? 'flex' : 'none';
     }
 
     if (snap.labMode === 'hearing') {

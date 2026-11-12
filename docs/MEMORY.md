@@ -8,6 +8,15 @@
 
 ## 1. Chronological Timeline & Milestones
 
+### 2026-11-12: Phase 2 — Production Dual-Theme Editorial Specimen UI & Unified Sidebar (`web/index.html`, `web/src/ui/hudChrome.ts`, `AppHUD.ts`, `DualStageScene.ts`)
+- **Objective:** Port the Phase 1 Dual-Theme Editorial Specimen UI (Dark Glassroom + Light Paper-Technical) and One-Side Expandable `#note-sidebar` from `web/showcase.html` into the production clinical app without regressing any of the 5 clinical modes, GLSL shaders, 3D Eye Avatar kinematics, Web Audio synthesizer, or zero-GC 60fps loop.
+- **Key Deliverables Achieved:**
+  - `web/index.html`, `web/src/style.css`, `web/src/ui/hudChrome.ts`: Replaced corner inspector cards and floating drawer overlays with unified `#note-sidebar` (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read`), re-hosted all 5 clinical drawers inside `#sidebar-pane-lab`, added `<div id="settings-popover" popover="auto">` (Dark Glassroom / Light Paper-Technical switcher) and native `<dialog id="report-dialog">` clinical report modal, and balanced desktop single-row vs. responsive/wide-read bottom dock wrapping.
+  - `web/src/render/DualStageScene.ts`: Enabled alpha-transparent WebGL2 canvas backed by CSS surface tokens, `THREE.AgXToneMapping`, `RoomEnvironment` PMREM reflections, adaptive light/dark GLSL shader theme uniforms, and animated `camera.setViewOffset` clearance tracks while preserving `webglcontextlost`/`restored` handling and zero-GC RAF execution.
+  - `web/src/ui/AppHUD.ts`: Synchronized `#note-sidebar` state machine, `<details id="further-read-details">` `toggle` listener, `--stage-left-gutter` / `--dock-shift-x` layout shifts, strict mutual exclusivity (collapsing `expanded` sidebar when `#gyro-flyout` opens on Mode 4), and live structure telemetry inside the unified reader.
+  - `scripts/verify_mvp_cdp.js`: Updated CDP verification for native `<details>` toggle timing, flexbox search clear button overlap, unified `#note-sidebar` / `#sidebar-pane-lab` drawer checks, `#settings-popover` light/dark polarity screenshot (`mvp_light_theme_desktop.png`), and `<dialog id="report-dialog">`.
+- **Verification:** `npm run verify` (`sync:assets`, `tsc --noEmit` 0 errors, all 7 Node suites / 392 assertions, `test:python`, and `vite build`), `npm test`, and `npm run test:cdp` passed 100% with 0 overlaps, 0 horizontal overflow, and 0 console errors across all 4 viewports (resting 3D stage: `91.0%` at `1440×900`, `89.4%` at `1280×800`, `85.9%` at `768×1024`, `86.7%` at `390×844`).
+
 ### 2026-11-11: Phase 1 Static Showcase — Dual-Theme One-Side Expandable Note Sidebar (`web/showcase.html`)
 - **Objective:** Prototype a social-media-worthy dual-polarity (Dark Glassroom + Light Paper-Technical) static frontend showcase before wiring Phase 2 production changes (`web/index.html`, `AppHUD.ts`, `DualStageScene.ts`), specifically replacing crowded small multi-corner overlays with a calm **One-Side Expandable Note Sidebar**.
 - **Key Deliverables Achieved:**
@@ -238,6 +247,10 @@
 
 ## 2. Key Architecture & Engineering Decisions (ADRs)
 
+### ADR-014: Unified `#note-sidebar`, Dual-Polarity Tokens & Dynamic AgX Stage Framing (Phase 2)
+- **Decision:** Consolidate the separate corner part inspector, medical accordion, and bottom-right floating clinical drawers into a single expandable `#note-sidebar` (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read` via `<details id="further-read-details">`; bottom sheet at `<= 720px`) paired with native `#settings-popover` (`[popover="auto"]`) and `<dialog id="report-dialog">`. Back the UI with system-aware Dark Glassroom + Light Paper-Technical `light-dark()` tokens synced to `THREE.AgXToneMapping`, `RoomEnvironment` PMREM reflections, alpha-transparent WebGL2 compositing, and animated `camera.setViewOffset` + `--dock-shift-x` stage shifts. Ensure `setNoteState()` silently closes active `#sidebar-pane-lab` drawers whenever switching back to `Note`, `compact`, or `collapsed` so hidden drawer RAF loops stop immediately.
+- **Rationale:** Eliminates corner chrome sprawl and mobile/tablet drawer collisions while lifting typography (`16px` note prose, `>= 13px` controls) and maintaining `>= 85%` resting 3D canvas area (`85.9%–91.0%`) across all four verified viewports.
+
 ### ADR-013: Pointer Lifecycle Synchronization & Zero-Allocation 60fps HUD Pipelines
 - **Decision:** Implement complete pointer lifecycle forwarding (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`) on 3D projected pin overlays with explicit `pageX`/`pageY` population and pointer capture, synchronizing with Three.js `OrbitControls` on the underlying canvas while preserving stationary clicks for structure selection. Eliminate all per-frame heap allocations in projected pin sorting and DOM updates in vestibular telemetry using pre-allocated ID sets and in-place `.textContent` updates.
 - **Rationale:** Prevents touch orbit gestures on mobile/tablet devices from getting stuck in multi-touch dolly/pan mode due to orphaned pointer IDs in Three.js OrbitControls, while eliminating garbage collection pauses during continuous 60fps simulation.
@@ -312,13 +325,15 @@ inner-ear-3d-lab/
 ├── AGENTS.md               # Unified instructions for AI agents working in this repo
 ├── CLAUDE.md               # Claude-specific environment and style guidelines
 ├── ARCHITECTURE.md         # High-abstract system architecture and data flow
+├── DESIGN.md               # Dual-Theme Editorial Specimen design system & token spec
+├── PRODUCT.md              # Product vision, clinical personas & mode positioning
 ├── ROADMAP.md              # Stage-by-stage engineering plan
 ├── STATUS.md               # Current milestone status and completed checklists
 ├── QA_NOTE.md              # Quality assurance, video verification, and visual audit
 ├── README.md               # High-level project overview
 │
 ├── docs/                   # Architectural & clinical design specifications
-│   ├── UI_DESIGN_SPEC.md   # Modal Workbench UI/UX spec & progressive disclosure
+│   ├── UI_DESIGN_SPEC.md   # Dual-Theme Editorial Specimen & #note-sidebar spec
 │   ├── CLINICAL_PILLARS.md # 4 expansion pillars (Hearing, Vestibular, CT, Surgery)
 │   ├── STAGE2_PLAN.md      # Stage 2 implementation blueprint & mathematical derivations
 │   ├── STAGE3_PLAN.md      # Stage 3 implementation blueprint & multi-canal VOR architecture
@@ -335,7 +350,7 @@ inner-ear-3d-lab/
 │   ├── test_surgical_engine.js  # Stage 4 CI, Labyrinthectomy & Neurectomy verifier (56 tests)
 │   ├── generate_multicanal_splines.py # Continuous 3D spline generator for Horizontal & Anterior canals
 │   ├── export_eye_avatar_glb.py # CC0 sculpted eye extractor & cyclotorsion texture generator
-│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test (Modes 1-5)
+│   └── verify_mvp_cdp.js        # Multi-viewport Chrome CDP automated test (Modes 1-5, Dark+Light)
 │
 ├── assets/
 │   ├── iemap/              # 27 authentic OBJ/VTK meshes, GLB, canal splines, eye avatar, and metadata
@@ -346,13 +361,19 @@ inner-ear-3d-lab/
 │   ├── physics/            # Stokes ODE gravity solver for BPPV
 │   └── render/             # Headless Blender scene builder & HUD compositor
 │
-└── web/                    # Modern Three.js WebGL 60fps Web Application
-    ├── index.html          # Clean entry point
+└── web/                    # Modern Three.js WebGL2 60fps Web Application
+    ├── index.html          # Production Dual-Theme Editorial Specimen entrypoint
+    ├── showcase.html       # Phase 1 standalone static specimen showcase entrypoint
     ├── vite.config.ts      # Vite configuration
     ├── package.json        # Dependencies (Three.js, TypeScript)
     └── src/
         ├── main.ts         # Application bootstrapper
-        ├── style.css       # Gate 3 design tokens & responsive styles
+        ├── style.css       # Dual-polarity light-dark() design tokens & responsive layout
+        ├── showcase/       # Phase 1 showcase entry & HeroSpecimen3D preview
+        │   ├── main.ts
+        │   ├── showcase.css
+        │   ├── showcaseData.ts
+        │   └── HeroSpecimen3D.ts
         ├── data/
         │   ├── ontology.ts # 27-part clinical metadata, presets, innervation
         │   ├── objLoader.ts# Three.js OBJ buffer loader & cache
@@ -366,11 +387,12 @@ inner-ear-3d-lab/
         │   ├── diagnosticVestibularEngine.ts # Caloric thermal convection & vHIT kinematics engine
         │   └── surgicalEngine.ts   # Stage 4 CI insertion, deafferentation & neurotelemetry
         ├── render/
-        │   ├── DualStageScene.ts # Core Three.js render loop & camera controller
+        │   ├── DualStageScene.ts # Core Three.js render loop, AgX + IBL, stage framing & camera
         │   ├── eyeAvatar.ts      # 3D Eye Avatar & Listing's Law kinematic engine
-        │   └── gate3Materials.ts # Custom GLSL shaders & analytic clipping
+        │   └── gate3Materials.ts # Custom GLSL shaders, uThemeLight & analytic clipping
         └── ui/
-            ├── AppHUD.ts         # DOM manager, search, floating inspector, bottom dock
+            ├── AppHUD.ts         # DOM manager, unified #note-sidebar, search, bottom dock
+            ├── hudChrome.ts      # Dual-theme popover, dialog & sidebar chrome helpers
             ├── AudiogramDrawer.ts# Interactive clinical audiogram drawer
             ├── CTSliceDrawer.ts  # Interactive 2D CT MPR canvas slice viewer
             ├── VORDrawer.ts      # Interactive 3D VOR eye avatar & VNG strip chart drawer

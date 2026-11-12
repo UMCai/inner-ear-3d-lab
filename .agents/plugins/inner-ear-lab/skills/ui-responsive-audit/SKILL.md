@@ -8,7 +8,7 @@ description: >-
 
 # Responsive Multi-Viewport HUD & Layout Audit
 
-Verify that all 5 clinical modes and 6 modal overlays (`#parts-drawer`, `#audiogram-drawer`, `#ct-slice-drawer`, `#vor-drawer`, `#surgical-drawer`, `#gyro-flyout`) obey Anti-Cockpit layout invariants across all 4 viewports.
+Verify that all 5 clinical modes, unified `#note-sidebar` states (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read`), 5 `#sidebar-pane-lab` drawers, `#gyro-flyout`, `#settings-popover`, and `<dialog id="report-dialog">` obey Anti-Cockpit layout invariants across all 4 viewports in both Dark Glassroom and Light Paper-Technical themes.
 
 ## 1. Automated 4-Viewport Geometric Audit
 
@@ -25,14 +25,14 @@ The harness validates these viewports in headless Chrome:
 
 Per-viewport assertions checked by `auditLayoutGeometry()`:
 - `document.documentElement.scrollWidth <= window.innerWidth` (no horizontal overflow).
-- `0` bounding-box overlaps between `.lab-header`, `.bottom-viz-bar`, `#inspector-card`, open `.open` drawers, and `#gyro-flyout`.
-- Unobstructed resting 3D stage area `>= 85%` in Anatomy resting view.
+- `0` bounding-box overlaps across `.lab-header`, `.bottom-viz-bar`, `#note-sidebar`, and `#gyro-flyout`.
+- Unobstructed resting 3D stage area `>= 85%` in Anatomy resting view (`#note-collapsed-pill` / `#note-sidebar[data-note-state="collapsed"]`).
 - `0` console errors or uncaught page exceptions across Anatomy, Hearing, Radiology, Vestibular (BPPV/Caloric/vHIT), and Surgical Suites.
 
 ## 2. CSS & DOM Regression Checklist
 
-- **Dynamic Dock Clearance:** Whenever `.bottom-viz-bar` wraps into multi-row toolbars (especially Tablet `768×1024` and Mobile `390×844` in Vestibular/Surgical modes), verify `syncDockClearance()` updates `--dock-clearance` on `#app` so drawers and `#inspector-card` remain bounded above the dock.
-- **Tablet Narrow Split (`<= 960px`):** Keep `#inspector-card` left width + open right-side drawer width (`audiogram`, `ct-slice`, `vor`, `surgical`, `gyro-flyout`) within `calc(100vw - margin)` with at least `8px` horizontal separation.
+- **Dynamic Dock Clearance & Framing:** Whenever `.bottom-viz-bar` wraps into multi-row toolbars or `#note-sidebar` expands (`expanded` / `wide-read`), verify `syncDockClearance()` updates `--dock-clearance`, `--stage-left-gutter` / `--dock-shift-x` shift the dock cleanly, and `scene.setStageFraming(...)` shifts the 3D ear away from covered regions.
+- **Native `<details>` & Popover Timing:** Allow ~40 ms after `.click()` on `#further-read-details > summary` for native `toggle` events before inspecting `data-wide-read`, and wait ~320 ms after switching into widened modes so `--dock-shift-x` transitions finish before measuring geometry.
 - **Test String Contracts:** Keep `.vor-drawer {`, `.gyro-flyout {`, and `.vestibular-dock-content {` intact (`scripts/test_vor_workbench.js`).
 - **Modern Web Guidance:** When introducing non-trivial CSS layout changes (popover/modal/container queries/scroll-contained panels), also invoke the `modern-web-guidance` skill for current browser compatibility patterns.
-- **Visual Inspection:** Inspect generated PNGs under `$TMPDIR/inner-ear-cdp/` (never modify tracked `output/*.png` unless running `--update-baselines`).
+- **Visual Inspection:** Inspect generated PNGs under `$TMPDIR/inner-ear-cdp/` including `mvp_light_theme_desktop.png` (never modify tracked `output/*.png` unless running `--update-baselines`).

@@ -247,13 +247,8 @@ async function auditLayoutGeometry(client, label, vp, options = {}) {
         const selectors = [
           { name: 'header', sel: '.lab-header' },
           { name: 'bottomDock', sel: '.bottom-viz-bar' },
-          { name: 'inspector', sel: '#inspector-card' },
+          { name: 'noteSidebar', sel: '#note-sidebar' },
           { name: 'gyroFlyout', sel: '#gyro-flyout' },
-          { name: 'partsDrawer', sel: '#parts-drawer' },
-          { name: 'audiogramDrawer', sel: '#audiogram-drawer' },
-          { name: 'ctDrawer', sel: '#ct-slice-drawer' },
-          { name: 'vorDrawer', sel: '#vor-drawer' },
-          { name: 'surgicalDrawer', sel: '#surgical-drawer' },
         ];
 
         const boxes = [];
@@ -323,7 +318,7 @@ async function auditLayoutGeometry(client, label, vp, options = {}) {
         const headerOverlaps = [];
         const headerEl = document.querySelector('.lab-header');
         if (headerEl) {
-          const clusterSels = ['.brand-cluster', '.mode-switcher', '.search-container', '.header-actions'];
+          const clusterSels = ['.brand-cluster', '.mode-switcher-shell', '.search-container', '.header-actions'];
           const clusterRects = [];
           for (const sel of clusterSels) {
             const el = headerEl.querySelector(sel);
@@ -356,11 +351,19 @@ async function auditLayoutGeometry(client, label, vp, options = {}) {
           }
           const searchInput = headerEl.querySelector('#search-input');
           const clearBtn = headerEl.querySelector('#search-clear-btn');
-          if (searchInput && clearBtn && getComputedStyle(clearBtn).display !== 'none') {
+          if (searchInput && clearBtn && !clearBtn.hidden && getComputedStyle(clearBtn).display !== 'none') {
+            const sr = searchInput.getBoundingClientRect();
             const cr = clearBtn.getBoundingClientRect();
-            const padR = parseFloat(getComputedStyle(searchInput).paddingRight || '0');
-            if (cr.width > 0 && padR < cr.width + 2) {
-              headerOverlaps.push({ a: '#search-input', b: '#search-clear-btn', padR, clearW: Math.round(cr.width) });
+            const isFlexSibling = getComputedStyle(clearBtn).position === 'static' || getComputedStyle(clearBtn).position === 'relative';
+            if (isFlexSibling) {
+              if (cr.width > 0 && sr.right > cr.left + 0.5) {
+                headerOverlaps.push({ a: '#search-input', b: '#search-clear-btn', overlap: Math.round(sr.right - cr.left) });
+              }
+            } else {
+              const padR = parseFloat(getComputedStyle(searchInput).paddingRight || '0');
+              if (cr.width > 0 && padR < cr.width + 2) {
+                headerOverlaps.push({ a: '#search-input', b: '#search-clear-btn', padR, clearW: Math.round(cr.width) });
+              }
             }
           }
         }
@@ -583,80 +586,102 @@ async function run() {
       }
       console.log(`✓ Minimal Top Header verified (Title: 'Inner Ear 3D Lab', Search Bar, Settings Button)`);
 
-      // 3. Verify Floating Inspector Card (Title, System badge, plain-English summary, Isolate, Reset)
+      // 3. Verify Unified Left Specimen Note Card (Compact -> Expanded -> Wide-Read -> Collapsed)
       const inspectorCheck = await client.send('Runtime.evaluate', {
         expression: `
           (() => {
-            const card = document.querySelector('#inspector-card');
-            const title = card?.querySelector('.inspector-title')?.textContent;
-            const badge = card?.querySelector('.system-badge')?.textContent;
-            const summary = card?.querySelector('.inspector-summary')?.textContent;
+            const sidebar = document.querySelector('#note-sidebar');
+            const card = document.querySelector('#note-card');
+            const compactTitle = document.querySelector('#note-title')?.textContent?.trim();
+            const sysBadge = document.querySelector('#note-system-label')?.textContent?.trim();
+            const compactLead = document.querySelector('#note-compact-lead')?.textContent?.trim();
+            const readBtn = document.querySelector('#note-read-btn');
+            readBtn?.click();
+
+            const expandedState = sidebar?.getAttribute('data-note-state');
+            const summary = document.querySelector('#insp-summary')?.textContent?.trim();
             const isolateBtn = card?.querySelector('#btn-isolate') !== null;
             const resetBtn = card?.querySelector('#btn-reset-view') !== null;
-            const accordionBtn = card?.querySelector('#accordion-toggle-btn') !== null;
+            const furtherDetails = card?.querySelector('#further-read-details') !== null;
             return {
-              visible: card?.classList.contains('visible'),
-              title,
-              badge,
+              visible: Boolean(card && !card.hidden),
+              expandedState,
+              title: compactTitle,
+              badge: sysBadge,
+              hasCompactLead: Boolean(compactLead && compactLead.length > 8),
               hasSummary: Boolean(summary && summary.length > 10),
               isolateBtn,
               resetBtn,
-              accordionBtn
+              furtherDetails,
             };
           })()
         `,
         returnByValue: true,
       });
-      if (!inspectorCheck.result.value.visible || !inspectorCheck.result.value.title) {
-        throw new Error('Floating Inspector Card is not visible with selected structure');
+      if (
+        !inspectorCheck.result.value.visible ||
+        !inspectorCheck.result.value.title ||
+        inspectorCheck.result.value.expandedState !== 'expanded'
+      ) {
+        throw new Error(`Note Sidebar Card check failed: ${JSON.stringify(inspectorCheck.result.value)}`);
       }
-      if (!inspectorCheck.result.value.isolateBtn || !inspectorCheck.result.value.resetBtn || !inspectorCheck.result.value.accordionBtn) {
-        throw new Error('Inspector Card action buttons missing');
+      if (!inspectorCheck.result.value.isolateBtn || !inspectorCheck.result.value.resetBtn || !inspectorCheck.result.value.furtherDetails) {
+        throw new Error('Note Sidebar Card action buttons or Further Read disclosure missing');
       }
-      console.log(`✓ Floating Inspector Card verified (Selected: "${inspectorCheck.result.value.title}", Badge: "${inspectorCheck.result.value.badge?.trim()}", Plain Summary present)`);
+      console.log(`✓ Unified Specimen Note Card verified (Selected: "${inspectorCheck.result.value.title}", Badge: "${inspectorCheck.result.value.badge}", Compact -> Expanded clean)`);
 
-      // 4. Test Accordion expansion
+      // 4. Test Further Read disclosure & Wide-Read Mode
+      await client.send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            const details = document.querySelector('#further-read-details');
+            const summaryEl = details?.querySelector('summary');
+            if (details && !details.open) {
+              summaryEl?.click();
+            }
+          })()
+        `,
+      });
+      await new Promise((r) => setTimeout(r, 40));
       const accordionTest = await client.send('Runtime.evaluate', {
         expression: `
           (() => {
-            const btn = document.querySelector('#accordion-toggle-btn');
-            const content = document.querySelector('#accordion-content');
-            if (!content?.classList.contains('open')) {
-              btn?.click();
-            }
+            const details = document.querySelector('#further-read-details');
+            const wideRead = document.querySelector('#note-sidebar')?.getAttribute('data-wide-read');
             return {
-              open: content?.classList.contains('open'),
-              text: content?.textContent || ''
+              open: Boolean(details?.open),
+              wideRead,
+              text: details?.textContent || '',
             };
           })()
         `,
         returnByValue: true,
       });
-      if (!accordionTest.result.value.open || !accordionTest.result.value.text.includes('Latin Term')) {
-        throw new Error('Medical Details accordion failed to expand with Latin details');
+      if (!accordionTest.result.value.open || accordionTest.result.value.wideRead !== 'true' || !accordionTest.result.value.text.includes('Latin Name')) {
+        throw new Error(`Further Read disclosure failed to expand into wide-read mode: ${JSON.stringify({ open: accordionTest.result.value.open, wideRead: accordionTest.result.value.wideRead })}`);
       }
-      console.log(`✓ Expandable Medical Details accordion verified (Latin, CN VIII Innervation, Pearls)`);
+      console.log(`✓ Further Read Wide-Read Disclosure verified (Latin Name, Innervation, Morphometry, RAS, Clinical Pearl)`);
 
-      // 4b. Test Accordion scroll retention under slider updates (no DOM scroll reset)
+      // 4b. Test Note Scroll retention under slider updates (no DOM scroll reset)
       const scrollRetentionTest = await client.send('Runtime.evaluate', {
         expression: `
           (() => {
-            const card = document.querySelector('#inspector-card');
-            card.scrollTop = 60;
-            const setScroll = card.scrollTop;
+            const scrollBody = document.querySelector('#note-scroll-body');
+            if (scrollBody) scrollBody.scrollTop = 60;
+            const setScroll = scrollBody?.scrollTop ?? 0;
             const slider = document.querySelector('#bone-peel-slider');
             slider.value = '50';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
-            const currentScroll = card.scrollTop;
+            const currentScroll = scrollBody?.scrollTop ?? 0;
             return { setScroll, currentScroll };
           })()
         `,
         returnByValue: true,
       });
       if (scrollRetentionTest.result.value.setScroll > 0 && scrollRetentionTest.result.value.currentScroll === 0) {
-        throw new Error('Inspector Card reset scroll position during slider input');
+        throw new Error('Note Sidebar reset scroll position during slider input');
       }
-      console.log(`✓ Inspector Card scroll preservation verified (retained: ${scrollRetentionTest.result.value.currentScroll}px)`);
+      console.log(`✓ Note Sidebar scroll preservation verified (retained: ${scrollRetentionTest.result.value.currentScroll}px)`);
 
       // 5. Test [ 🎯 Isolate Part ] and [ ↺ Reset View ]
       const isolateTest = await client.send('Runtime.evaluate', {
@@ -757,89 +782,137 @@ async function run() {
           (() => {
             const toggleBtn = document.querySelector('#parts-toggle-btn');
             const drawer = document.querySelector('#parts-drawer');
-            const inspectorCard = document.querySelector('#inspector-card');
+            const labPane = document.querySelector('#sidebar-pane-lab');
+            const notePane = document.querySelector('#sidebar-pane-note');
             if (!drawer?.classList.contains('open')) {
               toggleBtn?.click();
             }
-            const mobileDrawerActive = inspectorCard?.classList.contains('drawer-active') || false;
+            const labPaneVisible = Boolean(labPane && !labPane.hidden);
+            const notePaneHidden = Boolean(notePane && notePane.hidden);
             const rows = drawer?.querySelectorAll('.part-row') || [];
             const eyeBtn = rows[0]?.querySelector('.eye-toggle-btn');
             const beforeEye = eyeBtn?.textContent;
             eyeBtn?.click();
             const afterEye = eyeBtn?.textContent;
             eyeBtn?.click(); // restore
-            if (drawer?.classList.contains('open')) {
-              toggleBtn?.click(); // close drawer
-            }
+            const drawerOpen = Boolean(drawer?.classList.contains('open'));
             return {
-              drawerOpen: drawer?.classList.contains('open'),
+              drawerOpen,
+              labPaneVisible,
+              notePaneHidden,
               rowCount: rows.length,
               beforeEye,
               afterEye,
-              mobileDrawerActive
             };
           })()
         `,
         returnByValue: true,
       });
-      if (partsDrawerTest.result.value.rowCount !== 27) {
-        throw new Error(`Expected 27 anatomical parts in drawer, found ${partsDrawerTest.result.value.rowCount}`);
+      if (
+        !partsDrawerTest.result.value.drawerOpen ||
+        !partsDrawerTest.result.value.labPaneVisible ||
+        !partsDrawerTest.result.value.notePaneHidden ||
+        partsDrawerTest.result.value.rowCount !== 27
+      ) {
+        throw new Error(`Parts drawer check failed: ${JSON.stringify(partsDrawerTest.result.value)}`);
       }
       // Verify Parts Drawer open layout before closing
-      await client.send('Runtime.evaluate', {
-        expression: `(() => { const d = document.querySelector('#parts-drawer'); if (d && !d.classList.contains('open')) document.querySelector('#parts-toggle-btn')?.click(); })()`,
-      });
       await new Promise((r) => setTimeout(r, 80));
       await auditLayoutGeometry(client, 'Anatomy + Parts Drawer Open', vp);
       await client.send('Runtime.evaluate', {
         expression: `(() => { const d = document.querySelector('#parts-drawer'); if (d?.classList.contains('open')) document.querySelector('#parts-toggle-btn')?.click(); })()`,
       });
-      console.log(`✓ Collapsible 27 Parts Drawer verified (${partsDrawerTest.result.value.rowCount} parts rendered, single-click eye toggled "${partsDrawerTest.result.value.beforeEye}" -> "${partsDrawerTest.result.value.afterEye}")`);
+      console.log(`✓ Collapsible 27 Parts Drawer verified (${partsDrawerTest.result.value.rowCount} parts rendered in unified Lab tab, eye toggled "${partsDrawerTest.result.value.beforeEye}" -> "${partsDrawerTest.result.value.afterEye}")`);
 
-      // 10. Test Settings Popover & About Dialog
+      // 10. Test Settings Popover, Dual-Theme Switcher & Clinical Report Dialog
       const settingsTest = await client.send('Runtime.evaluate', {
         expression: `
           (() => {
             const settingsBtn = document.querySelector('#settings-btn');
-            settingsBtn.click();
+            settingsBtn?.click();
             const popover = document.querySelector('#settings-popover');
-            const popoverOpen = popover?.classList.contains('open');
+            const popoverOpen = Boolean(popover?.matches(':popover-open'));
 
-            const allLabelBtn = popover.querySelector('[data-label-mode="all"]');
+            const allLabelBtn = popover?.querySelector('[data-label-mode="all"]');
             allLabelBtn?.click();
+
+            // Test theme polarity switching inside popover
+            const appShell = document.querySelector('#app-shell');
+            const lightThemeBtn = popover?.querySelector('[data-theme-pref="light"]');
+            lightThemeBtn?.click();
+            const lightResolved = appShell?.getAttribute('data-resolved-theme');
 
             const aboutBtn = document.querySelector('#about-open-btn');
             aboutBtn?.click();
-            const modal = document.querySelector('#about-modal');
+            const modal = document.querySelector('#report-dialog');
             const mr = modal?.getBoundingClientRect();
-            const modalOpen = Boolean(modal && getComputedStyle(modal).display !== 'none' && mr && mr.width > 100 && mr.height > 100);
+            const modalOpen = Boolean(modal && modal.open && mr && mr.width > 100 && mr.height > 100);
 
             const closeBtn = document.querySelector('#about-close-btn');
             closeBtn?.click();
-            const modalClosed = modal?.style.display === 'none';
 
-            return { popoverOpen, modalOpen, modalClosed };
+            return { popoverOpen, lightResolved, modalOpen };
           })()
         `,
         returnByValue: true,
       });
-      if (!settingsTest.result.value.popoverOpen || !settingsTest.result.value.modalOpen || !settingsTest.result.value.modalClosed) {
-        throw new Error(`Settings/About dialog test failed: ${JSON.stringify(settingsTest.result.value)}`);
+      await new Promise((r) => setTimeout(r, 260));
+      const modalClosedCheck = await client.send('Runtime.evaluate', {
+        expression: `(() => {
+          const modal = document.querySelector('#report-dialog');
+          return { modalClosed: Boolean(modal && !modal.open) };
+        })()`,
+        returnByValue: true,
+      });
+      if (
+        !settingsTest.result.value.popoverOpen ||
+        settingsTest.result.value.lightResolved !== 'light' ||
+        !settingsTest.result.value.modalOpen ||
+        !modalClosedCheck.result.value.modalClosed
+      ) {
+        throw new Error(
+          `Settings/Theme/Report dialog test failed: ${JSON.stringify({
+            ...settingsTest.result.value,
+            ...modalClosedCheck.result.value,
+          })}`
+        );
       }
-      console.log(`✓ Settings Popover & About & Citations Modal verified (3D Labels: Off/Key/All, Reading Depth: Simple/Detailed, Citations)`);
+
+      if (vp.name === 'Desktop High-Res') {
+        await new Promise((r) => setTimeout(r, 120));
+        const lightSs = await client.send('Page.captureScreenshot', { format: 'png' });
+        const lightSsPath = join(OUTPUT_DIR, 'mvp_light_theme_desktop.png');
+        writeFileSync(lightSsPath, Buffer.from(lightSs.data, 'base64'));
+        console.log(`✓ Captured Light Paper-Technical visual screenshot to ${lightSsPath}`);
+      }
+
+      // Restore Dark Glassroom polarity for canonical stage screenshots
+      await client.send('Runtime.evaluate', {
+        expression: `(() => {
+          document.querySelector('[data-theme-pref="dark"]')?.click();
+          const p = document.querySelector('#settings-popover');
+          if (p?.matches(':popover-open')) p.hidePopover();
+        })()`,
+      });
+      await new Promise((r) => setTimeout(r, 80));
+      console.log(`✓ Settings Popover, Light/Dark Polarity & Clinical Report Dialog verified`);
 
       const ss = await client.send('Page.captureScreenshot', { format: 'png' });
       const ssPath = join(OUTPUT_DIR, `mvp_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
       writeFileSync(ssPath, Buffer.from(ss.data, 'base64'));
       console.log(`✓ Captured visual screenshot to ${ssPath}`);
 
-      // 10b. Verify Anatomy layout geometry (both with Inspector open and resting Stage view)
-      await auditLayoutGeometry(client, 'Anatomy + Inspector Open', vp);
+      // 10b. Verify Anatomy layout geometry (compact/open sidebar AND collapsed resting Stage >= 85%)
+      await auditLayoutGeometry(client, 'Anatomy + Note Sidebar Active', vp);
       await client.send('Runtime.evaluate', {
-        expression: `document.querySelector('#inspector-close-btn')?.click()`,
+        expression: `document.querySelector('#note-collapse-btn')?.click()`,
       });
       await new Promise((r) => setTimeout(r, 150));
-      await auditLayoutGeometry(client, 'Anatomy Resting (No Inspector)', vp, { minCanvasPct: 85 });
+      await auditLayoutGeometry(client, 'Anatomy Resting (Collapsed Note Pill)', vp, { minCanvasPct: 85 });
+      await client.send('Runtime.evaluate', {
+        expression: `document.querySelector('#note-collapsed-pill')?.click()`,
+      });
+      await new Promise((r) => setTimeout(r, 80));
       await client.send('Runtime.evaluate', {
         expression: `document.querySelector('.preset-btn[data-preset="overview"]')?.click()`,
       });
@@ -966,6 +1039,7 @@ async function run() {
       console.log(`✓ Drawer Mutual Exclusivity verified (Audiogram and 27-Parts drawers never overlap)`);
 
       // Capture Stage 1 Hearing Lab Screenshot
+      await new Promise((r) => setTimeout(r, 320));
       await auditLayoutGeometry(client, 'Hearing + Audiogram Open', vp);
       const hearingSs = await client.send('Page.captureScreenshot', { format: 'png' });
       const hearingSsPath = join(OUTPUT_DIR, `stage1_hearing_${vp.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png`);
@@ -1056,7 +1130,9 @@ async function run() {
             const hasCanvas = canvas !== null && canvas.width > 0 && canvas.height > 0;
             const partsDrawerOpen = document.querySelector('#parts-drawer')?.classList.contains('open');
             const audiogramDrawerOpen = document.querySelector('#audiogram-drawer')?.classList.contains('open');
-            const inspectorHidden = document.querySelector('#inspector-card')?.classList.contains('drawer-active');
+            const openDrawersCount = document.querySelectorAll('#sidebar-pane-lab > .open').length;
+            const notePaneHidden = Boolean(document.querySelector('#sidebar-pane-note')?.hidden);
+            const labPaneVisible = Boolean(document.querySelector('#sidebar-pane-lab') && !document.querySelector('#sidebar-pane-lab')?.hidden);
 
             // Switch to T2 MRI window preset and back
             const mriBtn = document.querySelector('#ct-window-mri-btn');
@@ -1066,18 +1142,23 @@ async function run() {
             boneBtn?.click();
             const boneActive = boneBtn?.classList.contains('active');
 
-            return { drawerOpen, hasCanvas, partsDrawerOpen, audiogramDrawerOpen, inspectorHidden, mriActive, boneActive };
+            return { drawerOpen, hasCanvas, partsDrawerOpen, audiogramDrawerOpen, openDrawersCount, notePaneHidden, labPaneVisible, mriActive, boneActive };
           })()
         `,
         returnByValue: true,
       });
-      if (!ctDrawerTest.result.value.drawerOpen || !ctDrawerTest.result.value.hasCanvas || ctDrawerTest.result.value.partsDrawerOpen || ctDrawerTest.result.value.audiogramDrawerOpen) {
+      if (
+        !ctDrawerTest.result.value.drawerOpen ||
+        !ctDrawerTest.result.value.hasCanvas ||
+        ctDrawerTest.result.value.partsDrawerOpen ||
+        ctDrawerTest.result.value.audiogramDrawerOpen ||
+        ctDrawerTest.result.value.openDrawersCount !== 1 ||
+        !ctDrawerTest.result.value.notePaneHidden ||
+        !ctDrawerTest.result.value.labPaneVisible
+      ) {
         throw new Error(`CT Drawer test failed: ${JSON.stringify(ctDrawerTest.result.value)}`);
       }
-      if (vp.width <= 640 && !ctDrawerTest.result.value.inspectorHidden) {
-        throw new Error('Mobile drawer exclusivity failed: inspector remained visible with CT drawer open');
-      }
-      console.log(`✓ 2D CT MPR Slice Drawer verified (Retina Canvas, Bone Window 4000/700, Mutual Exclusivity clean)`);
+      console.log(`✓ 2D CT MPR Slice Drawer verified (Retina Canvas, Bone Window 4000/700, Unified Lab Exclusivity clean)`);
 
       // 21. Test SCDS Defect Scenario & Third-Window Biomechanics Box
       const scdsTest = await client.send('Runtime.evaluate', {

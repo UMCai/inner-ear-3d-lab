@@ -6,7 +6,15 @@ An interactive WebGL 3D anatomy and clinical simulation platform, paired with a 
 
 ## ⚡ Quick Start: Running the 3D Web Application
 
-The interactive web application runs on **Vite**, **TypeScript**, and **Three.js**, featuring real-time 3D anatomy exploration, Greenwood tonotopy audio synthesis, pure-tone audiometry, virtual temporal bone CT multi-planar reformatting (MPR), multi-canal BPPV & VOR/Caloric/vHIT eye simulation, and otologic surgical suites.
+The interactive web application runs on **Vite**, **TypeScript**, and **Three.js** with a **Dual-Theme Editorial Specimen** UI (**Dark Glassroom** + **Light Paper-Technical**) powered by `THREE.AgXToneMapping` + `RoomEnvironment` IBL, a unified expandable `#note-sidebar` (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read`), and 5 clinical workbenches:
+
+1. **Anatomy Atlas:** 27 authentic IE-Map v1.0.0 RAS meshes, outer bone shell translucency peel, radial explode, guided presets, search combobox, and filterable parts tree.
+2. **Hearing & Tonotopy:** Donald D. Greenwood auditory place-frequency engine (`20 Hz–20.7 kHz`), traveling-wave shader, Web Audio pure-tone synthesizer, and interactive Right-Ear audiogram (`AudiogramDrawer.ts`).
+3. **Virtual Radiology:** Stereotaxic temporal bone MPR slicing (Pöschl, Stenvers, Axial, Coronal), analytic GPU fragment clipping, Retina 2D CT/T2-MRI drawer (`CTSliceDrawer.ts`), and SCDS third-window simulation.
+4. **Vestibular & VOR:** Multi-canal BPPV (6 maneuvers + `#gyro-flyout`), Caloric thermal convection (COWS, Alexander's law, Jongkees calculator + butterfly vestibulogram), vHIT (`40–80 ms` Curthoys gain, HIMP/SHIMP, saccades), and synchronized 3D Eye Avatar (`VORDrawer.ts`).
+5. **Surgical Suites:** Cochlear Implant insertion (`28.0 mm`, AOS curling, `>= 30 mN` translocation alarm), Labyrinthectomy (`70,000 RPM` drill + `tau = 72 h` compensation), and IAC Neurectomy (`"7-up, Coke down"`, Koos `0–IV`, ABR/EMG plots in `SurgicalDrawer.ts`).
+
+Also included is the lightweight static showcase entrypoint at `http://127.0.0.1:5173/showcase.html` (`web/showcase.html`).
 
 ### 1. Prerequisites
 - [Node.js](https://nodejs.org/) (v22.6+ or Node with TypeScript type stripping for `npm test`; v18+ for `npm run dev` / `npm run build`)
@@ -20,19 +28,22 @@ On initial clone, install the web dependencies (this also syncs the tracked `ass
 cd web && npm install
 ```
 
-Then run the dev server from the repository root (or inside `web/`):
+Then run the dev server from the repository root:
 ```bash
 npm run dev
 ```
 
 Open your browser at:
-👉 **http://127.0.0.1:5173/** (or http://localhost:5173/)
+👉 **http://127.0.0.1:5173/** (production clinical lab) · **http://127.0.0.1:5173/showcase.html** (editorial showcase)
 
-### 3. Build & Preview
+### 3. Build, Verify & Preview
 
 ```bash
-# Compile TypeScript & bundle production assets with Vite
-npm run build
+# Run full typecheck + 7 Node suites + Python spline/Epley self-tests + production Vite build
+npm run verify
+
+# Run Headless Chrome CDP geometric & multi-viewport QA across 1440x900, 1280x800, 768x1024, 390x844
+npm run test:cdp
 
 # Preview the production build locally
 npm run preview
@@ -76,32 +87,39 @@ $$\text{3/4 Clinical Patient Pose \& Doctor Layer} \;\longleftrightarrow\; \text
 
 ```text
 .
-├── output/
-│   ├── epley_maneuver_right_bppv.mp4       # Final 1920x1080 @ 30fps H.264/AAC Gate 3 educational video (110.20s)
-│   └── epley_maneuver_right_bppv.srt       # Synchronized clinical subtitles (SRT)
-├── build/qa/
-│   ├── review-contact-1080p.png            # 8-panel 1080p visual review contact sheet
-│   ├── review-small-screen-640x360.png     # 8-panel 640x360 small-screen legibility proof sheet
-│   └── scene1_locate_part1.png .. scene8_summary.png
+├── AGENTS.md / CLAUDE.md / DESIGN.md / PRODUCT.md / ARCHITECTURE.md / ROADMAP.md / STATUS.md / QA_NOTE.md
+├── docs/                                   # Clinical specs, UI_DESIGN_SPEC.md & MEMORY.md
+├── web/                                    # Vite + TypeScript + Three.js WebGL2 interactive app
+│   ├── index.html                          # Production Dual-Theme Editorial Specimen UI (#note-sidebar)
+│   ├── showcase.html                       # Phase 1 standalone static showcase entrypoint
+│   └── src/
+│       ├── audio/ToneSynthesizer.ts        # Procedural Web Audio tones, drill whine & EMG alarms
+│       ├── data/                           # ontology.ts, objLoader.ts, canalPaths.ts, greenwoodEngine.ts, radiologyEngine.ts
+│       ├── physics/                        # vestibularEngine.ts, diagnosticVestibularEngine.ts, surgicalEngine.ts
+│       ├── render/                         # DualStageScene.ts (AgX + IBL + setViewOffset), gate3Materials.ts, eyeAvatar.ts
+│       ├── showcase/                       # Phase 1 HeroSpecimen3D.ts, showcaseData.ts, showcase.css
+│       └── ui/                             # AppHUD.ts, hudChrome.ts, AudiogramDrawer.ts, CTSliceDrawer.ts, VORDrawer.ts, SurgicalDrawer.ts
 ├── assets/iemap/
 │   ├── look-config.json                    # Gate 3 (Medaium-BPPV-001) material, lighting & camera configuration
 │   ├── iemap_right_labyrinth.glb           # Combined 3D glTF 2.0 binary asset of the Right Labyrinth
-│   ├── posterior_canal_path.json           # 313-point 3D spline centerline (Posterior Canal -> Common Crus -> Utricle)
+│   ├── eye_avatar.glb                      # 3D bilateral eye avatar with radial iris crypts
+│   ├── posterior/horizontal/anterior_canal_path.json # Continuous 3D RAS splines
 │   ├── vtk/*.vtk & obj/*.obj               # 27 authentic IE-Map v1.0.0 inner-ear surface meshes
 │   └── fcsv/*.fcsv                         # 4 3D Slicer Markups fiducial files
-├── src/
-│   ├── anatomy/
-│   │   ├── prepare_iemap.py                # Ingests the 27 authentic IE-Map meshes, smooth canal path, fiducials & look-config.json
-│   │   └── export_glb_and_preview.py       # Exports iemap_right_labyrinth.glb and renders Gate 3 verification preview
-│   ├── physics/
-│   │   └── epley_simulator.py              # 3D Euler head kinematics & 5-particle Stokes gravitational sedimentation
-│   ├── audio/
-│   │   └── build_audio.py                  # Synthesizes 8-shot narration, ambient sound bed, SRT & timeline_manifest.json
-│   └── render/
-│       ├── blender_scene_builder.py        # Headless Blender 5.2 LTS 3/4 patient + sculpted head + doctor layer + Gate 3 labyrinth
-│       └── hud_compositor.py               # Gate 3 2D compositor, Dynamic Role Swap, staged pills & editorial lower-third
-└── scripts/
-    └── build_full_video.py                 # Full 8-shot 3D Blender render, parallel Gate 3 compositing, FFmpeg muxing & QA sheets
+├── output/
+│   ├── epley_maneuver_right_bppv.mp4       # Final 1920x1080 @ 30fps H.264/AAC Gate 3 educational video (110.20s)
+│   ├── epley_maneuver_right_bppv.srt       # Synchronized clinical subtitles (SRT)
+│   └── mvp_*.png                           # Verified multi-viewport Dark & Light visual baselines
+├── src/                                    # Python Blender 5.2 LTS video & physics pipeline
+│   ├── anatomy/{prepare_iemap.py, export_glb_and_preview.py}
+│   ├── physics/epley_simulator.py
+│   ├── audio/build_audio.py
+│   └── render/{blender_scene_builder.py, hud_compositor.py}
+└── scripts/                                # Verification suites, spline exporters & CDP visual audits
+    ├── verify_mvp_cdp.js
+    ├── test_{hearing_engine,radiology_engine,vestibular_engine,eye_avatar_vor,vor_workbench,diagnostic_vestibular,surgical_engine}.js
+    ├── test_canal_paths.py
+    └── build_full_video.py
 ```
 
 ---
@@ -115,25 +133,18 @@ cd web && npm install && cd ..
 
 # 1. Start local dev server (Vite @ http://127.0.0.1:5173/)
 npm run dev
-# (or: cd web && npm run dev)
 
-# 2. Type-check & build production bundle
-npm run build
-# (or: cd web && npm run build)
+# 2. Type-check, run all 7 Node suites + Python physics/spline tests, and build production bundle
+npm run verify
 
-# 3. Preview production build
-npm run preview
-# (or: cd web && npm run preview)
-
-# 4. Run all 7 automated Node.js verification suites (Hearing, Radiology, Vestibular, Eye Avatar, Workbench, Diagnostic VOR, Surgical)
+# 3. Full build + 7 Node test suites (Hearing, Radiology, Vestibular, Eye Avatar, Workbench, Diagnostic VOR, Surgical)
 npm test
 
-# 5. Run Python canal spline & BPPV physics checks
-python3 src/physics/epley_simulator.py
-python3 scripts/test_canal_paths.py
+# 4. Run multi-viewport Headless Chrome CDP verification (requires Google Chrome on macOS)
+npm run test:cdp
 
-# 6. Run multi-viewport Headless Chrome CDP verification (requires Google Chrome on macOS)
-node scripts/verify_mvp_cdp.js
+# 5. Preview production build
+npm run preview
 ```
 
 ### B. Headless Blender 5.2 LTS Editorial Video Pipeline

@@ -15,6 +15,7 @@ flowchart LR
     --> S2["Stage 2: Virtual Radiology<br/><b>[DONE]</b><br/>• Pöschl's & Stenvers' Slicers<br/>• Shader Clipping Planes<br/>• 2D CT MPR Canvas<br/>• SCDS Third-Window"]
     --> S3["Stage 3: Vestibular & VOR<br/><b>[DONE]</b><br/>• Multi-Canal BPPV (Gufoni)<br/>• 3D Eye Nystagmus Avatar<br/>• Caloric COWS & vHIT"]
     --> S4["Stage 4: Surgical Scenarios<br/><b>[DONE]</b><br/>• Cochlear Implant Insertion<br/>• Labyrinthectomy Compensation<br/>• Acoustic Neuroma Staging"]
+    --> S5["Stage 5: Dual-Theme UI Redesign<br/><b>[DONE]</b><br/>• Dark &amp; Light Paper Polarity<br/>• Unified #note-sidebar &amp; Lab Pane<br/>• AgX + RoomEnvironment IBL"]
 ```
 
 ---
@@ -182,3 +183,21 @@ Deliver specialized otologic surgical planning tools, implant kinematics, and bi
   - Header mode switcher `[ 🔬 Surgical Suites ]` and contextual bottom dock `#surgical-dock-content` with CI, Labyrinthectomy, and Neurectomy workbenches.
   - Strict 5-drawer mutual exclusivity (`partsDrawer`, `audiogramDrawer`, `ctSliceDrawer`, `vorDrawer`, `surgicalDrawer`, and `gyroFlyout`).
   - 100% test pass on `scripts/test_surgical_engine.js` (56 tests), root `npm test` (all 7 suites passing), `cd web && npm run build` (0 errors), and headless Chrome CDP visual multi-viewport validation.
+
+---
+
+## Stage 5: Dual-Theme Editorial Specimen Redesign (Phase 1 Showcase + Phase 2 Production) — ✅ COMPLETE
+
+### Objective
+Eliminate corner-card clutter by consolidating anatomy reading, `Further Read` clinical deep-dives, and all 5 clinical workbench drawers into a single expandable `#note-sidebar` (`collapsed` → `compact` → `expanded` `[Note | Lab]` → `wide-read`), paired with System + Manual Dark/Light polarity (`Dark Glassroom` + `Light Paper-Technical`), `THREE.AgXToneMapping` + `RoomEnvironment` IBL, and dynamic `camera.setViewOffset` stage framing.
+
+> **Design System & Spec:** [`DESIGN.md`](DESIGN.md) & [`docs/UI_DESIGN_SPEC.md`](docs/UI_DESIGN_SPEC.md)
+
+### Task Breakdown
+- [x] **Phase 1: Static Showcase Prototype (`web/showcase.html`, `web/src/showcase/`)**:
+  - Built standalone `HeroSpecimen3D.ts` (`AgXToneMapping`, `RoomEnvironment` PMREM, GLSL light/dark theme polarity, animated `camera.setViewOffset`) and editorial specimen layout.
+  - Authored dual-polarity token spec in `DESIGN.md` and `.impeccable/design.json`.
+- [x] **Phase 2: Production Web App Unification (`web/index.html`, `hudChrome.ts`, `AppHUD.ts`, `DualStageScene.ts`, `style.css`)**:
+  - Unified all 5 drawers (`PartsDrawer`, `AudiogramDrawer`, `CTSliceDrawer`, `VORDrawer`, `SurgicalDrawer`) inside `#sidebar-pane-lab` under `#note-sidebar` while preserving mutual exclusivity with `#gyro-flyout` and stopping hidden drawer RAF loops when returning to `Note`, `compact`, or `collapsed`.
+  - Wired `<div id="settings-popover" popover="auto">` theme/auto-stage settings, native `<dialog id="report-dialog">` clinical summary modal, `<details id="further-read-details">` (`Patient` | `Clinical` tone switch), and `--stage-left-gutter` / `--dock-shift-x` dock clearance.
+  - Updated `DualStageScene.ts` (`alpha: true` canvas, `AgXToneMapping`, `RoomEnvironment` IBL, `uThemeLight` GLSL uniform, animated `setStageFraming`, and full disposal) and `scripts/verify_mvp_cdp.js` for Dark + Light verification across all 4 viewports (`>= 85%` resting stage area, 0 overlaps, 0 console errors).

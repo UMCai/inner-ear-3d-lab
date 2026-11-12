@@ -53,6 +53,7 @@ Before finalizing changes that touch UI, WebGL shaders, shaders uniforms, audio,
 ## 4. Expected Pass Criteria
 
 - `npm run typecheck`: exits `0` with 0 TS errors (`noUnusedLocals` / `noUnusedParameters` enabled).
+- `npm run build`: cleanly bundles both production `web/index.html` and static showcase `web/showcase.html`.
 - `npm test`: exits `0`, `7/7` Node suites (`392` assertions) passing.
 - `npm run test:python`: all canal clearance checks and 5-step Epley kinematics pass.
-- `npm run test:cdp`: exits `0`, zero console errors across `1440×900`, `1280×800`, `768×1024`, `390×844`, `0 overlaps`, `scrollWidth <= vw`, and `>= 85%` resting 3D stage area.
+- `npm run test:cdp`: exits `0`, zero console errors across `1440×900`, `1280×800`, `768×1024`, `390×844` (including Light Paper-Technical verification on desktop), `0 overlaps`, `scrollWidth <= vw`, and `>= 85%` resting 3D stage area.

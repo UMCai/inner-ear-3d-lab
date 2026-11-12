@@ -1,6 +1,21 @@
 # Quality Assurance & Verification Report (`QA_NOTE.md`)
 
-## 1. Executive Summary
+## 1A. Web Application Phase 2 Multi-Viewport & Build Verification
+- **Production App Entry**: [`web/index.html`](web/index.html) (`AppHUD.ts`, `hudChrome.ts`, `DualStageScene.ts`, `gate3Materials.ts`, `style.css`) + Showcase (`web/showcase.html`)
+- **Automated Typecheck, Unit, Physics & Bundle Suite (`npm run verify`)**:
+  - `npm run sync:assets`: `27` OBJ meshes, `4` FCSV markups, `6` core files (`anterior`/`horizontal`/`posterior` splines, `eye_avatar.glb`, metadata, `look-config.json`).
+  - `tsc -p web/tsconfig.json --noEmit`: `0` errors (`noUnusedLocals` + `noUnusedParameters` enabled).
+  - Node ESM Domain Suites (`7/7` suites, `392` assertions passing 100%): `test:hearing`, `test:radiology`, `test:vestibular`, `test:eye-avatar`, `test:workbench`, `test:diagnostic`, `test:surgical`.
+  - Python Canal Splines & Epley Physics (`npm run test:python`): `test_canal_paths.py` + `epley_simulator.py` passing 100%.
+  - `vite build`: clean bundle across `index.html`, `showcase.html`, `three-vendor`, and `surgicalEngine` chunks.
+- **4-Viewport Headless Chrome CDP & Dual-Theme Audit (`npm run test:cdp`)**:
+  - Verified both **Dark Glassroom** (`data-theme="dark"`) and **Light Paper-Technical** (`data-theme="light"`) polarities, native `#settings-popover`, `<details id="further-read-details">` (`wide-read`), `#sidebar-pane-lab` 5-drawer exclusivity + `#gyro-flyout`, and `<dialog id="report-dialog">`.
+  - **0 console errors**, **0 overlaps**, **0 horizontal overflow**, and `>= 85%` unobstructed resting 3D stage area across every viewport (`1440×900`, `1280×800`, `768×1024`, `390×844`).
+  - Up-to-date Phase 2 visual baselines captured under [`output/`](output/) via `node scripts/verify_mvp_cdp.js --update-baselines`.
+
+---
+
+## 1B. Executive Summary (Headless Blender Editorial Video Pipeline)
 - **Final Video Artifact**: [output/epley_maneuver_right_bppv.mp4](output/epley_maneuver_right_bppv.mp4)
 - **Subtitle Artifact**: [output/epley_maneuver_right_bppv.srt](output/epley_maneuver_right_bppv.srt)
 - **QA Review Sheets** (local `build/qa/` outputs, gitignored):

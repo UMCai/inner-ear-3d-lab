@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
   DISSECTION_PRESETS,
   IEMAP_STRUCTURES,
@@ -161,6 +162,30 @@ interface MeshEntry {
 export class DualStageScene {
   private container: HTMLElement;
   private renderer: THREE.WebGLRenderer;
+  private envRenderTarget: THREE.WebGLRenderTarget | null = null;
+  private isLightTheme = false;
+  private isReducedMotion = false;
+  private motionMql: MediaQueryList | null = null;
+  private onMotionChangeBound?: () => void;
+
+  // Stage Lighting & Helper Refs
+  private ambientLight!: THREE.AmbientLight;
+  private dirKeyLight!: THREE.DirectionalLight;
+  private dirFillLight!: THREE.DirectionalLight;
+  private dirRimLight!: THREE.DirectionalLight;
+  private radPlaneQuadMat: THREE.MeshBasicMaterial | null = null;
+  private radPlaneEdgeMat: THREE.LineBasicMaterial | null = null;
+  private radPlaneCrossMat: THREE.LineBasicMaterial | null = null;
+
+  // Sidebar / Bottom-Sheet Viewport Framing Insets
+  private targetLeftInset = 0;
+  private targetBottomInset = 0;
+  private currentLeftInset = 0;
+  private currentBottomInset = 0;
+  private appliedOffsetX = 0;
+  private appliedOffsetY = 0;
+  private appliedViewW = 0;
+  private appliedViewH = 0;
 
   // Single-Stage WebGL Full-Screen Canvas Scene
   private scene: THREE.Scene;
@@ -364,15 +389,29 @@ export class DualStageScene {
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true,
+      premultipliedAlpha: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(new THREE.Color('#071014'), 1.0);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.toneMapping = THREE.AgXToneMapping;
+    this.renderer.toneMappingExposure = 1.06;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
     this.renderer.domElement.style.touchAction = 'none';
+
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      this.motionMql = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.isReducedMotion = this.motionMql.matches;
+      this.onMotionChangeBound = () => {
+        this.isReducedMotion = Boolean(this.motionMql?.matches);
+      };
+      this.motionMql.addEventListener('change', this.onMotionChangeBound);
+    }
+
     this.handleContextLostBound = (event: Event) => {
       event.preventDefault(); // Required by WebGL specification
       this.handleContextLost();
@@ -400,21 +439,23 @@ export class DualStageScene {
     this.controls.minPolarAngle = 0.02;
     this.controls.update();
 
-    // 3-Point Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-    this.scene.add(ambientLight);
+    // 3-Point Studio Lighting + PMREM RoomEnvironment IBL
+    this.initEnvironmentLighting();
 
-    const dirKey = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirKey.position.set(20, -25, 25);
-    this.scene.add(dirKey);
+    this.ambientLight = new THREE.AmbientLight(0xd9e8f0, 0.72);
+    this.scene.add(this.ambientLight);
 
-    const dirFill = new THREE.DirectionalLight(0x75c79e, 0.45);
-    dirFill.position.set(-25, 20, 15);
-    this.scene.add(dirFill);
+    this.dirKeyLight = new THREE.DirectionalLight(0xfffcf5, 1.35);
+    this.dirKeyLight.position.set(20, -25, 25);
+    this.scene.add(this.dirKeyLight);
 
-    const dirRim = new THREE.DirectionalLight(0x52dcf2, 0.65);
-    dirRim.position.set(0, 10, 30);
-    this.scene.add(dirRim);
+    this.dirFillLight = new THREE.DirectionalLight(0x75c79e, 0.52);
+    this.dirFillLight.position.set(-25, 20, 15);
+    this.scene.add(this.dirFillLight);
+
+    this.dirRimLight = new THREE.DirectionalLight(0x52dcf2, 0.72);
+    this.dirRimLight.position.set(0, 10, 30);
+    this.scene.add(this.dirRimLight);
 
     this.labyrinthRoot = new THREE.Group();
     this.scene.add(this.labyrinthRoot);
@@ -436,6 +477,104 @@ export class DualStageScene {
     this.initOtoconiaVisualizer();
     this.initSurgicalArray();
     this.setupPointerInteractions();
+  }
+
+  private initEnvironmentLighting(): void {
+    try {
+      this.envRenderTarget?.dispose();
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const roomEnv = new RoomEnvironment();
+      this.envRenderTarget = pmrem.fromScene(roomEnv, 0.04);
+      this.scene.environment = this.envRenderTarget.texture;
+      this.scene.environmentIntensity = this.isLightTheme ? 0.48 : 0.72;
+      roomEnv.dispose();
+      pmrem.dispose();
+    } catch {
+      this.envRenderTarget = null;
+    }
+  }
+
+  public setThemePolarity(isLightPaper: boolean): void {
+    if (this.isLightTheme === isLightPaper) return;
+    this.isLightTheme = isLightPaper;
+    const themeVal = isLightPaper ? 1.0 : 0.0;
+
+    for (const entry of this.meshEntries.values()) {
+      const u = entry.material.uniforms as unknown as Gate3ShaderUniforms;
+      if (u.uThemeLight) {
+        u.uThemeLight.value = themeVal;
+      }
+    }
+
+    if (this.ambientLight) {
+      this.ambientLight.intensity = isLightPaper ? 0.56 : 0.72;
+    }
+    if (this.dirKeyLight) {
+      this.dirKeyLight.intensity = isLightPaper ? 1.18 : 1.35;
+    }
+    if (this.dirFillLight) {
+      this.dirFillLight.intensity = isLightPaper ? 0.42 : 0.52;
+    }
+    if (this.dirRimLight) {
+      this.dirRimLight.intensity = isLightPaper ? 0.48 : 0.72;
+    }
+    this.scene.environmentIntensity = isLightPaper ? 0.48 : 0.72;
+
+    const planeColor = isLightPaper ? 0x0c667e : 0x52dcf2;
+    if (this.radPlaneQuadMat) {
+      this.radPlaneQuadMat.color.setHex(planeColor);
+      this.radPlaneQuadMat.opacity = isLightPaper ? 0.14 : 0.12;
+    }
+    if (this.radPlaneEdgeMat) {
+      this.radPlaneEdgeMat.color.setHex(planeColor);
+    }
+    if (this.radPlaneCrossMat) {
+      this.radPlaneCrossMat.color.setHex(planeColor);
+    }
+  }
+
+  public setStageFraming(leftInsetPx: number, bottomInsetPx: number): void {
+    this.targetLeftInset = Math.max(0, leftInsetPx);
+    this.targetBottomInset = Math.max(0, bottomInsetPx);
+    if (this.isReducedMotion) {
+      this.currentLeftInset = this.targetLeftInset;
+      this.currentBottomInset = this.targetBottomInset;
+      this.applyStageFraming(true);
+    }
+  }
+
+  private applyStageFraming(force = false): void {
+    const w = Math.max(1, this.container.clientWidth);
+    const h = Math.max(1, this.container.clientHeight);
+    const clampedLeft = Math.min(this.currentLeftInset, w * 0.44);
+    const clampedBottom = Math.min(this.currentBottomInset, h * 0.48);
+    const offsetX = -Math.round(clampedLeft * 0.48);
+    const offsetY = Math.round(clampedBottom * 0.40);
+    const sizeChanged = w !== this.appliedViewW || h !== this.appliedViewH;
+
+    if (
+      !force &&
+      !sizeChanged &&
+      Math.abs(offsetX - this.appliedOffsetX) < 0.5 &&
+      Math.abs(offsetY - this.appliedOffsetY) < 0.5
+    ) {
+      return;
+    }
+
+    this.appliedViewW = w;
+    this.appliedViewH = h;
+    this.appliedOffsetX = offsetX;
+    this.appliedOffsetY = offsetY;
+
+    if (offsetX === 0 && offsetY === 0) {
+      if (this.camera.view?.enabled) {
+        this.camera.clearViewOffset();
+      } else {
+        this.camera.updateProjectionMatrix();
+      }
+    } else {
+      this.camera.setViewOffset(w, h, offsetX, offsetY, w, h);
+    }
   }
 
   private initOtoconiaVisualizer(): void {
@@ -799,6 +938,7 @@ export class DualStageScene {
         baseAlpha: ontology.baseAlpha,
         overrideOpacity,
         highlightLevel,
+        themeLight: this.isLightTheme ? 1.0 : 0.0,
         clipActive,
         clipNormal,
         clipConstant,
@@ -1108,25 +1248,23 @@ export class DualStageScene {
     this.radiologyPlaneHelperGroup = new THREE.Group();
 
     const planeGeom = new THREE.PlaneGeometry(24, 24);
-    const planeMat = new THREE.MeshBasicMaterial({
-      color: 0x52dcf2,
+    this.radPlaneQuadMat = new THREE.MeshBasicMaterial({
+      color: this.isLightTheme ? 0x0c667e : 0x52dcf2,
       transparent: true,
-      opacity: 0.12,
+      opacity: this.isLightTheme ? 0.14 : 0.12,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const planeMesh = new THREE.Mesh(planeGeom, planeMat);
+    const planeMesh = new THREE.Mesh(planeGeom, this.radPlaneQuadMat);
     this.radiologyPlaneHelperGroup.add(planeMesh);
 
     const edges = new THREE.EdgesGeometry(planeGeom);
-    const edgeLine = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({
-        color: 0x52dcf2,
-        transparent: true,
-        opacity: 0.85,
-      })
-    );
+    this.radPlaneEdgeMat = new THREE.LineBasicMaterial({
+      color: this.isLightTheme ? 0x0c667e : 0x52dcf2,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const edgeLine = new THREE.LineSegments(edges, this.radPlaneEdgeMat);
     this.radiologyPlaneHelperGroup.add(edgeLine);
 
     // Subtle center crosshairs
@@ -1137,14 +1275,12 @@ export class DualStageScene {
       new THREE.Vector3(0, 12, 0.01),
     ];
     const crossGeom = new THREE.BufferGeometry().setFromPoints(crossPoints);
-    const crossLine = new THREE.LineSegments(
-      crossGeom,
-      new THREE.LineBasicMaterial({
-        color: 0x52dcf2,
-        transparent: true,
-        opacity: 0.35,
-      })
-    );
+    this.radPlaneCrossMat = new THREE.LineBasicMaterial({
+      color: this.isLightTheme ? 0x0c667e : 0x52dcf2,
+      transparent: true,
+      opacity: 0.35,
+    });
+    const crossLine = new THREE.LineSegments(crossGeom, this.radPlaneCrossMat);
     this.radiologyPlaneHelperGroup.add(crossLine);
     this.radiologyPlaneHelperGroup.visible = false;
     this.scene.add(this.radiologyPlaneHelperGroup);
@@ -2036,6 +2172,29 @@ export class DualStageScene {
 
       this.controls.update();
 
+      // Smooth sidebar/bottom-sheet stage framing inset transition (zero allocations)
+      if (
+        Math.abs(this.currentLeftInset - this.targetLeftInset) > 0.4 ||
+        Math.abs(this.currentBottomInset - this.targetBottomInset) > 0.4
+      ) {
+        if (this.isReducedMotion) {
+          this.currentLeftInset = this.targetLeftInset;
+          this.currentBottomInset = this.targetBottomInset;
+        } else {
+          const factor = 1 - Math.exp(-dt * 12);
+          this.currentLeftInset = THREE.MathUtils.lerp(this.currentLeftInset, this.targetLeftInset, factor);
+          this.currentBottomInset = THREE.MathUtils.lerp(this.currentBottomInset, this.targetBottomInset, factor);
+        }
+        this.applyStageFraming(false);
+      } else if (
+        this.currentLeftInset !== this.targetLeftInset ||
+        this.currentBottomInset !== this.targetBottomInset
+      ) {
+        this.currentLeftInset = this.targetLeftInset;
+        this.currentBottomInset = this.targetBottomInset;
+        this.applyStageFraming(true);
+      }
+
       const canvasW = this.container.clientWidth;
       const canvasH = this.container.clientHeight;
       if (canvasW === 0 || canvasH === 0) return;
@@ -2045,14 +2204,16 @@ export class DualStageScene {
         this.renderer.setPixelRatio(targetPR);
         this.renderer.setSize(canvasW, canvasH, false);
         this.camera.aspect = canvasW / canvasH;
-        this.camera.updateProjectionMatrix();
+        this.camera.fov = canvasW < canvasH ? 40 : 34;
+        this.applyStageFraming(true);
       }
 
       const rendererSize = this.renderer.getSize(this.tempRendererSize);
       if (rendererSize.x !== canvasW || rendererSize.y !== canvasH) {
         this.renderer.setSize(canvasW, canvasH, false);
         this.camera.aspect = canvasW / canvasH;
-        this.camera.updateProjectionMatrix();
+        this.camera.fov = canvasW < canvasH ? 40 : 34;
+        this.applyStageFraming(true);
       }
 
       this.renderer.render(this.scene, this.camera);
@@ -2118,6 +2279,7 @@ export class DualStageScene {
   private handleContextRestored(): void {
     if (this.isDisposed) return;
     console.info('[DualStageScene] WebGL context restored. Resuming render loop...');
+    this.initEnvironmentLighting();
     this.lastFrameTime = performance.now();
     this.startRenderLoop();
   }
@@ -2661,6 +2823,15 @@ export class DualStageScene {
     this.cancelVHITThrust();
     this.setCaloricUniforms(false, 0, 0, 0);
     this.setCaloricSimulationState(false, null);
+
+    if (this.motionMql && this.onMotionChangeBound) {
+      this.motionMql.removeEventListener('change', this.onMotionChangeBound);
+    }
+
+    if (this.envRenderTarget) {
+      this.envRenderTarget.dispose();
+      this.envRenderTarget = null;
+    }
 
     if (this.controls) {
       this.controls.dispose();

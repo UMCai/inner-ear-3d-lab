@@ -18,13 +18,13 @@ Read this checklist before declaring any new mode, clinical suite, shader effect
 - [ ] Routes audio through `masterGain` (`getIsMuted()` / `setMasterVolume()`) and `safetyLimiter`.
 - [ ] Uses exponential ramps from `0.0001` (`GAIN_FLOOR`), sample-accurate `.stop(...)`, and `.onended` node disconnection.
 
-## 4. HUD, Mutual Exclusivity & CSS (`AppHUD.ts`, `web/src/ui/*.ts`, `style.css`)
+## 4. HUD, Mutual Exclusivity & CSS (`AppHUD.ts`, `hudChrome.ts`, `web/src/ui/*.ts`, `style.css`)
 - [ ] Top header pill / bottom dock subview swaps cleanly without stealing resting 3D stage below `85%`.
-- [ ] Any drawer or flyout participates in mutual exclusivity (`closeAllDrawersExcept(...)`) and syncs its chevron (`'▸'` / `'▾'`).
-- [ ] `updateMobileDrawerExclusivity()` detects the drawer/flyout and suppresses `#inspector-card` via `.drawer-active` at `<= 640px`.
-- [ ] `syncDockClearance()` runs after switching into the mode/subview/procedure so `--dock-clearance` updates for wrapped docks.
+- [ ] New drawer mounts inside `#sidebar-pane-lab` (single `#note-sidebar` host) or participates in mutual exclusivity (`closeAllDrawersExcept(...)`, `closeAllLabDrawersSilently()`, chevron sync `'▸'` / `'▾'`, and collapses `#note-sidebar` when `#gyro-flyout` opens).
+- [ ] Mobile (`<= 720px`) renders `#note-sidebar[data-note-state="expanded"]` cleanly as a bottom reader sheet above `#bottom-bar` without overlapping dock controls.
+- [ ] `syncDockClearance()` runs after switching into the mode/subview/procedure and after `#note-sidebar` width transitions so `--stage-left-gutter`, `--dock-clearance`, and `--dock-shift-x` stay synchronized.
 - [ ] Preserves standalone `.vor-drawer {`, `.gyro-flyout {`, `.vestibular-dock-content {` blocks tested by `scripts/test_vor_workbench.js`.
-- [ ] Canvas tick/axis text uses WCAG AA `#94a3b8` or lighter.
+- [ ] Supports both Dark Glassroom and Light Paper-Technical polarities via `light-dark()` / `--theme-*` tokens and `Canvas`/`SVG` tick text with WCAG AA contrast (`>= 4.5:1`).
 
 ## 5. Tests & Documentation (`scripts/`, `STATUS.md`, `docs/MEMORY.md`)
 - [ ] Unit/integration script in `scripts/test_*.js` checks `SKIP_NESTED_BUILD=1` before spawning Vite rebuilds.

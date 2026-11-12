@@ -9,8 +9,10 @@ globs: "**/web/src/render/**, **/web/src/physics/**, **/web/src/audio/**, **/web
    - In [`DualStageScene.ts`](../../web/src/render/DualStageScene.ts) and [`eyeAvatar.ts`](../../web/src/render/eyeAvatar.ts), never allocate `THREE.Vector3`, `THREE.Quaternion`, arrays (`.map`, `.filter`), `Set`, DOM nodes, or spread objects (`{ ... }`) inside active render or physics ticks.
    - Reuse pre-allocated scratch buffers: `scratchPinVector`, `tempNDC`, `pinCandidates`, `activeCandidates`, `qVHITTmp`, `ciCenterPointsTmp`, `scratchSample` / `particleScratchSample`, `NystagmogramRingBuffer` (`Float32Array(600)`), and `VHITImpulseBuffer` (`Float32Array(350)`).
 
-2. **GPU Shader Uniform Discipline (`gate3Materials.ts`):**
+2. **GPU Shader Uniform & Dual-Polarity AgX Discipline (`gate3Materials.ts`, `DualStageScene.ts`):**
    - Never rebuild `ShaderMaterial` per frame or mode switch; mutate `.uniforms.<name>.value` in-place.
+   - Maintain `THREE.AgXToneMapping`, `RoomEnvironment` PMREM IBL (`envRenderTarget?.dispose()`), alpha-transparent WebGL2 compositing, and `#include <tonemapping_fragment>` + `#include <colorspace_fragment>` synced with resolved Dark Glassroom / Light Paper-Technical polarity (`uThemeLight`, `setThemePolarity()`).
+   - Keep `camera.setViewOffset` framing (`setStageFraming()` / `applyStageFraming()`) smooth and zero-GC inside `animate()`.
    - Drive cross-sections strictly via analytic GPU clipping (`uClipActive`, `uClipNormal`, `uClipConstant`), never CPU geometry booleans.
    - When mirroring laterality (`labyrinthRoot.scale.x = -1.0`), update `uMirrored` and swap `THREE.FrontSide`/`THREE.BackSide` culling synchronously.
    - Reset transient mode uniforms (`uTonotopyMode`, `uLossMaskActive`, `uClipActive`, `uCaloricActive`, `uSurgicalDrillActive`, `uTranslocationBreach`) when leaving their mode.

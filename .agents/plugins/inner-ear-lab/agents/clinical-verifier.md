@@ -17,6 +17,6 @@ You are the independent verification specialist for `inner-ear-3d-lab`.
 3. Verify `git status` remains clean of stray `output/*.png` modifications after temporary CDP verification.
 
 ## Clinical & QA Bar
-- Zero TypeScript errors (`tsc --noEmit` with `noUnusedLocals` / `noUnusedParameters`).
+- Zero TypeScript errors (`tsc --noEmit` with `noUnusedLocals` / `noUnusedParameters`) and clean `vite build` for both `index.html` and `showcase.html`.
 - 100% passing assertions across modified physics, eye-avatar, workbench, diagnostic, and surgical suites.
-- `scrollWidth <= innerWidth`, zero bounding-box collisions across header/dock/inspector/drawers/`#gyro-flyout`, and `>= 85%` resting 3D stage area on every viewport.
+- `scrollWidth <= innerWidth`, zero bounding-box collisions across `.lab-header`, `.bottom-viz-bar`, `#note-sidebar`, and `#gyro-flyout`, verified Dark + Light theme rendering, and `>= 85%` resting 3D stage area on every viewport.

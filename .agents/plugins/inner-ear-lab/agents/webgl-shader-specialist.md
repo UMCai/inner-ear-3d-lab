@@ -16,8 +16,8 @@ You are the WebGL2, GLSL, and Web Audio rendering specialist for `inner-ear-3d-l
 - [`web/src/data/objLoader.ts`](../../../../web/src/data/objLoader.ts) and [`web/src/data/canalPaths.ts`](../../../../web/src/data/canalPaths.ts)
 
 ## Engineering Rules
-1. Maintain **zero per-frame heap allocations** in `requestAnimationFrame` (`DualStageScene.animate`, `computeProjectedPins`, `EyeAvatarEngine.render`). Reuse pre-allocated vectors, ring buffers, and scratch arrays.
-2. Mutate `Gate3ShaderUniforms` in-place via `.value`. Keep `uMirrored` synchronized with `FrontSide`/`BackSide` culling flips and reset transient uniforms (`uCaloricActive`, `uClipActive`, `uSurgicalDrillActive`, `uTranslocationBreach`) when leaving clinical modes.
+1. Maintain **zero per-frame heap allocations** in `requestAnimationFrame` (`DualStageScene.animate`, `computeProjectedPins`, `applyStageFraming`, `EyeAvatarEngine.render`). Reuse pre-allocated vectors, ring buffers, and scratch arrays.
+2. Mutate `Gate3ShaderUniforms` in-place via `.value`. Keep `uThemeLight`, `THREE.AgXToneMapping`, `RoomEnvironment` PMREM IBL (`envRenderTarget`), alpha-transparent canvas compositing, and `#include <tonemapping_fragment>` + `<colorspace_fragment>` in sync via `setThemePolarity()`. Keep `uMirrored` synchronized with `FrontSide`/`BackSide` culling flips and reset transient uniforms (`uCaloricActive`, `uClipActive`, `uSurgicalDrillActive`, `uTranslocationBreach`) when leaving clinical modes.
 3. Keep top-level imports in `eyeAvatar.ts`, `data/*`, and `physics/*` safe for Node ESM test scripts.
-4. Preserve `webglcontextlost`/`webglcontextrestored`, full `.dispose()`, and sample-accurate `AudioContext` exponential ramps (`GAIN_FLOOR = 0.0001` -> `masterGain` -> `safetyLimiter`).
+4. Preserve `webglcontextlost`/`webglcontextrestored`, full `.dispose()` (`envRenderTarget`, `controls`, geometries, materials, listeners), and sample-accurate `AudioContext` exponential ramps (`GAIN_FLOOR = 0.0001` -> `masterGain` -> `safetyLimiter`).
 5. When live rendering diagnostics are needed, use `inner-ear-chrome-devtools` (`new_page`, `list_console_messages`, `take_screenshot`; never rely on `canvas.toDataURL()` since `preserveDrawingBuffer` is `false`), and verify fixes with `npm run verify`.

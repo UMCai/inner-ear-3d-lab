@@ -8,6 +8,7 @@ export interface Gate3ShaderUniforms {
   uRimPower: { value: number };
   uGhostMode: { value: number };
   uHighlight: { value: number };
+  uThemeLight: { value: number };
   uSingleSurface: { value: number };
   uClipActive: { value: number };
   uClipNormal: { value: THREE.Vector3 };
@@ -65,6 +66,7 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform float uRimPower;
   uniform float uGhostMode;
   uniform float uHighlight;
+  uniform float uThemeLight;
   uniform float uSingleSurface;
   uniform float uClipActive;
   uniform vec3 uClipNormal;
@@ -101,16 +103,16 @@ const FRAGMENT_SHADER = /* glsl */ `
 
   vec3 getGreenwoodSpectralColor(float x) {
     float cx = clamp(x, 0.0, 1.0);
-    // 7-stop perceptual rainbow spectrum:
+    // Linearized 7-stop perceptual rainbow spectrum for AgX + sRGB output:
     // 0: Apex (20 Hz, Violet) -> 1: ~70 Hz (Royal Blue) -> 2: ~300 Hz (Cyan)
     // -> 3: ~1.2 kHz (Emerald) -> 4: ~4.0 kHz (Amber Gold) -> 5: ~10 kHz (Orange) -> 6: Base (20.7 kHz, Scarlet)
-    vec3 c0 = vec3(0.38, 0.10, 0.78);
-    vec3 c1 = vec3(0.12, 0.38, 0.96);
-    vec3 c2 = vec3(0.10, 0.82, 0.94);
-    vec3 c3 = vec3(0.20, 0.88, 0.45);
-    vec3 c4 = vec3(0.98, 0.80, 0.14);
-    vec3 c5 = vec3(0.98, 0.45, 0.12);
-    vec3 c6 = vec3(0.95, 0.12, 0.22);
+    vec3 c0 = vec3(0.05, 0.03, 0.42);
+    vec3 c1 = vec3(0.02, 0.22, 0.64);
+    vec3 c2 = vec3(0.02, 0.48, 0.56);
+    vec3 c3 = vec3(0.06, 0.52, 0.16);
+    vec3 c4 = vec3(0.76, 0.46, 0.02);
+    vec3 c5 = vec3(0.76, 0.16, 0.03);
+    vec3 c6 = vec3(0.66, 0.03, 0.08);
 
     if (cx < 0.17) {
       return mix(c0, c1, cx / 0.17);
@@ -129,8 +131,9 @@ const FRAGMENT_SHADER = /* glsl */ `
 
   void main() {
     // Analytic 3D Cross-Section Clipping Plane in RAS space
+    float clipDist = 1000.0;
     if (uClipActive > 0.5) {
-      float clipDist = dot(vWorldPosition, uClipNormal) + uClipConstant;
+      clipDist = dot(vWorldPosition, uClipNormal) + uClipConstant;
       if (clipDist < 0.0) {
         discard;
       }
@@ -166,40 +169,44 @@ const FRAGMENT_SHADER = /* glsl */ `
     }
 
     float ndotv = clamp(abs(dot(normal, viewDir)), 0.0, 1.0);
-    float fresnel = pow(1.0 - ndotv, uRimPower);
+    float rimPow = mix(max(1.8, uRimPower), 2.1, uThemeLight);
+    float fresnel = pow(1.0 - ndotv, rimPow);
 
     // Gate 3 3-point studio lighting in world/view space
-    vec3 keyDir = normalize(vec3(0.45, -0.58, 0.68));
-    vec3 fillDir = normalize(vec3(-0.62, 0.42, 0.35));
-    vec3 topDir = normalize(vec3(0.0, 0.15, 0.98));
+    vec3 keyDir = normalize(vec3(0.50, -0.56, 0.66));
+    vec3 fillDir = normalize(vec3(-0.62, 0.46, 0.32));
+    vec3 topDir = normalize(vec3(0.0, 0.25, 0.96));
 
     vec3 nWorld = normalize(isFacingOut ? vNormalWorld : -vNormalWorld);
-    float keyTerm = max(dot(nWorld, keyDir), -0.25) * 0.48 + 0.52;
-    float fillTerm = max(dot(nWorld, fillDir), 0.0) * 0.24;
-    float topTerm = max(dot(nWorld, topDir), 0.0) * 0.16;
+    float keyTerm = max(dot(nWorld, keyDir), -0.20) * 0.52 + 0.48;
+    float fillTerm = max(dot(nWorld, fillDir), 0.0) * 0.22;
+    float topTerm = max(dot(nWorld, topDir), 0.0) * 0.18;
 
-    // Specular wet-tissue sheen
+    // Specular wet-tissue sheen (calibrated linear)
     vec3 halfVec = normalize(keyDir + viewDir);
-    float spec = pow(max(dot(normal, halfVec), 0.0), 28.0) * 0.26;
+    float spec = pow(max(dot(normal, halfVec), 0.0), 34.0) * 0.28;
 
-    vec3 litColor = uBaseColor * (keyTerm + fillTerm + topTerm + uEmission * 0.38);
-    vec3 rimColor = mix(uBaseColor * 1.35, vec3(0.55, 0.92, 1.0), 0.35 + uHighlight * 0.45);
-    litColor += rimColor * fresnel * (0.48 + uEmission * 0.45 + uHighlight * 0.75);
-    litColor += vec3(0.88, 0.96, 1.0) * spec * (1.0 - uGhostMode * 0.6);
+    // Theme-aware pigment strength so specimen reads crisply on BOTH obsidian and light drafting paper
+    vec3 pigment = mix(uBaseColor * 0.92, uBaseColor * 0.62, uThemeLight);
+    vec3 litColor = pigment * (keyTerm + fillTerm + topTerm + uEmission * 0.30);
+
+    vec3 darkRim = mix(uBaseColor * 1.25, vec3(0.10, 0.55, 0.52), 0.36 + uHighlight * 0.42);
+    vec3 lightRim = mix(uBaseColor * 0.42, vec3(0.02, 0.24, 0.32), 0.45 + uHighlight * 0.45);
+    vec3 rimColor = mix(darkRim, lightRim, uThemeLight);
+
+    litColor += rimColor * fresnel * mix(0.46 + uEmission * 0.35 + uHighlight * 0.65, 0.38 + uHighlight * 0.55, uThemeLight);
+    litColor += vec3(0.75, 0.85, 0.90) * spec * (1.0 - uGhostMode * 0.65);
 
     // Tonotopic Rainbow & von Békésy Traveling Wave
     if (uTonotopyMode > 0.01) {
       vec3 spectralColor = getGreenwoodSpectralColor(vGreenwoodX);
-      vec3 tonotopyLit = spectralColor * (keyTerm * 0.95 + fillTerm + topTerm * 0.8 + 0.38);
+      vec3 tonotopyLit = spectralColor * (keyTerm * 0.95 + fillTerm + topTerm * 0.78 + 0.32);
 
       // Active resonant tone & asymmetric von Békésy wave
       if (uActiveGreenwoodX >= 0.0 && uWaveAmplitude > 0.01) {
         float x0 = uActiveGreenwoodX;
         float bw = max(0.012, uResonantBandwidth);
 
-        // 1. Asymmetric traveling wave:
-        // Energy starts at base (x=1.0) traveling apically towards x0, building amplitude,
-        // then rapidly decays beyond x0 towards apex (x < x0).
         float wave = 0.0;
         if (vGreenwoodX >= x0) {
           float distBase = vGreenwoodX - x0;
@@ -212,21 +219,20 @@ const FRAGMENT_SHADER = /* glsl */ `
           wave = steepCutoff * sin(distApex * 35.0 - uWavePhase);
         }
 
-        // 2. Resonant Core Peak (Gaussian localization)
         float coreDist = abs(vGreenwoodX - x0);
         float core = exp(-pow(coreDist / bw, 2.0));
 
-        tonotopyLit += spectralColor * (wave * 0.38 * uWaveAmplitude);
-        vec3 coreGlow = mix(vec3(1.0), spectralColor * 1.6, 0.4);
-        tonotopyLit += coreGlow * (core * 0.95 * uWaveAmplitude);
+        tonotopyLit += spectralColor * (wave * 0.28 * uWaveAmplitude);
+        vec3 coreGlow = mix(vec3(0.92), spectralColor * 1.35, 0.42);
+        tonotopyLit += coreGlow * (core * 0.72 * uWaveAmplitude);
       }
 
-      // 3. Clinical Audiogram Hearing Loss Sector
+      // Clinical Audiogram Hearing Loss Sector (linearized)
       if (uLossMaskActive > 0.5) {
         if (vGreenwoodX >= uLossRange.x && vGreenwoodX <= uLossRange.y) {
-          float gray = dot(tonotopyLit, vec3(0.299, 0.587, 0.114));
-          vec3 crimson = vec3(0.92, 0.16, 0.28);
-          vec3 damaged = mix(vec3(gray) * 0.65, crimson, 0.88);
+          float lum = dot(tonotopyLit, vec3(0.2126, 0.7152, 0.0722));
+          vec3 crimson = vec3(0.68, 0.05, 0.12);
+          vec3 damaged = mix(vec3(lum * 0.42), crimson, 0.82);
           tonotopyLit = mix(tonotopyLit, damaged, clamp(uLossSeverity, 0.0, 1.0));
         }
       }
@@ -236,96 +242,100 @@ const FRAGMENT_SHADER = /* glsl */ `
 
     // Caloric Thermal Convection Shader on Lateral Duct
     if (uCaloricActive > 0.01 && uCaloricDiffusion > 0.001) {
-      // Coordinate along lateral arch in RAS space:
-      // X ranges ~4.2 mm (medial ampulla) to ~10.7 mm (lateral arch peak)
       float xCoord = abs(vWorldPosition.x);
       float uThermal = clamp((xCoord - 4.2) / (10.7 - 4.2), 0.0, 1.0);
 
-      // Convective flow ripple: animated waves along canal lumen
       float flowDir = (uCaloricTempDiff > 0.0) ? 1.0 : -1.0;
       float flowRipple = sin(uThermal * 18.0 + uCaloricTime * 4.0 * flowDir) * 0.15 + 0.85;
 
       vec3 thermalColor;
       if (uCaloricTempDiff < -20.0) {
-        // Ice water (4°C, ΔT = -33°C): intense frosty white-cyan with sparkle
-        vec3 iceBase = vec3(0.01, 0.52, 0.78);
-        vec3 frostPeak = vec3(0.88, 0.95, 1.0);
-        float sparkle = pow(max(0.0, sin(uThermal * 40.0 + uCaloricTime * 6.0)), 4.0) * 0.4;
+        vec3 iceBase = vec3(0.02, 0.25, 0.56);
+        vec3 frostPeak = vec3(0.72, 0.86, 0.98);
+        float sparkle = pow(max(0.0, sin(uThermal * 40.0 + uCaloricTime * 6.0)), 4.0) * 0.32;
         thermalColor = mix(iceBase, frostPeak, uThermal) * (flowRipple + sparkle);
       } else if (uCaloricTempDiff < 0.0) {
-        // Cold (30°C, ΔT = -7°C): Crystalline cyan-blue
-        vec3 coldDeep = vec3(0.11, 0.31, 0.85); // #1d4ed8
-        vec3 coldLight = vec3(0.22, 0.74, 0.97); // #38bdf8
+        vec3 coldDeep = vec3(0.03, 0.14, 0.62);
+        vec3 coldLight = vec3(0.06, 0.48, 0.78);
         thermalColor = mix(coldDeep, coldLight, uThermal) * flowRipple;
       } else {
-        // Warm (44°C, ΔT = +7°C): Fiery amber-orange to crimson
-        vec3 warmAmpulla = vec3(0.88, 0.11, 0.28); // #e11d48
-        vec3 warmArch = vec3(1.0, 0.42, 0.0); // #ff6b00
+        vec3 warmAmpulla = vec3(0.62, 0.04, 0.12);
+        vec3 warmArch = vec3(0.86, 0.24, 0.02);
         thermalColor = mix(warmAmpulla, warmArch, uThermal) * flowRipple;
       }
 
       float thermalIntensity = clamp(abs(uCaloricTempDiff) / 7.0, 0.5, 2.0) * uCaloricDiffusion * uCaloricActive;
-      litColor = mix(litColor, thermalColor * (1.3 + fresnel * 0.5), min(0.92, thermalIntensity * 0.85));
+      litColor = mix(litColor, thermalColor * (1.05 + fresnel * 0.35), min(0.92, thermalIntensity * 0.85));
     }
 
-    // Cross-section cut edge highlight glow (within 0.18 mm of clipping plane)
+    // Cross-section cut edge highlight glow (within 0.24 mm of clipping plane, theme-calibrated)
     if (uClipActive > 0.5) {
-      float clipDist = dot(vWorldPosition, uClipNormal) + uClipConstant;
-      float cutEdge = 1.0 - smoothstep(0.0, 0.22, clipDist);
-      litColor = mix(litColor, vec3(0.322, 0.863, 0.949) * 1.45, cutEdge * 0.85);
+      float cutEdge = 1.0 - smoothstep(0.0, 0.26, clipDist);
+      vec3 cutColor = mix(vec3(0.18, 0.78, 0.72), vec3(0.03, 0.36, 0.46), uThemeLight);
+      litColor = mix(litColor, cutColor * 1.25, cutEdge * 0.88);
     }
 
     // Selection / hover highlight boost
     if (uHighlight > 0.01) {
-      litColor = mix(litColor, rimColor * 1.25, uHighlight * (0.25 + 0.55 * fresnel));
+      litColor = mix(litColor, rimColor * 1.15, uHighlight * (0.20 + 0.44 * fresnel));
     }
 
     // Surgical Translocation Crimson Flash Alarm
     if (uTranslocationBreach > 0.01) {
-      vec3 crimsonBreach = vec3(0.98, 0.04, 0.18);
-      float pulse = 0.7 + 0.3 * sin(uSurgicalTime * 16.0);
-      litColor = mix(litColor, crimsonBreach * (1.3 * pulse), uTranslocationBreach * 0.85);
+      vec3 crimsonBreach = vec3(0.78, 0.04, 0.14);
+      float pulse = 0.65 + 0.35 * sin(uSurgicalTime * 16.0);
+      litColor = mix(litColor, crimsonBreach * (1.15 * pulse), uTranslocationBreach * 0.82);
     }
 
     // Surgical Otologic Drill Cutting Visual
     if (uSurgicalDrillActive > 0.5) {
-      // Localized drill burr friction glow near lateral canal / antrum [8.68, 0.45, 0.82]
       float drillDist = length(vWorldPosition - vec3(8.68, 0.45, 0.82));
       if (drillDist < 3.2) {
         float drillFlicker = 0.85 + 0.15 * sin(uSurgicalTime * 45.0);
-        litColor = mix(litColor, vec3(1.0, 0.92, 0.55) * 1.5 * drillFlicker, (1.0 - drillDist / 3.2) * 0.65);
+        litColor = mix(litColor, vec3(0.95, 0.78, 0.22) * 1.3 * drillFlicker, (1.0 - drillDist / 3.2) * 0.65);
       }
     }
 
     // Canal unroofing glistening cut edge highlight
     if (uCanalUnroofed.x > 0.5 || uCanalUnroofed.y > 0.5 || uCanalUnroofed.z > 0.5) {
       float unroofEdge = smoothstep(0.30, 0.40, vNormalWorld.z);
-      litColor = mix(litColor, vec3(0.85, 0.95, 1.0) * 1.35, unroofEdge * 0.4);
+      vec3 unroofCol = mix(vec3(0.68, 0.86, 0.98), vec3(0.18, 0.38, 0.48), uThemeLight);
+      litColor = mix(litColor, unroofCol * 1.25, unroofEdge * 0.4);
     }
 
     float finalAlpha = uOpacity;
 
     if (uGhostMode > 0.5) {
-      // Fresnel X-Ray Ghost Silhouette: transparent interior, crisp luminous rim
-      float ghostRim = pow(1.0 - ndotv, 1.75);
-      float bfAtten = isBackface ? 0.32 : 1.0;
-      finalAlpha = clamp((0.04 + 0.46 * ghostRim) * uOpacity * bfAtten, 0.02, 0.62);
-      litColor = mix(uBaseColor * 0.78, vec3(0.45, 0.82, 0.96), ghostRim * 0.65);
+      // Fresnel X-Ray Ghost Silhouette: transparent interior, crisp luminous/drafting rim
+      float ghostRim = pow(1.0 - ndotv, 1.8);
+      float bfAtten = isBackface ? 0.28 : 1.0;
+      float baseFill = mix(0.03, 0.06, uThemeLight);
+      float rimWeight = mix(0.40, 0.44, uThemeLight);
+      finalAlpha = clamp((baseFill + rimWeight * ghostRim) * uOpacity * bfAtten, 0.02, 0.56);
+      vec3 ghostDarkCol = mix(uBaseColor * 0.55, vec3(0.12, 0.54, 0.60), ghostRim * 0.55);
+      vec3 ghostLightCol = mix(vec3(0.28, 0.34, 0.38), vec3(0.04, 0.28, 0.36), ghostRim * 0.65);
+      litColor = mix(ghostDarkCol, ghostLightCol, uThemeLight);
       if (uHighlight > 0.01) {
-        finalAlpha = clamp(finalAlpha + 0.25 * uHighlight, 0.05, 0.85);
+        finalAlpha = clamp(finalAlpha + 0.24 * uHighlight, 0.05, 0.85);
       }
     } else if (uOpacity < 0.82) {
       // Gate 3 translucent lumen shader: clear front lumen + attenuated backface + crisp rim
-      float bfAtten = isBackface ? 0.38 : 1.0;
-      float edgeAlpha = mix(uOpacity * 0.48, min(0.92, uOpacity * 1.58), fresnel);
-      finalAlpha = clamp(edgeAlpha * bfAtten + uHighlight * 0.18, 0.05, 0.95);
+      float bfAtten = isBackface ? 0.42 : 1.0;
+      float edgeAlpha = mix(uOpacity * 0.56, min(0.95, uOpacity * 1.42), fresnel);
+      finalAlpha = clamp(edgeAlpha * bfAtten + uHighlight * 0.16, 0.07, 0.95);
     }
 
     if (uTonotopyMode > 0.01) {
-      finalAlpha = mix(finalAlpha, 0.88, uTonotopyMode * 0.35);
+      finalAlpha = mix(finalAlpha, mix(0.86, 0.93, uThemeLight), uTonotopyMode * 0.65);
+    }
+
+    if (uClipActive > 0.5 && isBackface) {
+      finalAlpha = max(finalAlpha, 0.36);
     }
 
     gl_FragColor = vec4(litColor, finalAlpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
   }
 `;
 
@@ -342,6 +352,7 @@ export function createGate3StructureMaterial(options: {
     uRimPower: { value: 2.1 },
     uGhostMode: { value: 0.0 },
     uHighlight: { value: 0.0 },
+    uThemeLight: { value: 0.0 },
     uSingleSurface: { value: options.singleSurface ? 1.0 : 0.0 },
     uClipActive: { value: 0.0 },
     uClipNormal: { value: new THREE.Vector3(0, 0, -1) },
@@ -372,6 +383,7 @@ export function createGate3StructureMaterial(options: {
     fragmentShader: FRAGMENT_SHADER,
     uniforms: uniforms as unknown as Record<string, THREE.IUniform>,
     transparent: true,
+    toneMapped: true,
     depthWrite: !isTranslucent,
     depthTest: true,
     side: THREE.DoubleSide,
@@ -385,6 +397,7 @@ export function updateGate3MaterialState(
     baseAlpha: number;
     overrideOpacity?: number;
     highlightLevel: number; // 0 = none, 0.5 = hover, 1.0 = selected
+    themeLight?: number;
     clipActive: boolean;
     clipNormal: THREE.Vector3;
     clipConstant: number;
@@ -420,6 +433,7 @@ export function updateGate3MaterialState(
   }
 
   u.uHighlight.value = params.highlightLevel;
+  if (params.themeLight !== undefined) u.uThemeLight.value = params.themeLight;
   u.uClipActive.value = params.clipActive ? 1.0 : 0.0;
   u.uClipNormal.value.copy(params.clipNormal);
   u.uClipConstant.value = params.clipConstant;
