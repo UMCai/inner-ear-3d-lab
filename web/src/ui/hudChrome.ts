@@ -1,4 +1,4 @@
-import type { StructureOntologyItem } from '../data/ontology';
+import { SYSTEM_GROUPS, type StructureOntologyItem } from '../data/ontology';
 import type { LabMode, LabelDensityMode, ReadingDepth } from '../render/DualStageScene';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -40,6 +40,9 @@ export const SVG_ICONS = {
   collapse: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>`,
   labels: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="12" r="2.2" /><path d="M11 8h8M11 12h8M11 16h6" /></svg>`,
   reset: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.5-5.8L4 8.7" /><path d="M4 4.5v4.2h4.2" /></svg>`,
+  undo: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>`,
+  eye: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.8" /></svg>`,
+  eyeOff: `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18" /><path d="M10.6 6.2A9.8 9.8 0 0 1 12 6c6 0 9.5 6 9.5 6a16.8 16.8 0 0 1-3.4 4.1M6.6 6.6C4 8.5 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.9-.3 4.1-.9" /></svg>`,
 };
 
 export function formatRAS(ras: [number, number, number]): string {
@@ -47,12 +50,47 @@ export function formatRAS(ras: [number, number, number]): string {
   return `[${fmt(ras[0])}, ${fmt(ras[1])}, ${fmt(ras[2])}]`;
 }
 
-export function compactFluidLabel(fluid: string): string {
+export function compactFluidLabel(fluid: string, includePotential = false): string {
+  if (includePotential) {
+    const potMatch = fluid.match(/[+-]?\d+\s*mV/i);
+    const base = fluid.replace(/\s*\([^)]*\)/g, '').trim().split(',')[0].split(' / ')[0].trim();
+    return potMatch ? `${base} (${potMatch[0]})` : base;
+  }
   const clean = fluid.replace(/\s*\([^)]*\)/g, '').trim();
   const segments = clean.split(',').map((s) => s.trim()).filter(Boolean);
   if (segments.length <= 1) return clean;
   const head = segments[0].split(' / ')[0].trim();
   return `${head} + ${segments.length - 1}`;
+}
+
+export function matchesStructureQuery(item: StructureOntologyItem, rawQuery: string): boolean {
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return true;
+  const isV8Query =
+    q === 'v8' ||
+    q === 'cn8' ||
+    q === 'cn viii' ||
+    q === 'cnviii' ||
+    q === 'viii' ||
+    q === '8' ||
+    q.includes('cranial nerve 8') ||
+    q.includes('cranial nerve viii') ||
+    q.includes('vestibulocochlear') ||
+    q.includes('acoustic nerve') ||
+    q.includes('vestibular nerve') ||
+    q.includes('cochlear nerve') ||
+    q === 'nerve';
+
+  return (
+    item.displayName.toLowerCase().includes(q) ||
+    item.latinName.toLowerCase().includes(q) ||
+    item.shortLabel.toLowerCase().includes(q) ||
+    (SYSTEM_GROUPS[item.systemGroup]?.title.toLowerCase().includes(q) ?? false) ||
+    item.fluidCompartment.toLowerCase().includes(q) ||
+    Boolean(item.innervation && item.innervation.toLowerCase().includes(q)) ||
+    Boolean(item.clinicalPearl && item.clinicalPearl.toLowerCase().includes(q)) ||
+    (isV8Query && Boolean(item.innervation && (item.innervation.includes('CN VIII') || item.innervation.includes('Nerve'))))
+  );
 }
 
 export function formatStructureHeadline(item: StructureOntologyItem): string {

@@ -608,11 +608,11 @@ export class EyeAvatarEngine {
 
     // Realistic Balanced Illumination
     // Ambient fill prevents pitch shadows while preserving 3D form
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.48);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.42);
     this.scene.add(ambientLight);
 
     // Warm key directional light produces crisp corneal specular glints
-    const dirLight = new THREE.DirectionalLight(0xfffaf2, 1.05);
+    const dirLight = new THREE.DirectionalLight(0xfffaf2, 0.86);
     dirLight.position.set(0.08, 0.18, -0.22);
     this.scene.add(dirLight);
 

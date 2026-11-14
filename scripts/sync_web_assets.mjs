@@ -20,6 +20,7 @@ const SRC_IEMAP = join(REPO_ROOT, 'assets', 'iemap');
 const DST_IEMAP = join(REPO_ROOT, 'web', 'public', 'assets', 'iemap');
 const DST_OBJ = join(DST_IEMAP, 'obj');
 const DST_FCSV = join(DST_IEMAP, 'fcsv');
+const DST_RAD = join(DST_IEMAP, 'radiology');
 
 function copyIfNeeded(src, dst) {
   if (!existsSync(src)) {
@@ -44,6 +45,7 @@ function main() {
 
   mkdirSync(DST_OBJ, { recursive: true });
   mkdirSync(DST_FCSV, { recursive: true });
+  mkdirSync(DST_RAD, { recursive: true });
 
   let copied = 0;
   const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
@@ -84,8 +86,20 @@ function main() {
     }
   }
 
+  const radDir = join(SRC_IEMAP, 'radiology');
+  let radCount = 0;
+  if (existsSync(radDir)) {
+    const radFiles = readdirSync(radDir).filter((f) => !f.startsWith('.')).sort();
+    for (const fname of radFiles) {
+      if (copyIfNeeded(join(radDir, fname), join(DST_RAD, fname))) {
+        copied++;
+      }
+      radCount++;
+    }
+  }
+
   console.log(
-    `[sync_web_assets] Web assets up to date (${Object.keys(meta.meshes ?? {}).length} OBJ meshes, ${fcsvFiles.length} FCSV, ${requiredFiles.length} core files; copied ${copied} updated file(s)).`
+    `[sync_web_assets] Web assets up to date (${Object.keys(meta.meshes ?? {}).length} OBJ meshes, ${fcsvFiles.length} FCSV, ${requiredFiles.length} core files, ${radCount} radiology files; copied ${copied} updated file(s)).`
   );
 }
 

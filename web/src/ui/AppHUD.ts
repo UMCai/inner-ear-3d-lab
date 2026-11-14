@@ -60,6 +60,7 @@ import {
   formatStructureHeadline,
   getCompactNoteSentence,
   getStructurePrimaryMetric,
+  matchesStructureQuery,
   supportsTopLayerExit,
   updateRangeProgress,
   type NoteState,
@@ -388,6 +389,7 @@ export class AppHUD {
     this.scene.onStructurePicked((meshName) => this.handleStructurePicked(meshName));
     this.scene.onVestibularTelemetry((telem) => this.handleLiveVestibularTelemetry(telem));
     this.scene.onHearingToneRequest((freqHz) => {
+      this.applyHearingAttenuation(freqHz);
       if (this.toneSynth.getIsPlaying()) {
         this.toneSynth.setFrequency(freqHz);
       }
@@ -772,7 +774,10 @@ export class AppHUD {
                   <div class="parts-drawer" id="parts-drawer" role="region" aria-label="Anatomical Parts List">
                     <div class="parts-drawer-header">
                       <h2 class="parts-drawer-title">All 27 Anatomical Structures</h2>
-                      <button type="button" class="drawer-close-btn" id="drawer-close-btn" aria-label="Close parts list">✕</button>
+                      <div class="parts-drawer-actions">
+                        <button type="button" class="drawer-undo-btn" id="btn-parts-undo" title="Undo last visibility change" aria-label="Undo last visibility change" disabled>${SVG_ICONS.undo}<span>Undo</span></button>
+                        <button type="button" class="drawer-close-btn" id="drawer-close-btn" aria-label="Close parts list">✕</button>
+                      </div>
                     </div>
                     <div class="lab-filter-row" id="parts-filter-chips" role="group" aria-label="Filter by system">
                       <button type="button" class="chip-btn active" data-sys-filter="all">All (27)</button>
@@ -940,11 +945,11 @@ export class AppHUD {
           <!-- 4C. Radiology Workbench Dock Content -->
           <div class="radiology-dock-content" id="radiology-dock-content" style="display: none;">
             <div class="radiology-plane-group" id="rad-plane-chips" role="group" aria-label="Radiological Slicing Planes">
-              <button type="button" class="plane-chip active" data-plane="poschl" title="Pöschl's Oblique Sagittal (Parallel to SSC)">
-                <span class="chip-label">Pöschl</span>
+              <button type="button" class="plane-chip active" data-plane="poschl" title="Pöschl's Oblique Sagittal (Parallel to SSC Arch)">
+                <span class="chip-label">Pöschl · Arch</span>
               </button>
-              <button type="button" class="plane-chip" data-plane="stenvers" title="Stenvers' Oblique Coronal (Perpendicular to SSC)">
-                <span class="chip-label">Stenvers</span>
+              <button type="button" class="plane-chip" data-plane="stenvers" title="Stenvers' Oblique Coronal (Cross-Section of SSC)">
+                <span class="chip-label">Stenvers · Cross</span>
               </button>
               <button type="button" class="plane-chip" data-plane="axial" title="True Axial Transverse MPR">
                 <span class="chip-label">Axial</span>
@@ -1006,11 +1011,11 @@ export class AppHUD {
               <div class="vestibular-protocol-group" id="vest-protocol-chips" role="group" aria-label="BPPV Clinical Protocols">
                 <button type="button" class="protocol-chip active" data-maneuver="epley" title="Epley Maneuver (Posterior Canal - 5 Steps)">
                   <span class="chip-badge">Post</span>
-                  <span class="chip-label">Epley (5s)</span>
+                  <span class="chip-label">Epley (5-Step)</span>
                 </button>
                 <button type="button" class="protocol-chip" data-maneuver="semont" title="Semont Liberatory Maneuver (Posterior Canal - 3 Steps)">
                   <span class="chip-badge">Post</span>
-                  <span class="chip-label">Semont (3s)</span>
+                  <span class="chip-label">Semont (3-Step)</span>
                 </button>
                 <button type="button" class="protocol-chip" data-maneuver="gufoni_geotropic" title="Gufoni Maneuver (Horizontal Geotropic - 4 Steps)">
                   <span class="chip-badge">Horiz</span>
@@ -1026,7 +1031,7 @@ export class AppHUD {
                 </button>
                 <button type="button" class="protocol-chip" data-maneuver="yacovino" title="Yacovino Maneuver (Anterior Canal - 4 Steps)">
                   <span class="chip-badge">Ant</span>
-                  <span class="chip-label">Yacovino (4s)</span>
+                  <span class="chip-label">Yacovino (4-Step)</span>
                 </button>
               </div>
 
@@ -1210,7 +1215,7 @@ export class AppHUD {
 
               <div class="surg-timeline-wrap">
                 <div class="timeline-header">
-                  <span class="timeline-title" id="ci-depth-title">Insertion Depth: 0.0 mm (0.0°)</span>
+                  <span class="timeline-title" id="ci-depth-title">Depth: 0.0 mm (0°)</span>
                   <div class="timeline-meta-cluster">
                     <span class="hold-timer-badge" id="ci-force-badge">F: 0.0 mN</span>
                     <span class="clearance-badge" id="ci-risk-badge">OPTIMAL</span>
@@ -2000,6 +2005,11 @@ export class AppHUD {
       this.closePartsDrawer();
     });
 
+    const partsUndoBtn = this.root.querySelector('#btn-parts-undo') as HTMLButtonElement | null;
+    partsUndoBtn?.addEventListener('click', () => {
+      this.scene.undoDissection();
+    });
+
     this.partsFilterChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         this.partsSystemFilter = (chip.dataset.sysFilter as 'all' | SystemGroupId) || 'all';
@@ -2064,7 +2074,9 @@ export class AppHUD {
       const isPlaying = !this.toneSynth.getIsPlaying();
       const currentFreq = this.scene.getSnapshot().hearingState.activeFrequency;
       if (isPlaying) {
+        this.applyHearingAttenuation(currentFreq);
         this.toneSynth.play(currentFreq);
+        this.applyHearingAttenuation(currentFreq);
       } else {
         this.toneSynth.pause();
       }
@@ -2105,6 +2117,8 @@ export class AppHUD {
 
     this.audiogramDrawer.onPresetChange((presetId, lossSector) => {
       this.scene.setHearingLossSector(lossSector, presetId);
+      const currentFreq = this.scene.getSnapshot().hearingState.activeFrequency;
+      this.applyHearingAttenuation(currentFreq);
     });
 
     // 11. Radiology Workbench Listeners
@@ -2156,7 +2170,7 @@ export class AppHUD {
       this.scene.setSCDSActive(next);
       this.radiologyScdsBtn.classList.toggle('active', next);
       if (this.audiogramDrawer) {
-        this.audiogramDrawer.setActivePreset(next ? 'conductive_scds' : 'normal');
+        this.audiogramDrawer.setActivePreset(next ? 'scds' : 'normal');
       }
       if (this.ctSliceDrawer) {
         const st = this.scene.getRadiologyState();
@@ -2372,6 +2386,12 @@ export class AppHUD {
 
     this.vorDrawer.onAlexanderGazeChange((gaze) => {
       this.selectCaloricAlexanderGaze(gaze);
+    });
+
+    this.vorDrawer.onFixationChange(() => {
+      if (this.vestSubmode === 'caloric') {
+        this.selectCaloricAlexanderGaze(this.caloricAlexanderGaze);
+      }
     });
 
     this.vorDrawer.onClose(() => {
@@ -2705,33 +2725,7 @@ export class AppHUD {
       return;
     }
 
-    const q = query.toLowerCase();
-    const isV8Query =
-      q === 'v8' ||
-      q === 'cn8' ||
-      q === 'cn viii' ||
-      q === 'cnviii' ||
-      q === 'viii' ||
-      q === '8' ||
-      q.includes('cranial nerve 8') ||
-      q.includes('cranial nerve viii') ||
-      q.includes('vestibulocochlear') ||
-      q.includes('acoustic nerve') ||
-      q.includes('vestibular nerve') ||
-      q.includes('cochlear nerve') ||
-      q === 'nerve';
-
-    const matches = IEMAP_STRUCTURES.filter((item) => {
-      const matchName = item.displayName.toLowerCase().includes(q);
-      const matchLatin = item.latinName.toLowerCase().includes(q);
-      const matchShort = item.shortLabel.toLowerCase().includes(q);
-      const matchGroup = SYSTEM_GROUPS[item.systemGroup]?.title.toLowerCase().includes(q);
-      const matchInnervation = item.innervation && item.innervation.toLowerCase().includes(q);
-      const matchPearl = item.clinicalPearl && item.clinicalPearl.toLowerCase().includes(q);
-      const matchV8 = isV8Query && Boolean(item.innervation && (item.innervation.includes('CN VIII') || item.innervation.includes('Nerve')));
-
-      return matchName || matchLatin || matchShort || matchGroup || matchInnervation || matchPearl || matchV8;
-    });
+    const matches = IEMAP_STRUCTURES.filter((item) => matchesStructureQuery(item, query));
 
     if (matches.length === 0) {
       this.searchDropdown.innerHTML = `
@@ -3315,7 +3309,7 @@ export class AppHUD {
     } else if (proc === 'labyrinthectomy') {
       this.scene.selectStructure('ls_Hsapiens_Sl', false);
     } else if (proc === 'neurectomy') {
-      this.scene.selectStructure('ls_Hsapiens_Sv', false);
+      this.scene.selectStructure('ls_Hsapiens_utricle', false);
     }
 
     this.syncSurgicalUI();
@@ -3348,7 +3342,7 @@ export class AppHUD {
       }
     }
 
-    this.ciDepthTitleEl.textContent = `Insertion Depth: ${ciState.insertionDepthMm.toFixed(1)} mm (${ciState.angularDepthDeg.toFixed(1)}°)`;
+    this.ciDepthTitleEl.textContent = `Depth: ${ciState.insertionDepthMm.toFixed(1)} mm (${ciState.angularDepthDeg.toFixed(0)}°)`;
     this.ciForceBadgeEl.textContent = `F: ${ciState.insertionForceMilliNewtons.toFixed(1)} mN`;
     this.ciRiskBadgeEl.textContent = ciState.translocationRisk.toUpperCase();
 
@@ -3799,10 +3793,10 @@ export class AppHUD {
     const isIce = temp === 'Ice4';
     if (this.caloricStatusTitleEl) {
       this.caloricStatusTitleEl.textContent = isIce
-        ? 'Ice 4°C: Strong Ampullofugal Inhibition -> Opposite Fast Phase'
+        ? 'Ice 4°C · Opposite Fast Phase'
         : isWarm
-        ? `Warm 44°C: Ampullopetal Excitation -> ${isLeft ? 'Left' : 'Right'} (Same) Fast Phase`
-        : `Cold 30°C: Ampullofugal Inhibition -> ${isLeft ? 'Right' : 'Left'} (Opposite) Fast Phase`;
+        ? `Warm 44°C · Ampullopetal (${isLeft ? 'L' : 'R'}-Beat)`
+        : `Cold 30°C · Ampullofugal (${isLeft ? 'R' : 'L'}-Beat)`;
     }
 
     this.selectCaloricAlexanderGaze(this.caloricAlexanderGaze);
@@ -3874,6 +3868,9 @@ export class AppHUD {
         this.caloricAlexanderGaze,
         beatSign
       );
+      const fixFactor = this.vorDrawer?.isFixationActive() ? 0.3 : 1.0;
+      const effectiveSPV = alex.modulatedSPV * fixFactor;
+      const fixTag = fixFactor < 1.0 ? ' · Fix' : '';
 
       this.scene.setCaloricUniforms(
         true,
@@ -3881,20 +3878,21 @@ export class AppHUD {
         Math.min(1.0, this.caloricElapsedSec / 40.0),
         this.caloricElapsedSec
       );
-      this.scene.setCaloricSimulationState(true, conv, alex.modulatedSPV);
-      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, alex.modulatedSPV);
+      this.scene.setCaloricSimulationState(true, conv, effectiveSPV);
+      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, effectiveSPV);
 
       if (this.caloricTimerBadgeEl) {
         this.caloricTimerBadgeEl.textContent = `⏱️ ${this.caloricElapsedSec.toFixed(1)}s / 40s`;
       }
       if (this.caloricSpvBadgeEl) {
-        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+        this.caloricSpvBadgeEl.textContent = `SPV: ${effectiveSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})${fixTag}`;
       }
       if (this.caloricAlexBadgeEl) {
         this.caloricAlexBadgeEl.textContent = `${alex.clinicalDegree}`;
       }
       if (this.caloricStatusTitleEl) {
-        this.caloricStatusTitleEl.textContent = `COWS: ${conv.flowDirection.toUpperCase()} | ${conv.fastPhaseBeatDirection} (${conv.beatDirectionDescription})`;
+        const beatShort = conv.fastPhaseBeatDirection === 'Left-Beating' ? 'L-Beat' : 'R-Beat';
+        this.caloricStatusTitleEl.textContent = `COWS · ${conv.flowDirection === 'ampullopetal' ? 'Ampullopetal' : 'Ampullofugal'} (${beatShort})`;
       }
     }, 100);
   }
@@ -3989,23 +3987,26 @@ export class AppHUD {
         ? 1
         : 0;
     const alex = computeAlexanderModulation(conv.slowPhaseVelocity, gazeDeg, beatSign);
+    const fixFactor = this.vorDrawer?.isFixationActive() ? 0.3 : 1.0;
+    const effectiveSPV = alex.modulatedSPV * fixFactor;
+    const fixTag = fixFactor < 1.0 ? ' · Fix' : '';
     if (this.caloricAlexBadgeEl) {
       this.caloricAlexBadgeEl.textContent = `${alex.clinicalDegree}`;
     }
 
     if (this.isCaloricIrrigating) {
-      this.scene.setCaloricSimulationState(true, conv, alex.modulatedSPV);
-      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, alex.modulatedSPV);
+      this.scene.setCaloricSimulationState(true, conv, effectiveSPV);
+      this.vorDrawer.setCaloricActiveIrrigation(this.activeCaloricTemp, effectiveSPV);
       if (this.caloricSpvBadgeEl) {
-        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+        this.caloricSpvBadgeEl.textContent = `SPV: ${effectiveSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})${fixTag}`;
       }
     } else if (this.caloricElapsedSec >= 40.0) {
       if (this.caloricSpvBadgeEl) {
-        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})`;
+        this.caloricSpvBadgeEl.textContent = `SPV: ${effectiveSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})${fixTag}`;
       }
     } else if (this.caloricElapsedSec > 0) {
       if (this.caloricSpvBadgeEl) {
-        this.caloricSpvBadgeEl.textContent = `SPV: ${alex.modulatedSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection}) (Paused)`;
+        this.caloricSpvBadgeEl.textContent = `SPV: ${effectiveSPV.toFixed(1)}°/s (${conv.fastPhaseBeatDirection})${fixTag} (Paused)`;
       }
     } else {
       if (this.caloricSpvBadgeEl) {
@@ -4084,13 +4085,13 @@ export class AppHUD {
 
     let branchLabel = 'CN VIII SVN';
     if (pair === 'ralp') {
-      branchLabel = 'CN VIII Post IVN / Ant SVN';
+      branchLabel = 'Post IVN / Ant SVN';
     } else if (pair === 'larp') {
-      branchLabel = 'CN VIII Ant SVN / Post IVN';
+      branchLabel = 'Ant SVN / Post IVN';
     }
-    const label = pair === 'horizontal' ? 'Horizontal (Yaw)' : pair.toUpperCase();
+    const label = pair === 'horizontal' ? 'Horiz' : pair.toUpperCase();
     if (this.vhitStatusTitleEl) {
-      this.vhitStatusTitleEl.textContent = `Head Impulse (${label}, 15°, 120ms) · ${branchLabel}`;
+      this.vhitStatusTitleEl.textContent = `vHIT ${label} (15° · 120ms) · ${branchLabel}`;
     }
     this.updateVHITReadout();
   }
@@ -4175,6 +4176,7 @@ export class AppHUD {
   }
 
   private handleFrequencyChange(freq: number, updateSlider: boolean): void {
+    this.applyHearingAttenuation(freq);
     this.scene.setHearingFrequency(freq, true);
     if (this.toneSynth.getIsPlaying()) {
       this.toneSynth.setFrequency(freq);
@@ -4183,12 +4185,22 @@ export class AppHUD {
     this.syncFrequencyUI(freq, updateSlider);
   }
 
+  private applyHearingAttenuation(freqHz: number): void {
+    const thresholdDb = this.audiogramDrawer?.getThresholdAtFrequency(freqHz) ?? 10;
+    const lossOverNormal = Math.max(0, thresholdDb - 15);
+    const volume = Math.max(0.06, Math.min(0.88, 0.85 * Math.pow(10, -lossOverNormal / 65)));
+    this.toneSynth.setVolume(volume);
+    this.scene.setHearingThresholdGain(volume / 0.85);
+  }
+
   private syncFrequencyUI(freq: number, updateSlider = true): void {
+    this.applyHearingAttenuation(freq);
     this.hearingFreqReadout.textContent = `${Math.round(freq)} Hz`;
     const landmark = getAcousticLandmark(freq);
     const x = greenwoodPosition(freq);
     const apexDist = getDistanceApexMm(x);
-    this.hearingLandmarkBadge.textContent = `${landmark.shortTag} (${apexDist.toFixed(1)} mm)`;
+    const zoneTag = x > 0.65 ? 'Stiff Base' : x < 0.35 ? 'Compliant Apex' : 'Mid Turn';
+    this.hearingLandmarkBadge.textContent = `${landmark.shortTag} · ${zoneTag} (${apexDist.toFixed(1)} mm)`;
 
     if (updateSlider && document.activeElement !== this.hearingSlider) {
       const val = Math.round((Math.log10(Math.max(20, freq) / 20) / 3) * 1000);
@@ -4342,7 +4354,10 @@ export class AppHUD {
       this.inspDeepProse.textContent = item.physiologicalFunction;
     }
 
-    this.inspFluidEl.textContent = compactFluidLabel(item.fluidCompartment);
+    this.inspFluidEl.textContent = compactFluidLabel(
+      item.fluidCompartment,
+      this.activeReadingDepth === 'detailed'
+    );
     const primaryMetric = getStructurePrimaryMetric(item);
     this.inspMetricKeyEl.textContent = primaryMetric.label;
     this.inspMetricValEl.textContent = primaryMetric.value;
@@ -4726,12 +4741,7 @@ export class AppHUD {
         const groupMeta = SYSTEM_GROUPS[groupId];
         const groupItems = IEMAP_STRUCTURES.filter((item) => {
           if (item.systemGroup !== groupId) return false;
-          if (!q) return true;
-          return (
-            item.displayName.toLowerCase().includes(q) ||
-            item.latinName.toLowerCase().includes(q) ||
-            item.shortLabel.toLowerCase().includes(q)
-          );
+          return matchesStructureQuery(item, q);
         });
         if (groupItems.length === 0) return '';
 
@@ -4748,7 +4758,7 @@ export class AppHUD {
                   data-eye-mesh="${item.meshName}"
                   title="${isHidden ? 'Show part' : 'Hide part'}"
                   aria-label="Toggle ${item.shortLabel}"
-                >${isHidden ? '🚫' : '👁️'}</button>
+                >${isHidden ? SVG_ICONS.eyeOff : SVG_ICONS.eye}</button>
                 <div class="part-labels" data-click-mesh="${item.meshName}">
                   <span class="part-row-title">${item.displayName}</span>
                   <span class="part-row-latin">${item.latinName}</span>
@@ -5067,6 +5077,11 @@ export class AppHUD {
       }
     }
 
+    const undoBtn = this.partsDrawer?.querySelector('#btn-parts-undo') as HTMLButtonElement | null;
+    if (undoBtn) {
+      undoBtn.disabled = !snap.canUndo;
+    }
+
     const partRows = this.root.querySelectorAll<HTMLElement>('.part-row');
     partRows.forEach((row) => {
       const mesh = row.getAttribute('data-mesh');
@@ -5075,8 +5090,11 @@ export class AppHUD {
         const eyeBtn = row.querySelector<HTMLButtonElement>('.eye-toggle-btn');
         if (eyeBtn) {
           const isHidden = snap.visibilityMap[mesh] === 'hidden';
+          const wasHidden = eyeBtn.classList.contains('hidden-state');
           eyeBtn.classList.toggle('hidden-state', isHidden);
-          eyeBtn.textContent = isHidden ? '🚫' : '👁️';
+          if (wasHidden !== isHidden || !eyeBtn.querySelector('svg')) {
+            eyeBtn.innerHTML = isHidden ? SVG_ICONS.eyeOff : SVG_ICONS.eye;
+          }
           eyeBtn.title = isHidden ? 'Show part' : 'Hide part';
         }
       }

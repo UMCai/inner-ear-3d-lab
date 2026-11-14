@@ -64,45 +64,45 @@ export interface DissectionPreset {
 export const SYSTEM_GROUPS: Record<SystemGroupId, SystemGroupMeta> = {
   semicircular_ducts: {
     id: 'semicircular_ducts',
-    title: 'Balance Loops (Semicircular Canals)',
-    shortTitle: 'Balance Loops',
-    subtitle: '3 Fluid-Filled Loops That Sense Head Turning & Tilting',
+    title: 'Semicircular Canals (Balance)',
+    shortTitle: 'Canals',
+    subtitle: 'Three Endolymph Loops for Angular Head Rotation',
     accentHex: '#52dcf2',
     description:
       'Membranous semicircular ducts suspended within the bony canals. Organized in functional coplanar pairs (LARP, RALP, Horizontal) to transduce 3D head angular velocity.',
   },
   ampullae_cupulae: {
     id: 'ampullae_cupulae',
-    title: 'Balance Sensors (Ampullae & Cupulae)',
-    shortTitle: 'Balance Sensors',
-    subtitle: 'Gelatinous Motion-Sensing Flaps at the Base of Each Loop',
+    title: 'Ampullae & Cupulae (Sensors)',
+    shortTitle: 'Ampullae',
+    subtitle: 'Cupula Deflection Receptors at Each Canal Base',
     accentHex: '#f0aa62',
     description:
       'Dilated ampullary chambers at the utricular end of each semicircular duct housing the saddle-shaped crista ampullaris and the elastic 3-zone cupula diaphragm.',
   },
   otolith_vestibule: {
     id: 'otolith_vestibule',
-    title: 'Gravity & Resting Sacs (Utricle & Saccule)',
-    shortTitle: 'Resting Sacs',
-    subtitle: 'Main Chambers Where Balance Crystals Normally Rest',
+    title: 'Otolith Organs (Gravity & Linear)',
+    shortTitle: 'Otoliths',
+    subtitle: 'Utricle & Saccule Chambers Housing Otoconia',
     accentHex: '#75c79e',
     description:
       'Central vestibular sacs containing horizontal (utricular) and vertical (saccular) maculae weighted by calcium carbonate otoconia crystals.',
   },
   cochlear_system: {
     id: 'cochlear_system',
-    title: 'Hearing Snail (Cochlea & Chambers)',
-    shortTitle: 'Hearing Snail',
-    subtitle: 'Spiral Hearing Organ & Fluid Sound Chambers',
+    title: 'Cochlea & Chambers (Hearing)',
+    shortTitle: 'Cochlea',
+    subtitle: 'Tonotopic Spiral & Perilymphatic Scalae',
     accentHex: '#7fa8d4',
     description:
       '2.6-turn helico-spiral auditory organ partitioned into ascending perilymphatic Scala Vestibuli, central endolymphatic Scala Media, and descending Scala Tympani.',
   },
   bony_capsule: {
     id: 'bony_capsule',
-    title: 'Outer Bone Shell (Bony Labyrinth)',
-    shortTitle: 'Outer Bone Shell',
-    subtitle: 'Protective Temporal Bone Shell Around the Inner Ear',
+    title: 'Otic Capsule (Bony Shell)',
+    shortTitle: 'Otic Capsule',
+    subtitle: 'Dense Petrous Temporal Bone Casing',
     accentHex: '#8fa4bc',
     description:
       'Dense petrous bone envelope derived from T2 MRI Otsu segmentation enclosing the perilymphatic space around the delicate membranous labyrinth.',
@@ -296,8 +296,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     subGroup: 'Posterior Ampullary Apparatus',
     defaultState: 'visible',
     colorHex: '#f0aa62',
-    baseAlpha: 0.78,
-    emissionStrength: 0.28,
+    baseAlpha: 0.64,
+    emissionStrength: 0.24,
     centroidRAS: [4.07, -1.10, -2.29],
     explodeOffsetRAS: [2.2, -3.8, -4.2],
     cameraViewOffsetRAS: [11.5, -7.5, -1.5],
@@ -408,8 +408,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     subGroup: 'Anterior Ampullary Apparatus',
     defaultState: 'visible',
     colorHex: '#d4956a',
-    baseAlpha: 0.72,
-    emissionStrength: 0.18,
+    baseAlpha: 0.62,
+    emissionStrength: 0.16,
     centroidRAS: [6.21, 3.30, 2.32],
     explodeOffsetRAS: [3.2, 4.5, 3.5],
     cameraViewOffsetRAS: [13.5, 9.5, 5.5],
@@ -520,8 +520,8 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
     subGroup: 'Lateral Ampullary Apparatus',
     defaultState: 'visible',
     colorHex: '#c98b5f',
-    baseAlpha: 0.72,
-    emissionStrength: 0.18,
+    baseAlpha: 0.62,
+    emissionStrength: 0.16,
     centroidRAS: [7.35, 2.90, 1.00],
     explodeOffsetRAS: [5.2, 3.6, 1.0],
     cameraViewOffsetRAS: [15.0, 8.5, 4.0],
@@ -716,15 +716,15 @@ export const IEMAP_STRUCTURES: StructureOntologyItem[] = [
   {
     meshName: 'mesh_david_cochlea',
     structureId: 'right.cochlea',
-    displayName: 'Membranous Cochlear Spiral (David Atlas)',
-    shortLabel: 'Cochlea (Envelope)',
+    displayName: 'Membranous Cochlear Spiral',
+    shortLabel: 'Cochlear Spiral',
     latinName: 'Labyrinthus cochlearis / Ductus cochlearis',
     etymology: 'Greek: kochlias (snail shell with spiral turns)',
     systemGroup: 'cochlear_system',
     subGroup: 'Cochlear Spiral',
     defaultState: 'visible',
     colorHex: '#6b82a6',
-    baseAlpha: 0.68,
+    baseAlpha: 0.56,
     emissionStrength: 0.14,
     centroidRAS: [1.77, 6.38, -2.96],
     explodeOffsetRAS: [-4.5, 5.5, -3.5],
@@ -927,38 +927,38 @@ export function getPatientSystemSummary(groupId: SystemGroupId): {
   switch (groupId) {
     case 'semicircular_ducts':
       return {
-        title: 'Balance Loops (Semicircular Canals)',
+        title: 'Semicircular Canals (Balance)',
         subtitle: 'Three fluid-filled loops that sense head turns and tilts',
         roleNote:
-          'When tiny ear crystals slip out of the resting sac into one of these fluid loops (most often the back loop), tilting your head makes the crystals slide and briefly triggers a spinning sensation (vertigo).',
+          'When tiny ear crystals slip out of the utricle into one of these fluid canals (most often the posterior canal), tilting your head makes the crystals slide and briefly triggers spinning vertigo.',
       };
     case 'ampullae_cupulae':
       return {
-        title: 'Balance Motion Sensors (Ampullae & Cupulae)',
-        subtitle: 'Soft gel sensor flaps at the end of each balance loop',
+        title: 'Ampullae & Cupulae (Sensors)',
+        subtitle: 'Soft gel sensor flaps at the base of each semicircular canal',
         roleNote:
-          'Each balance loop has a soft gel flap (cupula) that bends when fluid moves. In vertigo (BPPV), sliding crystals pull fluid like a plunger and bend this flap until the crystals settle.',
+          'Each canal has a gelatinous cupula flap that bends when endolymph moves. In BPPV vertigo, sliding crystals pull fluid like a plunger and deflect this cupula until they settle.',
       };
     case 'otolith_vestibule':
       return {
-        title: 'Crystal Resting Sacs (Utricle & Saccule)',
-        subtitle: 'Gravity sensors where ear crystals normally belong',
+        title: 'Otolith Organs (Gravity & Linear)',
+        subtitle: 'Utricle & saccule gravity sensors where otoconia crystals belong',
         roleNote:
-          'Tiny calcium crystals normally sit inside these sacs to help you feel gravity and straight-line motion. The Epley head-turn treatment guides loose crystals out of the balance loop and back home to the utricle sac.',
+          'Tiny calcium carbonate crystals normally rest on macular membranes inside these chambers to sense gravity and tilt. Canalith repositioning guides loose crystals safely back to the utricle.',
       };
     case 'cochlear_system':
       return {
-        title: 'Hearing Organ (Cochlear Snail)',
-        subtitle: 'Spiral fluid tunnels that turn sound vibrations into hearing',
+        title: 'Cochlea & Chambers (Hearing)',
+        subtitle: 'Spiral auditory duct and fluid chambers (scalae)',
         roleNote:
-          'The snail-shaped cochlea sits right next to the balance organs in the inner ear, but its job is hearing rather than balance. Classic crystal vertigo (BPPV) does not damage your hearing.',
+          'The spiral cochlea sits adjacent to the vestibular system in the inner ear and converts sound vibrations into nerve signals. Typical BPPV crystal vertigo leaves hearing intact.',
       };
     case 'bony_capsule':
       return {
-        title: 'Protective Bone Shell (Bony Labyrinth)',
-        subtitle: 'Hard skull bone that surrounds and cushions the inner ear',
+        title: 'Otic Capsule (Bony Shell)',
+        subtitle: 'Dense petrous bone casing protecting the membranous labyrinth',
         roleNote:
-          'This dense bone shell forms a protective hollow casing inside the skull to shield the delicate balance loops and hearing snail.',
+          'This rigid bony labyrinth forms a protective hollow shell inside the temporal bone around the delicate sensory canals and cochlea.',
       };
   }
 }
@@ -1355,8 +1355,10 @@ export const KEY_STRUCTURE_MESH_NAMES = new Set<string>([
   'ls_Hsapiens_Sp',
   'ls_Hsapiens_Sa',
   'ls_Hsapiens_Sl',
-  'ls_Hsapiens_CCp',
-  'ls_Hsapiens_Ap',
+  'ls_Hsapiens_CCa',
+  'ls_Hsapiens_Post_Cup_Duct',
+  'ls_Hsapiens_Ant_Cup_Duct',
+  'ls_Hsapiens_Lat_Cup_Duct',
   'ls_Hsapiens_utricle',
   'mesh_david_sacculus',
   'mesh_david_cochlea',

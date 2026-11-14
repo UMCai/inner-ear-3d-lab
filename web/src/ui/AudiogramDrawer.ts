@@ -13,6 +13,7 @@ export interface AudiogramPreset {
   shortLabel: string;
   subtitle: string;
   thresholds: Record<number, number>; // freqHz -> dB HL
+  boneThresholds?: Record<number, number>; // unmasked right bone conduction ([)
   lossSector: [number, number] | null; // [xMin, xMax] on 3D cochlea
   description: string;
 }
@@ -62,8 +63,9 @@ export const AUDIOGRAM_PRESETS: Record<string, AudiogramPreset> = {
     shortLabel: 'SSCD',
     subtitle: 'Low-frequency pseudo-conductive air-bone gap',
     thresholds: { 125: 35, 250: 30, 500: 20, 1000: 15, 2000: 10, 4000: 10, 8000: 10 },
+    boneThresholds: { 125: -5, 250: -10, 500: -10, 1000: -5, 2000: 10, 4000: 15, 8000: 20 },
     lossSector: [0.0, 0.25], // < 1 kHz, acoustic energy leakage
-    description: 'Third-window acoustic energy leakage causes low-frequency conductive loss on air conduction (25–30 dB HL at 250 Hz) while bone conduction remains supranormal (-5 to 0 dB HL).',
+    description: 'Third-window acoustic energy leakage causes low-frequency conductive loss on air conduction (25–30 dB HL at 250 Hz) while bone conduction ([) remains supranormal (-10 to 0 dB HL).',
   },
   acoustic_trauma: {
     id: 'acoustic_trauma',
@@ -166,6 +168,24 @@ export class AudiogramDrawer {
     this.updateFrequencyCursor();
   }
 
+  /**
+   * Returns interpolated air-conduction hearing threshold (dB HL) at any frequency in Hz.
+   */
+  public getThresholdAtFrequency(freqHz: number): number {
+    const f = Math.max(AUDIOGRAM_FREQUENCIES[0], Math.min(AUDIOGRAM_FREQUENCIES[AUDIOGRAM_FREQUENCIES.length - 1], freqHz));
+    for (let i = 0; i < AUDIOGRAM_FREQUENCIES.length - 1; i++) {
+      const f0 = AUDIOGRAM_FREQUENCIES[i];
+      const f1 = AUDIOGRAM_FREQUENCIES[i + 1];
+      if (f >= f0 && f <= f1) {
+        const t = (Math.log2(f) - Math.log2(f0)) / (Math.log2(f1) - Math.log2(f0));
+        const db0 = this.currentThresholds[f0] ?? 15;
+        const db1 = this.currentThresholds[f1] ?? 15;
+        return db0 + (db1 - db0) * t;
+      }
+    }
+    return this.currentThresholds[1000] ?? 15;
+  }
+
   public onPresetChange(cb: (presetId: string, lossSector: [number, number] | null) => void): void {
     this.onPresetChangeCallbacks.push(cb);
   }
@@ -254,6 +274,7 @@ export class AudiogramDrawer {
           </div>
           <div class="audiogram-conventions">
             <span class="legend-item"><span class="legend-sym red-circle">○</span> Right Ear Air Conduction</span>
+            ${activePreset?.boneThresholds ? '<span class="legend-item"><span class="legend-sym" style="color:#38bdf8;font-weight:700;">[</span> Right Bone Conduction</span>' : ''}
             <span class="legend-item"><span class="legend-swatch normal-swatch"></span> Normal (0–20 dB)</span>
             <span class="legend-item"><span class="legend-swatch speech-swatch"></span> Speech Banana</span>
           </div>
@@ -302,6 +323,32 @@ export class AudiogramDrawer {
       return { f, x: this.freqToX(f), y: this.dbToY(db), db };
     });
     const polylinePts = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+    // Bone Conduction Points & Air-Bone Gap Shading (e.g. SSCD 3rd Window)
+    const activePreset = AUDIOGRAM_PRESETS[this.activePresetId];
+    const boneThresholds = activePreset?.boneThresholds;
+    const bonePts = boneThresholds
+      ? AUDIOGRAM_FREQUENCIES.map((f) => {
+          const db = boneThresholds[f] ?? (this.currentThresholds[f] ?? 15);
+          return { f, x: this.freqToX(f), y: this.dbToY(db), db };
+        })
+      : null;
+    const bonePolylinePts = bonePts
+      ? bonePts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+      : '';
+    const gapPts = bonePts
+      ? pts.filter((p, idx) => Math.abs(p.db - bonePts[idx].db) >= 8 || p.f <= 1000)
+      : [];
+    const gapPolygonPts =
+      bonePts && gapPts.length >= 2
+        ? [
+            ...pts.slice(0, gapPts.length).map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+            ...bonePts
+              .slice(0, gapPts.length)
+              .reverse()
+              .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+          ].join(' ')
+        : '';
 
     // Active Frequency Cursor Line
     const clampedActiveF = Math.max(125, Math.min(8000, this.activeFrequency));
@@ -358,10 +405,10 @@ export class AudiogramDrawer {
             const isZero = db === 0;
             const isNormLimit = db === 20;
             const strokeColor = isNormLimit
-              ? 'rgba(82, 220, 242, 0.45)'
+              ? 'var(--accent-primary, #52dcf2)'
               : isZero
-                ? 'rgba(255, 255, 255, 0.35)'
-                : 'rgba(255, 255, 255, 0.10)';
+                ? 'var(--border-strong, rgba(140, 165, 180, 0.55))'
+                : 'var(--border-subtle, rgba(140, 165, 180, 0.20))';
             const strokeW = isNormLimit || isZero ? 1.2 : 0.7;
             return `
             <line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="${strokeColor}" stroke-width="${strokeW}" />
@@ -375,7 +422,7 @@ export class AudiogramDrawer {
           const x = this.freqToX(f);
           const fLabel = f >= 1000 ? `${f / 1000}k` : `${f}`;
           return `
-            <line x1="${x}" y1="${padT}" x2="${x}" y2="${H - padB}" stroke="rgba(255, 255, 255, 0.12)" stroke-width="0.8" />
+            <line x1="${x}" y1="${padT}" x2="${x}" y2="${H - padB}" stroke="var(--border-subtle, rgba(140, 165, 180, 0.22))" stroke-width="0.8" />
             <text x="${x}" y="${padT - 12}" class="axis-label-x" text-anchor="middle">${fLabel}</text>
             <!-- Clickable Frequency Column Hit Area -->
             <rect
@@ -401,10 +448,42 @@ export class AudiogramDrawer {
           y1="${padT}"
           x2="${cursorX}"
           y2="${H - padB}"
-          stroke="#52dcf2"
+          stroke="var(--accent-primary, #52dcf2)"
           stroke-width="1.8"
           stroke-dasharray="4 3"
         />
+
+        <!-- Bone Conduction & Shaded Air-Bone Gap (3rd Window) -->
+        ${
+          bonePts
+            ? `
+          ${
+            gapPolygonPts
+              ? `
+            <polygon points="${gapPolygonPts}" fill="rgba(56, 189, 248, 0.18)" stroke="rgba(56, 189, 248, 0.45)" stroke-width="1" stroke-dasharray="3 2" />
+            <text x="${((pts[0].x + pts[Math.min(2, pts.length - 1)].x) * 0.52).toFixed(1)}" y="${((pts[1].y + bonePts[1].y) * 0.5 + 3).toFixed(1)}" fill="#38bdf8" font-size="9.5" font-weight="700" text-anchor="middle" style="letter-spacing:0.03em;">AIR-BONE GAP (3rd Window)</text>
+          `
+              : ''
+          }
+          <polyline
+            points="${bonePolylinePts}"
+            fill="none"
+            stroke="#38bdf8"
+            stroke-width="2.0"
+            stroke-dasharray="5 3"
+          />
+          ${bonePts
+            .map(
+              (p) => `
+            <g class="bone-node" data-freq="${p.f}" data-db="${p.db}" transform="translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)})">
+              <path d="M 1 -5.5 L -4.5 -5.5 L -4.5 5.5 L 1 5.5" fill="none" stroke="#38bdf8" stroke-width="2.3" stroke-linecap="square" />
+            </g>
+          `
+            )
+            .join('')}
+        `
+            : ''
+        }
 
         <!-- Right Ear Threshold Connecting Line (Solid Red) -->
         <polyline

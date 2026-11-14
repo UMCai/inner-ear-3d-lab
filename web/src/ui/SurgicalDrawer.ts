@@ -88,7 +88,7 @@ export class SurgicalDrawer {
         <div class="surg-monitor-section">
           <div class="surg-monitor-header">
             <span class="surg-monitor-title" id="surg-monitor-title">Scala Tympani Lumen Cross-Section</span>
-            <span class="surg-caliper-text" id="surg-caliper-text">d_BM: 0.45 mm (SAFE)</span>
+            <span class="surg-caliper-text" id="surg-caliper-text">BM Clearance: 0.45 mm (SAFE)</span>
           </div>
           <div class="surg-monitor-wrap">
             <canvas
@@ -214,15 +214,15 @@ export class SurgicalDrawer {
       if (ciState.isRuptured) {
         this.statusBadgeEl.textContent = 'CRITICAL BREACH';
         this.statusBadgeEl.className = 'surg-status-badge status-danger';
-        this.caliperTextEl.textContent = `d_BM: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (RUPTURE)`;
+        this.caliperTextEl.textContent = `BM Clearance: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (BREACH)`;
       } else if (ciState.translocationRisk === 'caution') {
         this.statusBadgeEl.textContent = 'CAUTION';
         this.statusBadgeEl.className = 'surg-status-badge status-warning';
-        this.caliperTextEl.textContent = `d_BM: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (CLOSE)`;
+        this.caliperTextEl.textContent = `BM Clearance: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (CAUTION)`;
       } else {
         this.statusBadgeEl.textContent = 'OPTIMAL';
         this.statusBadgeEl.className = 'surg-status-badge status-safe';
-        this.caliperTextEl.textContent = `d_BM: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (SAFE)`;
+        this.caliperTextEl.textContent = `BM Clearance: ${ciState.distanceToBasilarMembraneMm.toFixed(2)} mm (SAFE)`;
       }
 
       this.plotLegendEl.innerHTML = `
@@ -431,11 +431,12 @@ export class SurgicalDrawer {
 
     // Caliper label tag
     const caliperY = (tipY + ceilingY) / 2;
+    const tagX = Math.min(w - 134, tipX + 8);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(tipX + 8, caliperY - 8, 90, 16);
+    ctx.fillRect(tagX, caliperY - 8, 126, 16);
     ctx.font = '10px monospace';
     ctx.fillStyle = ciState.isRuptured ? '#f87171' : '#34d399';
-    ctx.fillText(`d_BM = ${ciState.distanceToBasilarMembraneMm.toFixed(2)}mm`, tipX + 12, caliperY + 4);
+    ctx.fillText(`BM Clear: ${ciState.distanceToBasilarMembraneMm.toFixed(2)}mm`, tagX + 4, caliperY + 4);
 
     // Rupture flashing alarm text if breached
     if (ciState.isRuptured) {

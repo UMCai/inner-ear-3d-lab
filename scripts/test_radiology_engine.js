@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -370,6 +371,113 @@ for (const [id, p] of Object.entries(PLANES)) {
     `${p.title}: All 4 orientation tokens defined (Top: ${tokens.top}, Bottom: ${tokens.bottom}, Left: ${tokens.left}, Right: ${tokens.right})`
   );
 }
+
+// -------------------------------------------------------------
+// Test Suite 7: Real IE-Map CT & CISS Volume Assets, RAS Alignment & OOB
+// -------------------------------------------------------------
+console.log('\n--- Test Suite 7: Real IE-Map CT & CISS Volume Assets ---');
+
+const radDir = path.resolve(__dirname, '../assets/iemap/radiology');
+const manifestPath = path.join(radDir, 'radiology_volumes.json');
+assert(fs.existsSync(manifestPath), 'radiology_volumes.json manifest exists');
+
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+assert(manifest.coordinateSystem === 'RAS', 'Manifest declares RAS coordinate system');
+assert(Boolean(manifest.volumes?.bone && manifest.volumes?.mri_t2), 'Manifest includes both bone (CT) and mri_t2 (CISS) volumes');
+
+function loadQuantizedVolume(spec) {
+  const binPath = path.join(radDir, spec.file);
+  assert(fs.existsSync(binPath), `Compressed volume ${spec.file} exists`);
+  const gz = fs.readFileSync(binPath);
+  assert(gz.length < 5 * 1024 * 1024, `${spec.file} is lightweight (${(gz.length / 1024).toFixed(1)} KiB < 5 MiB)`);
+  const raw = zlib.gunzipSync(gz);
+  const expected = spec.dims[0] * spec.dims[1] * spec.dims[2];
+  assert(raw.length === expected, `${spec.file} decompresses to exact voxel count (${raw.length} === ${expected})`);
+  return { spec, data: raw };
+}
+
+const ctVol = loadQuantizedVolume(manifest.volumes.bone);
+const cissVol = loadQuantizedVolume(manifest.volumes.mri_t2);
+
+function sampleVolumeNearest(vol, ras) {
+  const [nx, ny, nz] = vol.spec.dims;
+  const [ox, oy, oz] = vol.spec.originRAS;
+  const [sx, sy, sz] = vol.spec.spacingMm;
+  const fi = (ras[0] - ox) / sx;
+  const fj = (ras[1] - oy) / sy;
+  const fk = (ras[2] - oz) / sz;
+  if (fi < 0 || fi >= nx - 1 || fj < 0 || fj >= ny - 1 || fk < 0 || fk >= nz - 1) {
+    return null; // Out-of-bounds
+  }
+  const i = Math.round(fi);
+  const j = Math.round(fj);
+  const k = Math.round(fk);
+  return vol.data[i + nx * (j + ny * k)];
+}
+
+// Check CT & CISS contrast at Superior Canal (SA) lumen vs 0.8 mm superior bone roof
+let ctLumenSum = 0, ctBoneSum = 0, ctSamples = 0;
+let cissLumenSum = 0, cissBoneSum = 0, cissSamples = 0;
+for (let idx = 0; idx < saVerts.length; idx += 10) {
+  const v = saVerts[idx];
+  const vSup = [v[0], v[1], v[2] + 0.8];
+  const c0 = sampleVolumeNearest(ctVol, v);
+  const c1 = sampleVolumeNearest(ctVol, vSup);
+  if (c0 !== null && c1 !== null) {
+    ctLumenSum += c0;
+    ctBoneSum += c1;
+    ctSamples++;
+  }
+  const m0 = sampleVolumeNearest(cissVol, v);
+  const m1 = sampleVolumeNearest(cissVol, vSup);
+  if (m0 !== null && m1 !== null) {
+    cissLumenSum += m0;
+    cissBoneSum += m1;
+    cissSamples++;
+  }
+}
+
+const ctLumenMean = ctLumenSum / ctSamples;
+const ctBoneMean = ctBoneSum / ctSamples;
+const cissLumenMean = cissLumenSum / cissSamples;
+const cissBoneMean = cissBoneSum / cissSamples;
+
+assert(
+  ctBoneMean > ctLumenMean + 15,
+  `CT RAS alignment verified: superior bone roof (${ctBoneMean.toFixed(1)}) > SA lumen (${ctLumenMean.toFixed(1)})`
+);
+assert(
+  cissLumenMean > cissBoneMean + 40,
+  `CISS MRI RAS alignment verified: SA T2 fluid lumen (${cissLumenMean.toFixed(1)}) > superior bone (${cissBoneMean.toFixed(1)})`
+);
+
+// Verify out-of-bounds detection for 24mm FOV corners exceeding 19.92^3 mm CT volume
+const oobCornerRAS = [
+  poschl.centerRAS[0] - 12.0 * poschl.inPlaneX[0] - 12.0 * poschl.inPlaneY[0],
+  poschl.centerRAS[1] - 12.0 * poschl.inPlaneX[1] - 12.0 * poschl.inPlaneY[1],
+  poschl.centerRAS[2] - 12.0 * poschl.inPlaneX[2] - 12.0 * poschl.inPlaneY[2],
+];
+assert(
+  sampleVolumeNearest(ctVol, oobCornerRAS) === null,
+  '24 mm MPR FOV corner outside 19.92^3 mm CT volume cleanly returns out-of-bounds (null)'
+);
+
+// Verify Pöschl horizontal orientation: cochlea centroid projects to +inPlaneX (AS = Left on canvas)
+let cochCentroid = [0, 0, 0];
+for (const v of cochleaVerts) {
+  cochCentroid[0] += v[0];
+  cochCentroid[1] += v[1];
+  cochCentroid[2] += v[2];
+}
+cochCentroid = cochCentroid.map((c) => c / cochleaVerts.length);
+const cochU = dot(
+  [cochCentroid[0] - poschl.centerRAS[0], cochCentroid[1] - poschl.centerRAS[1], cochCentroid[2] - poschl.centerRAS[2]],
+  poschl.inPlaneX
+);
+assert(
+  cochU > 1.0,
+  `Pöschl AS/PI orientation verified: cochlea projects to +inPlaneX (${cochU.toFixed(2)} mm -> AS Left)`
+);
 
 console.log('\n================================================================');
 console.log(`🏆 ALL ${passedTests}/${totalTests} DEEP RADIOLOGY VERIFICATION TESTS PASSED CLEANLY (100%)`);

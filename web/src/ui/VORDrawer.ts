@@ -64,6 +64,8 @@ export class VORDrawer {
   };
   private onAlexGazeChangeCallbacks: Array<(gaze: number) => void> = [];
   private onDiagnosticModeChangeCallbacks: Array<(mode: 'nystagmogram' | 'caloric' | 'vhit') => void> = [];
+  private visualFixationActive = false;
+  private onFixationChangeCallbacks: Array<(active: boolean) => void> = [];
 
   // Mode DOM Elements
   private stripTitleEl!: HTMLElement;
@@ -75,6 +77,7 @@ export class VORDrawer {
   private stripLegendEl!: HTMLElement;
 
   // DOM Elements
+  private fixationBtn: HTMLButtonElement | null = null;
   private modeToggleBtn!: HTMLButtonElement;
   private modeIconEl!: HTMLElement;
   private modeLabelEl!: HTMLElement;
@@ -86,6 +89,9 @@ export class VORDrawer {
   private tValEl!: HTMLElement;
   private spvValEl!: HTMLElement;
   private statusEl!: HTMLElement;
+  private cn8StripEl: HTMLElement | null = null;
+  private cn8ValEl: HTMLElement | null = null;
+  private cn8EwaldEl: HTMLElement | null = null;
 
   // Retina Scaling Factors
   private static readonly AVATAR_LOGICAL_W = 360;
@@ -151,6 +157,14 @@ export class VORDrawer {
           <div class="vor-header-actions">
             <button
               type="button"
+              class="vor-mode-toggle-btn vor-fixation-btn"
+              id="vor-fixation-btn"
+              title="Toggle Visual Fixation Suppression (70% Peripheral SPV Attenuation)"
+              aria-label="Toggle Visual Fixation Suppression"
+              aria-pressed="false"
+            >Fixation: Off</button>
+            <button
+              type="button"
               class="vor-mode-toggle-btn"
               id="vor-mode-toggle-btn"
               title="Toggle Natural vs Infrared VNG Goggles Mode"
@@ -204,6 +218,10 @@ export class VORDrawer {
           <div class="vor-nystagmus-status" id="vor-nystagmus-status">
             Resting Equilibrium (No Nystagmus)
           </div>
+          <div class="vor-cn8-strip" id="vor-cn8-strip">
+            <span class="cn8-rate-tag" id="vor-cn8-val">CN VIII: 90 sp/s</span>
+            <span class="cn8-ewald-tag" id="vor-cn8-ewald">Ewald: Tonic Balanced</span>
+          </div>
         </div>
 
         <!-- Rolling 3-Lead Nystagmogram / Caloric / vHIT Dual-Trace Strip Chart -->
@@ -253,6 +271,7 @@ export class VORDrawer {
     this.avatarCanvas = this.rootEl.querySelector('#vor-avatar-canvas') as HTMLCanvasElement;
     this.hudCanvas = this.rootEl.querySelector('#vor-hud-canvas') as HTMLCanvasElement;
     this.stripCanvas = this.rootEl.querySelector('#vor-strip-canvas') as HTMLCanvasElement;
+    this.fixationBtn = this.rootEl.querySelector('#vor-fixation-btn') as HTMLButtonElement | null;
     this.modeToggleBtn = this.rootEl.querySelector('#vor-mode-toggle-btn') as HTMLButtonElement;
     this.modeIconEl = this.rootEl.querySelector('#vor-mode-icon') as HTMLElement;
     this.modeLabelEl = this.rootEl.querySelector('#vor-mode-label') as HTMLElement;
@@ -263,6 +282,9 @@ export class VORDrawer {
     this.tValEl = this.rootEl.querySelector('#vor-t-val') as HTMLElement;
     this.spvValEl = this.rootEl.querySelector('#vor-spv-val') as HTMLElement;
     this.statusEl = this.rootEl.querySelector('#vor-nystagmus-status') as HTMLElement;
+    this.cn8StripEl = this.rootEl.querySelector('#vor-cn8-strip') as HTMLElement | null;
+    this.cn8ValEl = this.rootEl.querySelector('#vor-cn8-val') as HTMLElement | null;
+    this.cn8EwaldEl = this.rootEl.querySelector('#vor-cn8-ewald') as HTMLElement | null;
 
     this.stripTitleEl = this.rootEl.querySelector('#vor-strip-title') as HTMLElement;
     this.stripRangeEl = this.rootEl.querySelector('#vor-strip-range') as HTMLElement;
@@ -290,6 +312,10 @@ export class VORDrawer {
   private attachEvents(): void {
     if (this.closeBtn) {
       this.closeBtn.addEventListener('click', () => this.close());
+    }
+
+    if (this.fixationBtn && typeof this.fixationBtn.addEventListener === 'function') {
+      this.fixationBtn.addEventListener('click', () => this.toggleFixation());
     }
 
     if (this.modeToggleBtn) {
@@ -506,6 +532,13 @@ export class VORDrawer {
         this.statusEl.className = 'vor-nystagmus-status';
       }
     }
+    if (this.cn8ValEl) {
+      this.cn8ValEl.textContent = `CN VIII: ${Math.round(cn8Rate)} sp/s`;
+    }
+    if (this.cn8EwaldEl) {
+      const ewaldTag = cn8Rate > 115 ? 'Ampullopetal Excitation (+)' : cn8Rate < 75 ? 'Ampullofugal Inhibition (−)' : 'Ewald: Tonic Baseline';
+      this.cn8EwaldEl.textContent = ewaldTag;
+    }
 
     if (this.diagnosticViewMode === 'vhit') {
       this.renderVHITDualTracePlot();
@@ -610,6 +643,32 @@ export class VORDrawer {
     this.setVisualMode(nextMode);
   }
 
+  public isFixationActive(): boolean {
+    return this.visualFixationActive;
+  }
+
+  public setFixationActive(active: boolean): void {
+    this.visualFixationActive = active;
+    if (this.fixationBtn) {
+      this.fixationBtn.textContent = active ? 'Fixation: On' : 'Fixation: Off';
+      this.fixationBtn.classList.toggle?.('active', active);
+      this.fixationBtn.setAttribute?.('aria-pressed', String(active));
+    }
+    for (const cb of this.onFixationChangeCallbacks) {
+      cb(active);
+    }
+  }
+
+  public toggleFixation(): boolean {
+    const next = !this.visualFixationActive;
+    this.setFixationActive(next);
+    return next;
+  }
+
+  public onFixationChange(cb: (active: boolean) => void): void {
+    this.onFixationChangeCallbacks.push(cb);
+  }
+
   // ---------------------------------------------------------------------------
   // 60FPS Telemetry & Simulation Step
   // ---------------------------------------------------------------------------
@@ -693,6 +752,29 @@ export class VORDrawer {
           this.statusEl.className = 'vor-nystagmus-status';
         }
       }
+    }
+
+    const firingRate = typeof vestTelem.afferentSpikesPerSec === 'number' ? vestTelem.afferentSpikesPerSec : 90;
+    const defl = typeof vestTelem.cupulaDeflectionNormalized === 'number' ? vestTelem.cupulaDeflectionNormalized : 0;
+    if (this.cn8ValEl) {
+      this.cn8ValEl.textContent = `CN VIII: ${Math.round(firingRate)} sp/s`;
+    }
+    if (this.cn8EwaldEl) {
+      let polarity = 'Ewald: Tonic Balanced';
+      if (this.visualFixationActive && eyeTelem.slowPhaseVelocityDegPerSec > 0.5) {
+        polarity = 'Fixation Suppression (-70% SPV)';
+      } else if (firingRate > 115 || defl > 0.12) {
+        polarity = 'Excitation (+) · Fast -> Active';
+      } else if (firingRate < 75 || defl < -0.12) {
+        polarity = 'Inhibition (−) · Fast -> Opposite';
+      }
+      this.cn8EwaldEl.textContent = polarity;
+    }
+    if (this.cn8StripEl) {
+      this.cn8StripEl.setAttribute?.(
+        'data-polarity',
+        firingRate > 115 ? 'excitation' : firingRate < 75 ? 'inhibition' : 'tonic'
+      );
     }
   }
 
@@ -856,8 +938,8 @@ export class VORDrawer {
       ctx.fill('evenodd');
 
       // Subtle Palpebral Lid Margins
-      ctx.lineWidth = 1.4;
-      ctx.strokeStyle = 'rgba(82, 220, 242, 0.32)';
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(148, 178, 195, 0.20)';
       ctx.beginPath();
       this.drawPalpebralPath(ctx, cxR, cyR, true);
       this.drawPalpebralPath(ctx, cxL, cyL, false);
@@ -916,8 +998,8 @@ export class VORDrawer {
 
     if (typeof ctx.createLinearGradient === 'function') {
       const shadowGrad = ctx.createLinearGradient(0, cy - 27, 0, cy - 4);
-      shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
-      shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
+      shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.76)');
+      shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.30)');
       shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
       ctx.fillStyle = shadowGrad;
       ctx.fillRect(cx - 60, cy - 28, 120, 25);
@@ -1170,11 +1252,13 @@ export class VORDrawer {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Curthoys Gain Readout Badge in Window
+    // Curthoys Gain Readout Badge (top-right aligned to clear Covert/Overt saccade bars)
     const gain = this.vhitBuffer.calculatedGain;
     ctx.fillStyle = gain >= 0.80 ? '#22c55e' : '#ef4444';
     ctx.font = 'bold 18px monospace';
-    ctx.fillText(`VOR Gain: ${gain.toFixed(2)}`, x80 + 12, 24);
+    ctx.textAlign = 'right';
+    ctx.fillText(`VOR Gain: ${gain.toFixed(2)}`, w - 12, 22);
+    ctx.textAlign = 'left';
 
     // Plot Head Velocity (Amber, #f59e0b)
     const cap = this.vhitBuffer.getCapacity();

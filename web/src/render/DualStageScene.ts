@@ -30,6 +30,13 @@ import {
   getShaderClipUniforms,
 } from '../data/radiologyEngine';
 import {
+  getLoadedRadiologyVolume,
+  MPR_FOV_MM,
+  onRadiologyVolumeReady,
+  preloadRadiologyVolumes,
+  resliceVolumeToRGBA,
+} from '../data/radiologyVolume';
+import {
   loadAllCanalPaths,
   type CanalId,
 } from '../data/canalPaths';
@@ -55,6 +62,7 @@ import {
   type LabyrinthectomyState,
   type NeurectomyState,
   SURGICAL_CAMERA_PERSPECTIVES,
+  SURGICAL_LANDMARKS,
   computeCIInsertionKinematics,
   computeLabyrinthectomyAblation,
   computeNeurectomyElectrophysiology,
@@ -214,6 +222,9 @@ export class DualStageScene {
 
   // Tonotopy Cursor & Saved Anatomy State
   private tonotopyCursorMesh: THREE.Mesh | null = null;
+  private tonotopyHaloMesh: THREE.Mesh | null = null;
+  private readonly scratchBeaconColor = new THREE.Color();
+  private readonly scratchWhiteColor = new THREE.Color(0xffffff);
   private savedAnatomyState: {
     visibilityMap: Record<string, VisibilityState>;
     bonyPeelPercent: number;
@@ -258,6 +269,14 @@ export class DualStageScene {
   private scdsWaveArcs: Array<{ mesh: THREE.Mesh; initialScale: number; phaseOffset: number }> = [];
   private clipNormalVec = new THREE.Vector3(0, 0, 1);
   private tempPlaneMatrix = new THREE.Matrix4();
+  private tempBasisX = new THREE.Vector3();
+  private tempBasisY = new THREE.Vector3();
+  private tempBasisZ = new THREE.Vector3();
+  private static readonly RAD_TEXTURE_SIZE = 192;
+  private radSliceData: Uint8Array<ArrayBuffer> | null = null;
+  private radSliceTexture: THREE.DataTexture | null = null;
+  private radSliceHasVolume = false;
+  private unsubRadVolumeReady: (() => void) | null = null;
 
   // Vestibular Dynamics Engine & 3D Otoconial Cloud
   private vestibularEngine: VestibularDynamicsEngine | null = null;
@@ -281,6 +300,19 @@ export class DualStageScene {
   private readonly qVHITTmp = new THREE.Quaternion();
   private readonly qIdentity = new THREE.Quaternion(0, 0, 0, 1);
   private readonly vhitQuatArray = new Float64Array(4);
+  private readonly LABYRINTH_PIVOT_RAS = new THREE.Vector3(4.5, 1.4, 0.5);
+  private readonly tempPivotRotated = new THREE.Vector3();
+  private readonly headRotMatrix4 = new THREE.Matrix4();
+  private readonly headTargetQuat = new THREE.Quaternion();
+  private readonly gravityIndicatorOffsets: ReadonlyArray<readonly [number, number, number]> = [
+    [0, 0, 0],
+    [0.16, 0.08, 0.05],
+    [-0.14, -0.06, 0.09],
+    [0.09, -0.14, -0.05],
+    [-0.08, 0.14, -0.07],
+  ];
+  private gravityIndicatorGroup: THREE.Group | null = null;
+  private hearingAttenuationGain = 1.0;
   private activeCaloricState: {
     active: boolean;
     cupulaDeflection: number;
@@ -298,6 +330,26 @@ export class DualStageScene {
   private ciCarrierMesh: THREE.Line | null = null;
   private ciCarrierTubeMesh: THREE.Mesh | null = null;
   private ciContactMeshes: THREE.Mesh[] = [];
+  private ciStarterTipMesh: THREE.Mesh | null = null;
+  private ciEntryPortalGroup: THREE.Group | null = null;
+  private ciEntryRingMat: THREE.MeshBasicMaterial | null = null;
+  private ciEntryArrowMat: THREE.MeshBasicMaterial | null = null;
+  private labySurgicalGroup: THREE.Group | null = null;
+  private labyBurrMesh: THREE.Mesh | null = null;
+  private labyBurrMat: THREE.MeshStandardMaterial | null = null;
+  private iacSurgicalGroup: THREE.Group | null = null;
+  private iacNerveCN7: THREE.Mesh | null = null;
+  private iacNerveCochlear: THREE.Mesh | null = null;
+  private iacNerveSVN: THREE.Mesh | null = null;
+  private iacNerveIVN: THREE.Mesh | null = null;
+  private iacCleavageMesh: THREE.Mesh | null = null;
+  private iacTumorMesh: THREE.Mesh | null = null;
+  private iacToolGroup: THREE.Group | null = null;
+  private iacToolTipMat: THREE.MeshStandardMaterial | null = null;
+  private readonly scratchEntryPos = new THREE.Vector3();
+  private readonly scratchEntryNext = new THREE.Vector3();
+  private readonly scratchEntryDir = new THREE.Vector3();
+  private readonly scratchUpZ = new THREE.Vector3(0, 0, 1);
   private ciCenterPointsTmp: [number, number, number][] = Array.from({ length: 65 }, () => [0, 0, 0]);
   private surgicalSimTime = 0.0;
 
@@ -460,21 +512,36 @@ export class DualStageScene {
     this.labyrinthRoot = new THREE.Group();
     this.scene.add(this.labyrinthRoot);
 
-    // Glowing 3D Tonotopic Resonant Cursor Sphere
-    const cursorGeom = new THREE.SphereGeometry(0.32, 16, 16);
+    // Glowing 3D Tonotopic Resonant Beacon (frequency-tinted core + additive halo)
+    const cursorGeom = new THREE.SphereGeometry(0.22, 20, 20);
     const cursorMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#ffffff'),
       transparent: true,
-      opacity: 0.95,
-      depthTest: false,
+      opacity: 0.96,
+      depthTest: true,
     });
     this.tonotopyCursorMesh = new THREE.Mesh(cursorGeom, cursorMat);
     this.tonotopyCursorMesh.renderOrder = 999;
     this.tonotopyCursorMesh.visible = false;
+
+    const haloGeom = new THREE.SphereGeometry(0.46, 20, 20);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#52dcf2'),
+      transparent: true,
+      opacity: 0.44,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: true,
+    });
+    this.tonotopyHaloMesh = new THREE.Mesh(haloGeom, haloMat);
+    this.tonotopyHaloMesh.renderOrder = 1000;
+    this.tonotopyCursorMesh.add(this.tonotopyHaloMesh);
+
     this.labyrinthRoot.add(this.tonotopyCursorMesh);
 
     this.initRadiology3DHelpers();
     this.initOtoconiaVisualizer();
+    this.initGravityIndicator();
     this.initSurgicalArray();
     this.setupPointerInteractions();
   }
@@ -522,14 +589,24 @@ export class DualStageScene {
 
     const planeColor = isLightPaper ? 0x0c667e : 0x52dcf2;
     if (this.radPlaneQuadMat) {
-      this.radPlaneQuadMat.color.setHex(planeColor);
-      this.radPlaneQuadMat.opacity = isLightPaper ? 0.14 : 0.12;
+      if (this.radSliceHasVolume) {
+        this.radPlaneQuadMat.color.setHex(0xffffff);
+        this.radPlaneQuadMat.opacity = 0.86;
+      } else {
+        this.radPlaneQuadMat.color.setHex(planeColor);
+        this.radPlaneQuadMat.opacity = isLightPaper ? 0.14 : 0.12;
+      }
     }
     if (this.radPlaneEdgeMat) {
       this.radPlaneEdgeMat.color.setHex(planeColor);
     }
     if (this.radPlaneCrossMat) {
       this.radPlaneCrossMat.color.setHex(planeColor);
+    }
+
+    const tetherOpacity = isLightPaper ? 0.52 : 0.42;
+    for (const entry of this.meshEntries.values()) {
+      (entry.tetherLine.material as THREE.LineBasicMaterial).opacity = tetherOpacity;
     }
   }
 
@@ -579,30 +656,75 @@ export class DualStageScene {
 
   private initOtoconiaVisualizer(): void {
     this.otoconiaGroup = new THREE.Group();
+    this.otoconiaGroup.renderOrder = 5;
     this.otoconiaMeshes = [];
 
     const particleGeom = new THREE.SphereGeometry(0.135, 12, 12);
     const particleMat = new THREE.MeshBasicMaterial({
-      color: 0xffb74d,
+      color: 0xffc857,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.98,
+    });
+
+    const haloGeom = new THREE.SphereGeometry(0.22, 8, 8);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0xff9800,
+      transparent: true,
+      opacity: 0.48,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
 
     for (let i = 0; i < 5; i++) {
       const mesh = new THREE.Mesh(particleGeom, particleMat);
-      const haloGeom = new THREE.SphereGeometry(0.22, 8, 8);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: 0xff9800,
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-      });
-      mesh.add(new THREE.Mesh(haloGeom, haloMat));
+      mesh.scale.setScalar(1.35);
+      mesh.renderOrder = 5;
+      const halo = new THREE.Mesh(haloGeom, haloMat);
+      halo.renderOrder = 6;
+      mesh.add(halo);
       this.otoconiaGroup.add(mesh);
       this.otoconiaMeshes.push(mesh);
     }
     this.otoconiaGroup.visible = false;
     this.labyrinthRoot.add(this.otoconiaGroup);
+  }
+
+  private initGravityIndicator(): void {
+    this.gravityIndicatorGroup = new THREE.Group();
+    this.gravityIndicatorGroup.name = 'vestibular_gravity_vector';
+    // Positioned cleanly beside the tilted labyrinth in world RAS space pointing straight down (-Z)
+    this.gravityIndicatorGroup.position.set(12.2, -1.8, 3.8);
+
+    const shaftMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const shaftGeom = new THREE.CylinderGeometry(0.11, 0.11, 2.8, 12);
+    shaftGeom.rotateX(Math.PI * 0.5); // Align cylinder length along world Z
+    const shaftMesh = new THREE.Mesh(shaftGeom, shaftMat);
+    shaftMesh.position.set(0, 0, -1.4);
+    this.gravityIndicatorGroup.add(shaftMesh);
+
+    const headGeom = new THREE.ConeGeometry(0.32, 0.78, 16);
+    headGeom.rotateX(-Math.PI * 0.5); // Tip pointing straight along world -Z
+    const headMesh = new THREE.Mesh(headGeom, shaftMat);
+    headMesh.position.set(0, 0, -3.1);
+    this.gravityIndicatorGroup.add(headMesh);
+
+    const horizonGeom = new THREE.RingGeometry(0.45, 0.62, 28);
+    const horizonMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.72,
+      side: THREE.DoubleSide,
+    });
+    const horizonRing = new THREE.Mesh(horizonGeom, horizonMat);
+    horizonRing.position.set(0, 0, 0);
+    this.gravityIndicatorGroup.add(horizonRing);
+
+    this.gravityIndicatorGroup.visible = false;
+    this.scene.add(this.gravityIndicatorGroup);
   }
 
   private initSurgicalArray(): void {
@@ -686,8 +808,230 @@ export class DualStageScene {
       this.ciContactMeshes.push(mesh);
     }
 
+    // 3. Basal Entry Starter Tip (always visible at s = 0 mm portal) & CI Entry Portal Ring
+    const starterGeom = new THREE.SphereGeometry(0.32, 16, 16);
+    const starterMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 0.55,
+      metalness: 0.5,
+      roughness: 0.25,
+    });
+    this.ciStarterTipMesh = new THREE.Mesh(starterGeom, starterMat);
+    const rwBase = SURGICAL_LANDMARKS.scalaTympaniLumenBase;
+    this.ciStarterTipMesh.position.set(rwBase[0], rwBase[1], rwBase[2]);
+    this.ciStarterTipMesh.renderOrder = 12;
+    this.ciElectrodeGroup.add(this.ciStarterTipMesh);
+
+    this.ciEntryPortalGroup = new THREE.Group();
+    this.ciEntryPortalGroup.name = 'surgical_ci_entry_portal';
+    this.ciEntryRingMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.92,
+      side: THREE.DoubleSide,
+    });
+    const portalRing = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.08, 12, 32), this.ciEntryRingMat);
+    this.ciEntryPortalGroup.add(portalRing);
+
+    this.ciEntryArrowMat = new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const arrowShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.35, 10), this.ciEntryArrowMat);
+    arrowShaft.rotation.x = Math.PI * 0.5;
+    arrowShaft.position.set(0, 0, -0.95);
+    this.ciEntryPortalGroup.add(arrowShaft);
+    const arrowCone = new THREE.Mesh(new THREE.ConeGeometry(0.20, 0.45, 12), this.ciEntryArrowMat);
+    arrowCone.rotation.x = Math.PI * 0.5;
+    arrowCone.position.set(0, 0, -0.15);
+    this.ciEntryPortalGroup.add(arrowCone);
+    this.ciEntryPortalGroup.visible = false;
+    this.labyrinthRoot.add(this.ciEntryPortalGroup);
+
     this.ciElectrodeGroup.visible = false;
+    this.ciElectrodeGroup.renderOrder = 10;
     this.labyrinthRoot.add(this.ciElectrodeGroup);
+
+    // 4. Transmastoid Labyrinthectomy Group: 3D CN VII (Facial Nerve) + Donaldson's Line + Burr
+    this.labySurgicalGroup = new THREE.Group();
+    this.labySurgicalGroup.name = 'surgical_labyrinthectomy_landmarks';
+
+    const cn7Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(7.1, 2.2, 0.4), // Tympanic segment inferior to Lat SCC
+      new THREE.Vector3(9.4, -1.2, 0.1), // Second Genu
+      new THREE.Vector3(
+        SURGICAL_LANDMARKS.facialNerveMastoid[0],
+        SURGICAL_LANDMARKS.facialNerveMastoid[1],
+        SURGICAL_LANDMARKS.facialNerveMastoid[2]
+      ),
+      new THREE.Vector3(10.5, -2.1, -6.8), // Stylomastoid exit
+    ]);
+    const cn7Mat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xca8a04,
+      emissiveIntensity: 0.42,
+      roughness: 0.28,
+      metalness: 0.15,
+    });
+    const cn7Tube = new THREE.Mesh(new THREE.TubeGeometry(cn7Curve, 32, 0.26, 12, false), cn7Mat);
+    cn7Tube.renderOrder = 10;
+    this.labySurgicalGroup.add(cn7Tube);
+
+    // Donaldson's Line bisecting Horizontal Canal longitudinally toward Posterior Canal & Endolymphatic Sac
+    const donaldsonGeom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(6.2, 1.8, 0.9),
+      new THREE.Vector3(12.2, -5.6, -2.0),
+    ]);
+    const donaldsonLine = new THREE.Line(
+      donaldsonGeom,
+      new THREE.LineBasicMaterial({
+        color: 0x22d3ee,
+        transparent: true,
+        opacity: 0.92,
+      })
+    );
+    this.labySurgicalGroup.add(donaldsonLine);
+
+    this.labyBurrMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      emissive: 0x38bdf8,
+      emissiveIntensity: 0.3,
+      metalness: 0.85,
+      roughness: 0.18,
+    });
+    this.labyBurrMesh = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), this.labyBurrMat);
+    this.labyBurrMesh.position.set(11.2, -3.5, 2.8);
+    this.labyBurrMesh.renderOrder = 11;
+    this.labySurgicalGroup.add(this.labyBurrMesh);
+    this.labySurgicalGroup.visible = false;
+    this.labyrinthRoot.add(this.labySurgicalGroup);
+
+    // 5. Retrosigmoid IAC / CPA Neurectomy Bundle ("7-Up, Coke Down", Bill's Bar, Falciform Crest, Koos Tumor)
+    this.iacSurgicalGroup = new THREE.Group();
+    this.iacSurgicalGroup.name = 'surgical_iac_bundle';
+
+    const iacPorus = new THREE.Vector3(...SURGICAL_LANDMARKS.iacPorusAcusticus);
+    const iacFundus = new THREE.Vector3(...SURGICAL_LANDMARKS.iacFundusMidpoint);
+    const iacCPA = new THREE.Vector3(-3.4, -0.4, -0.5);
+    const nerveLen = iacFundus.distanceTo(iacCPA);
+    const nerveMid = iacFundus.clone().add(iacCPA).multiplyScalar(0.5);
+    const nerveDir = iacFundus.clone().sub(iacCPA).normalize();
+    const qAxis = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), nerveDir);
+    const anteriorOffset = new THREE.Vector3(0, 0.42, 0).applyQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), nerveDir)
+    );
+    void anteriorOffset;
+
+    // Porus Acusticus dural ring marker
+    const porusMat = new THREE.MeshBasicMaterial({
+      color: 0x94a3b8,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide,
+    });
+    const porusRing = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.08, 12, 32), porusMat);
+    porusRing.position.copy(iacPorus);
+    porusRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), nerveDir);
+    this.iacSurgicalGroup.add(porusRing);
+
+    // Falciform Crest (horizontal transverse divider at IAC Fundus) & Bill's Bar (vertical crest)
+    const crestMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      transparent: true,
+      opacity: 0.78,
+      roughness: 0.4,
+    });
+    const falciform = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.9, 0.14), crestMat);
+    falciform.position.copy(iacFundus);
+    this.iacSurgicalGroup.add(falciform);
+
+    const billsBar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.95), crestMat);
+    billsBar.position.set(iacFundus.x, iacFundus.y, iacFundus.z + 0.45);
+    this.iacSurgicalGroup.add(billsBar);
+
+    const nerveGeo = new THREE.CylinderGeometry(0.15, 0.15, nerveLen, 14);
+    const makeNerve = (colorHex: number, emissiveHex: number, offY: number, offZ: number): THREE.Mesh => {
+      const m = new THREE.Mesh(
+        nerveGeo,
+        new THREE.MeshStandardMaterial({
+          color: colorHex,
+          emissive: emissiveHex,
+          emissiveIntensity: 0.35,
+          roughness: 0.28,
+        })
+      );
+      m.position.set(nerveMid.x, nerveMid.y + offY, nerveMid.z + offZ);
+      m.quaternion.copy(qAxis);
+      m.renderOrder = 10;
+      this.iacSurgicalGroup!.add(m);
+      return m;
+    };
+
+    // Anterior-Superior: CN VII Facial ("7-Up"), Anterior-Inferior: Cochlear ("Coke Down")
+    this.iacNerveCN7 = makeNerve(0xfacc15, 0xb45309, 0.36, 0.38);
+    this.iacNerveCochlear = makeNerve(0x34d399, 0x059669, 0.36, -0.38);
+    // Posterior-Superior: SVN, Posterior-Inferior: IVN (accessible from Retrosigmoid approach)
+    this.iacNerveSVN = makeNerve(0x38bdf8, 0x0284c7, -0.36, 0.38);
+    this.iacNerveIVN = makeNerve(0x818cf8, 0x4f46e5, -0.36, -0.38);
+
+    // Microsurgical Cleavage Plane Sheet (between Cochlear and Vestibular bundles)
+    this.iacCleavageMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(nerveLen * 0.72, 1.35),
+      new THREE.MeshBasicMaterial({
+        color: 0x34d399,
+        transparent: true,
+        opacity: 0.24,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    this.iacCleavageMesh.position.set(nerveMid.x + 0.6, nerveMid.y, nerveMid.z);
+    this.iacCleavageMesh.quaternion.copy(qAxis);
+    this.iacCleavageMesh.rotateZ(Math.PI * 0.5);
+    this.iacSurgicalGroup.add(this.iacCleavageMesh);
+
+    // Koos I-IV Vestibular Schwannoma Tumor Ellipsoid (zero-GC scaling in-place)
+    this.iacTumorMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.0, 24, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0xfb7185,
+        emissive: 0xbe123c,
+        emissiveIntensity: 0.28,
+        transparent: true,
+        opacity: 0.72,
+        roughness: 0.38,
+      })
+    );
+    this.iacTumorMesh.position.set(1.2, 0.55, 0.05);
+    this.iacTumorMesh.visible = false;
+    this.iacTumorMesh.renderOrder = 11;
+    this.iacSurgicalGroup.add(this.iacTumorMesh);
+
+    // Active Micro-Instrument Tip (Scissors / Hook / Bipolar)
+    this.iacToolGroup = new THREE.Group();
+    this.iacToolTipMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.5,
+      metalness: 0.85,
+      roughness: 0.2,
+    });
+    const toolShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.09, 2.4, 10),
+      new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.85, roughness: 0.2 })
+    );
+    toolShaft.position.set(0, -1.2, 0);
+    this.iacToolGroup.add(toolShaft);
+    const toolTip = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 12), this.iacToolTipMat);
+    toolTip.position.set(0, 0.25, 0);
+    this.iacToolGroup.add(toolTip);
+    this.iacToolGroup.position.set(1.6, -2.5, 0.1);
+    this.iacSurgicalGroup.add(this.iacToolGroup);
+
+    this.iacSurgicalGroup.visible = false;
+    this.labyrinthRoot.add(this.iacSurgicalGroup);
   }
 
   // ===========================================================================
@@ -722,7 +1066,7 @@ export class DualStageScene {
           const url = `/assets/iemap/obj/${item.meshName}.obj`;
           const geometry = await fetchObjGeometry(url);
 
-          if (item.meshName === 'mesh_david_cochlea') {
+          if (item.systemGroup === 'cochlear_system') {
             const greenwoodX = computeMeshGreenwoodX(geometry);
             geometry.setAttribute('aGreenwoodX', new THREE.BufferAttribute(greenwoodX, 1));
           }
@@ -763,7 +1107,7 @@ export class DualStageScene {
           const tetherMat = new THREE.LineBasicMaterial({
             color: new THREE.Color(item.colorHex),
             transparent: true,
-            opacity: 0.55,
+            opacity: this.isLightTheme ? 0.52 : 0.42,
             depthWrite: false,
           });
           const tetherLine = new THREE.Line(tetherGeom, tetherMat);
@@ -796,10 +1140,55 @@ export class DualStageScene {
   // ===========================================================================
   // SHADER & MESH UPDATES (Bone Shell Peel, Radial Explode & Highlight)
   // ===========================================================================
+  private computeEffectiveHearingWaveAmplitude(): number {
+    if (this.state.labMode !== 'hearing') return 0.0;
+    const { isPlaying, lossSector, activeGreenwoodX, activePresetId } = this.state.hearingState;
+    const baseAmp = isPlaying ? 1.0 : 0.42;
+    if (activePresetId === 'acoustic_trauma' || activePresetId === 'labyrinthectomy_anacusis') {
+      return baseAmp * 0.14;
+    }
+    const inLossSector = Boolean(
+      lossSector &&
+      activeGreenwoodX >= lossSector[0] &&
+      activeGreenwoodX <= lossSector[1]
+    );
+    const lossDamping = inLossSector
+      ? Math.min(0.65, Math.max(0.24, this.hearingAttenuationGain))
+      : Math.max(0.24, this.hearingAttenuationGain);
+    return baseAmp * lossDamping;
+  }
+
+  private syncAuxiliaryGroupVisibility(): void {
+    const mode = this.state.labMode;
+    const proc = this.state.surgicalState.activeProcedure;
+    if (this.otoconiaGroup) {
+      this.otoconiaGroup.visible = mode === 'vestibular';
+    }
+    if (this.gravityIndicatorGroup) {
+      this.gravityIndicatorGroup.visible = mode === 'vestibular' && this.vestSubmode === 'bppv';
+    }
+    if (this.tonotopyCursorMesh) {
+      this.tonotopyCursorMesh.visible = mode === 'hearing';
+    }
+    if (this.ciElectrodeGroup) {
+      this.ciElectrodeGroup.visible = mode === 'surgical' && proc === 'cochlear_implant';
+    }
+    if (this.ciEntryPortalGroup) {
+      this.ciEntryPortalGroup.visible = mode === 'surgical' && proc === 'cochlear_implant';
+    }
+    if (this.labySurgicalGroup) {
+      this.labySurgicalGroup.visible = mode === 'surgical' && proc === 'labyrinthectomy';
+    }
+    if (this.iacSurgicalGroup) {
+      this.iacSurgicalGroup.visible = mode === 'surgical' && proc === 'neurectomy';
+    }
+  }
+
   private applySceneStateToMeshes(): void {
     const {
       labMode,
       hearingState,
+      surgicalState,
       visibilityMap,
       bonyPeelPercent,
       explodePercent,
@@ -810,6 +1199,7 @@ export class DualStageScene {
     const isHearingMode = labMode === 'hearing';
     const isRadiologyMode = labMode === 'radiology';
     const isVestibularMode = labMode === 'vestibular';
+    const isSurgicalMode = labMode === 'surgical';
     const explodeFactor = explodePercent / 100.0;
 
     // Radiology clipping uniforms calculation
@@ -843,15 +1233,16 @@ export class DualStageScene {
       if (isHearingMode) {
         if (ontology.systemGroup === 'cochlear_system') {
           effState = 'visible';
+          activeGreenwoodX = hearingState.activeGreenwoodX;
+          waveAmplitude = this.computeEffectiveHearingWaveAmplitude();
+          lossMaskActive = hearingState.lossSector ? 1.0 : 0.0;
           if (meshName === 'mesh_david_cochlea') {
             tonotopyMode = 1.0;
-            activeGreenwoodX = hearingState.activeGreenwoodX;
-            waveAmplitude = hearingState.isPlaying ? 1.0 : 0.0;
-            lossMaskActive = hearingState.lossSector ? 1.0 : 0.0;
-            overrideOpacity = 0.88;
+            overrideOpacity = 0.96;
           } else {
-            // Keep internal scala chambers visible through translucent spectral cochlea
-            overrideOpacity = 0.82;
+            // Crystal-translucent spectral scalae let the Organ of Corti traveling wave shine through
+            tonotopyMode = 0.55;
+            overrideOpacity = 0.28;
           }
         } else if (ontology.systemGroup === 'bony_capsule') {
           effState = 'hidden';
@@ -859,6 +1250,67 @@ export class DualStageScene {
           // Vestibular system ghosted to 15% opacity
           effState = 'ghost';
           overrideOpacity = 0.15;
+        }
+      } else if (isSurgicalMode) {
+        const proc = surgicalState.activeProcedure;
+        if (proc === 'cochlear_implant') {
+          if (ontology.systemGroup === 'cochlear_system') {
+            effState = 'visible';
+            if (meshName === 'mesh_david_cochlea') {
+              overrideOpacity = 0.24;
+            } else if (meshName === 'seg_coch_inner_scala_tympani') {
+              overrideOpacity = 0.46;
+            } else if (meshName === 'seg_coch_inner_scala_vestibuli') {
+              overrideOpacity = 0.26;
+            } else {
+              overrideOpacity = 0.32;
+            }
+          } else if (ontology.systemGroup === 'bony_capsule') {
+            effState = 'hidden';
+          } else {
+            effState = 'ghost';
+            overrideOpacity = 0.15;
+          }
+        } else if (proc === 'labyrinthectomy') {
+          if (ontology.systemGroup === 'bony_capsule') {
+            effState = surgicalState.labyState.step >= 1 ? 'ghost' : 'visible';
+            overrideOpacity = surgicalState.labyState.step >= 1 ? 0.24 : 0.72;
+          } else if (
+            ontology.systemGroup === 'semicircular_ducts' ||
+            ontology.systemGroup === 'ampullae_cupulae' ||
+            ontology.systemGroup === 'otolith_vestibule'
+          ) {
+            if (
+              surgicalState.labyState.neuroepitheliumAblated &&
+              ontology.systemGroup !== 'semicircular_ducts'
+            ) {
+              effState = 'ghost';
+              overrideOpacity = 0.12;
+            } else {
+              effState = 'visible';
+              overrideOpacity = 0.78;
+            }
+          } else {
+            effState = 'ghost';
+            overrideOpacity = 0.18;
+          }
+        } else {
+          // Retrosigmoid Neurectomy & CPA Exposure
+          if (ontology.systemGroup === 'bony_capsule') {
+            effState = 'hidden';
+          } else if (ontology.systemGroup === 'cochlear_system') {
+            effState = 'visible';
+            overrideOpacity = meshName === 'mesh_david_cochlea' ? 0.55 : 0.34;
+          } else if (
+            surgicalState.neurectomyState.vestibularNerveTransected &&
+            ontology.systemGroup === 'otolith_vestibule'
+          ) {
+            effState = 'ghost';
+            overrideOpacity = 0.22;
+          } else {
+            effState = 'visible';
+            overrideOpacity = 0.55;
+          }
         }
       } else if (isRadiologyMode) {
         // Outer Bony Capsule remains solid/translucent bone (85% opacity) to reveal internal cavities upon slicing
@@ -870,15 +1322,17 @@ export class DualStageScene {
           overrideOpacity = Math.max(0.75, ontology.baseAlpha);
         }
       } else if (isVestibularMode) {
-        // Vestibular Mode: Semicircular canals and vestibular system full visibility (95% opacity)
-        // Cochlea (mesh_david_cochlea) and Bony Capsule (segT2_th1.07_Otsu) ghosted to 15% opacity (depthWrite: false)
-        if (
-          ontology.systemGroup === 'semicircular_ducts' ||
+        // Vestibular Mode: Translucent semicircular ducts (48% opacity, depthWrite: false) reveal internal otoconia & cupulae
+        // Ampullae/cupulae & vestibule remain crisp (84%), while Cochlea & Bony Capsule ghost to 15%
+        if (ontology.systemGroup === 'semicircular_ducts') {
+          effState = 'visible';
+          overrideOpacity = 0.48;
+        } else if (
           ontology.systemGroup === 'ampullae_cupulae' ||
           ontology.systemGroup === 'otolith_vestibule'
         ) {
           effState = 'visible';
-          overrideOpacity = 0.95;
+          overrideOpacity = 0.84;
         } else {
           effState = 'ghost';
           overrideOpacity = 0.15;
@@ -951,11 +1405,12 @@ export class DualStageScene {
       });
     }
 
-    // Update 3D Tonotopic Resonant Cursor Sphere
+    // Update 3D Tonotopic Resonant Beacon
     if (this.tonotopyCursorMesh) {
       if (isHearingMode) {
         const coords = getCoordinatesForFrequency(this.state.hearingState.activeFrequency);
         this.tonotopyCursorMesh.position.set(coords[0], coords[1], coords[2]);
+        this.updateTonotopyBeaconColor(this.state.hearingState.activeGreenwoodX);
         this.tonotopyCursorMesh.visible = true;
       } else {
         this.tonotopyCursorMesh.visible = false;
@@ -1054,6 +1509,8 @@ export class DualStageScene {
       }
 
       this.state.labMode = 'radiology';
+      this.state.selectedMesh = 'ls_Hsapiens_Sa';
+      preloadRadiologyVolumes(this.state.radiologyState.windowMode);
 
       // If SCDS defect was already enabled, ensure Poschl plane
       if (this.state.radiologyState.scdsActive) {
@@ -1099,6 +1556,13 @@ export class DualStageScene {
       }
 
       this.state.labMode = 'vestibular';
+      const activeCanal = this.vestibularEngine?.getCanal() || 'posterior';
+      this.state.selectedMesh =
+        this.vestSubmode !== 'bppv' || activeCanal === 'horizontal'
+          ? 'ls_Hsapiens_Sl'
+          : activeCanal === 'anterior'
+          ? 'ls_Hsapiens_Sa'
+          : 'ls_Hsapiens_Sp';
 
       // Optimal labyrinth vestibular perspective fly-to
       const camPos = new THREE.Vector3(21.5, -11.5, 7.2);
@@ -1116,7 +1580,14 @@ export class DualStageScene {
       }
 
       this.state.labMode = 'surgical';
-      this.flyToSurgicalProcedure(this.state.surgicalState.activeProcedure);
+      const proc = this.state.surgicalState.activeProcedure;
+      this.state.selectedMesh =
+        proc === 'cochlear_implant'
+          ? 'mesh_david_cochlea'
+          : proc === 'labyrinthectomy'
+          ? 'ls_Hsapiens_Sl'
+          : 'ls_Hsapiens_utricle';
+      this.flyToSurgicalProcedure(proc);
     } else if (mode === 'anatomy') {
       this.state.labMode = 'anatomy';
       if (this.savedAnatomyState) {
@@ -1131,17 +1602,7 @@ export class DualStageScene {
       }
     }
 
-    if (this.otoconiaGroup) {
-      this.otoconiaGroup.visible = this.state.labMode === 'vestibular';
-    }
-    if (this.tonotopyCursorMesh) {
-      this.tonotopyCursorMesh.visible = this.state.labMode === 'hearing';
-    }
-    if (this.ciElectrodeGroup) {
-      this.ciElectrodeGroup.visible =
-        this.state.labMode === 'surgical' &&
-        this.state.surgicalState.activeProcedure === 'cochlear_implant';
-    }
+    this.syncAuxiliaryGroupVisibility();
 
     if (this.state.labMode !== 'surgical') {
       const entrySV = this.meshEntries.get('seg_coch_inner_scala_vestibuli');
@@ -1183,20 +1644,39 @@ export class DualStageScene {
     this.emitState();
   }
 
+  private updateTonotopyBeaconColor(greenwoodX: number): void {
+    if (!this.tonotopyCursorMesh) return;
+    const c = getGreenwoodColor(greenwoodX);
+    this.scratchBeaconColor.copy(c);
+    const coreMat = this.tonotopyCursorMesh.material as THREE.MeshBasicMaterial;
+    coreMat.color.copy(this.scratchBeaconColor).lerp(this.scratchWhiteColor, 0.35);
+    if (this.tonotopyHaloMesh) {
+      const haloMat = this.tonotopyHaloMesh.material as THREE.MeshBasicMaterial;
+      haloMat.color.copy(this.scratchBeaconColor);
+    }
+  }
+
   public setHearingFrequency(freqHz: number, triggerAudio = true): void {
     const clamped = Math.max(20, Math.min(20000, freqHz));
     const x = greenwoodPosition(clamped);
     this.state.hearingState.activeFrequency = clamped;
     this.state.hearingState.activeGreenwoodX = x;
 
-    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
-    if (cochleaEntry) {
-      cochleaEntry.material.uniforms.uActiveGreenwoodX.value = x;
+    for (const entry of this.meshEntries.values()) {
+      if (entry.ontology.systemGroup === 'cochlear_system') {
+        entry.material.uniforms.uActiveGreenwoodX.value = x;
+        if (this.state.labMode === 'hearing') {
+          const factor = entry.ontology.meshName === 'mesh_david_cochlea' ? 1.0 : 0.55;
+          entry.material.uniforms.uWaveAmplitude.value =
+            this.computeEffectiveHearingWaveAmplitude() * factor;
+        }
+      }
     }
 
     if (this.tonotopyCursorMesh) {
       const coords = getCoordinatesForFrequency(clamped);
       this.tonotopyCursorMesh.position.set(coords[0], coords[1], coords[2]);
+      this.updateTonotopyBeaconColor(x);
       this.tonotopyCursorMesh.visible = this.state.labMode === 'hearing';
     }
 
@@ -1209,11 +1689,27 @@ export class DualStageScene {
     this.emitState();
   }
 
+  public setHearingThresholdGain(gain: number): void {
+    this.hearingAttenuationGain = Math.max(0.08, Math.min(1.0, gain));
+    if (this.state.labMode === 'hearing') {
+      const amp = this.computeEffectiveHearingWaveAmplitude();
+      for (const entry of this.meshEntries.values()) {
+        if (entry.ontology.systemGroup === 'cochlear_system') {
+          const factor = entry.ontology.meshName === 'mesh_david_cochlea' ? 1.0 : 0.55;
+          entry.material.uniforms.uWaveAmplitude.value = amp * factor;
+        }
+      }
+    }
+  }
+
   public setHearingPlayback(isPlaying: boolean): void {
     this.state.hearingState.isPlaying = isPlaying;
-    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
-    if (cochleaEntry) {
-      cochleaEntry.material.uniforms.uWaveAmplitude.value = isPlaying ? 1.0 : 0.0;
+    const amp = this.computeEffectiveHearingWaveAmplitude();
+    for (const entry of this.meshEntries.values()) {
+      if (entry.ontology.systemGroup === 'cochlear_system') {
+        const factor = entry.ontology.meshName === 'mesh_david_cochlea' ? 1.0 : 0.55;
+        entry.material.uniforms.uWaveAmplitude.value = amp * factor;
+      }
     }
     this.emitState();
   }
@@ -1222,15 +1718,19 @@ export class DualStageScene {
     this.state.hearingState.lossSector = lossSector;
     this.state.hearingState.activePresetId = presetId;
 
-    const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
-    if (cochleaEntry) {
-      if (lossSector) {
-        this.lossRangeVector.set(lossSector[0], lossSector[1]);
-        cochleaEntry.material.uniforms.uLossMaskActive.value = 1.0;
-        cochleaEntry.material.uniforms.uLossRange.value.copy(this.lossRangeVector);
-        cochleaEntry.material.uniforms.uLossSeverity.value = 0.92;
-      } else {
-        cochleaEntry.material.uniforms.uLossMaskActive.value = 0.0;
+    const amp = this.computeEffectiveHearingWaveAmplitude();
+    for (const entry of this.meshEntries.values()) {
+      if (entry.ontology.systemGroup === 'cochlear_system') {
+        if (lossSector) {
+          this.lossRangeVector.set(lossSector[0], lossSector[1]);
+          entry.material.uniforms.uLossMaskActive.value = 1.0;
+          entry.material.uniforms.uLossRange.value.copy(this.lossRangeVector);
+          entry.material.uniforms.uLossSeverity.value = 0.92;
+        } else {
+          entry.material.uniforms.uLossMaskActive.value = 0.0;
+        }
+        const factor = entry.ontology.meshName === 'mesh_david_cochlea' ? 1.0 : 0.55;
+        entry.material.uniforms.uWaveAmplitude.value = amp * factor;
       }
     }
     this.emitState();
@@ -1247,6 +1747,20 @@ export class DualStageScene {
     // 1. 3D Technical Cutting Plane Quad Helper (24x24 mm)
     this.radiologyPlaneHelperGroup = new THREE.Group();
 
+    const texSize = DualStageScene.RAD_TEXTURE_SIZE;
+    this.radSliceData = new Uint8Array(texSize * texSize * 4);
+    this.radSliceTexture = new THREE.DataTexture(
+      this.radSliceData,
+      texSize,
+      texSize,
+      THREE.RGBAFormat
+    );
+    this.radSliceTexture.minFilter = THREE.LinearFilter;
+    this.radSliceTexture.magFilter = THREE.LinearFilter;
+    this.radSliceTexture.wrapS = THREE.ClampToEdgeWrapping;
+    this.radSliceTexture.wrapT = THREE.ClampToEdgeWrapping;
+    this.radSliceTexture.flipY = false;
+
     const planeGeom = new THREE.PlaneGeometry(24, 24);
     this.radPlaneQuadMat = new THREE.MeshBasicMaterial({
       color: this.isLightTheme ? 0x0c667e : 0x52dcf2,
@@ -1257,6 +1771,16 @@ export class DualStageScene {
     });
     const planeMesh = new THREE.Mesh(planeGeom, this.radPlaneQuadMat);
     this.radiologyPlaneHelperGroup.add(planeMesh);
+
+    this.unsubRadVolumeReady = onRadiologyVolumeReady((mode) => {
+      if (
+        this.state.labMode === 'radiology' &&
+        this.state.radiologyState.showPlaneHelper &&
+        mode === this.state.radiologyState.windowMode
+      ) {
+        this.updateRadiologySliceTexture();
+      }
+    });
 
     const edges = new THREE.EdgesGeometry(planeGeom);
     this.radPlaneEdgeMat = new THREE.LineBasicMaterial({
@@ -1278,19 +1802,18 @@ export class DualStageScene {
     this.radPlaneCrossMat = new THREE.LineBasicMaterial({
       color: this.isLightTheme ? 0x0c667e : 0x52dcf2,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.52,
     });
     const crossLine = new THREE.LineSegments(crossGeom, this.radPlaneCrossMat);
     this.radiologyPlaneHelperGroup.add(crossLine);
     this.radiologyPlaneHelperGroup.visible = false;
     this.scene.add(this.radiologyPlaneHelperGroup);
 
-    // 2. SCDS 3D Defect Visualizer & Sound Shunting Arcs
+    // 2. SCDS 3D Defect Visualizer & Sound Shunting Arcs anchored at Superior Canal Roof Apex
     this.scdsVisualizerGroup = new THREE.Group();
 
-    // Amber glowing collar around apex defect [3.85, 0.45, 4.30]
-    const apex = SCDS_PARAMETERS.apexRAS;
-    const collarGeom = new THREE.TorusGeometry(0.85, 0.16, 16, 32);
+    const roofApex = SCDS_PARAMETERS.canalRoofApexRAS;
+    const collarGeom = new THREE.TorusGeometry(0.78, 0.14, 16, 32);
     const collarMat = new THREE.MeshBasicMaterial({
       color: 0xf0aa62,
       transparent: true,
@@ -1298,39 +1821,38 @@ export class DualStageScene {
       side: THREE.DoubleSide,
     });
     const collarMesh = new THREE.Mesh(collarGeom, collarMat);
-    collarMesh.position.set(apex[0], apex[1], apex[2]);
-    collarMesh.rotation.x = Math.PI * 0.45;
+    collarMesh.position.set(roofApex[0], roofApex[1], roofApex[2]);
+    collarMesh.rotation.set(Math.PI * 0.18, -Math.PI * 0.12, 0);
     this.scdsVisualizerGroup.add(collarMesh);
 
     // Canal roof beacon marker [5.72, 1.28, 7.56]
-    const roofApex = SCDS_PARAMETERS.canalRoofApexRAS;
-    const roofMarkerGeom = new THREE.SphereGeometry(0.32, 16, 16);
+    const roofMarkerGeom = new THREE.SphereGeometry(0.28, 16, 16);
     const roofMarkerMat = new THREE.MeshBasicMaterial({
-      color: 0xffb74d,
+      color: 0xffc875,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
     });
     const roofMarker = new THREE.Mesh(roofMarkerGeom, roofMarkerMat);
     roofMarker.position.set(roofApex[0], roofApex[1], roofApex[2]);
     this.scdsVisualizerGroup.add(roofMarker);
 
-    // 3 Concentric acoustic sound dispersion arcs radiating towards middle cranial fossa (+Z)
+    // 3 Concentric acoustic sound dispersion arcs radiating upward towards middle cranial fossa (+Z)
     for (let i = 0; i < 3; i++) {
-      const ringGeom = new THREE.RingGeometry(0.7, 0.95, 32, 1, 0, Math.PI);
+      const ringGeom = new THREE.RingGeometry(0.62, 0.84, 32, 1, 0, Math.PI);
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0xf0aa62,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.68,
         side: THREE.DoubleSide,
         depthWrite: false,
       });
       const arcMesh = new THREE.Mesh(ringGeom, ringMat);
-      arcMesh.position.set(apex[0], apex[1], apex[2] + 0.3);
-      arcMesh.rotation.x = -Math.PI * 0.35;
+      arcMesh.position.set(roofApex[0], roofApex[1], roofApex[2] + 0.25);
+      arcMesh.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.15);
       this.scdsVisualizerGroup.add(arcMesh);
       this.scdsWaveArcs.push({
         mesh: arcMesh,
-        initialScale: 1.0 + i * 0.45,
+        initialScale: 0.95 + i * 0.42,
         phaseOffset: i * 0.33,
       });
     }
@@ -1346,10 +1868,13 @@ export class DualStageScene {
       if (isRadiology && this.state.radiologyState.showPlaneHelper) {
         const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
         const s = this.state.radiologyState.sliceDepthMm;
+        this.tempBasisX.set(plane.inPlaneX[0], plane.inPlaneX[1], plane.inPlaneX[2]);
+        this.tempBasisY.set(plane.inPlaneY[0], plane.inPlaneY[1], plane.inPlaneY[2]);
+        this.tempBasisZ.set(plane.normalRAS[0], plane.normalRAS[1], plane.normalRAS[2]);
         this.tempPlaneMatrix.makeBasis(
-          new THREE.Vector3(...plane.inPlaneX),
-          new THREE.Vector3(...plane.inPlaneY),
-          new THREE.Vector3(...plane.normalRAS)
+          this.tempBasisX,
+          this.tempBasisY,
+          this.tempBasisZ
         );
         this.radiologyPlaneHelperGroup.setRotationFromMatrix(this.tempPlaneMatrix);
         this.radiologyPlaneHelperGroup.position.set(
@@ -1358,6 +1883,7 @@ export class DualStageScene {
           plane.centerRAS[2] + s * plane.normalRAS[2]
         );
         this.radiologyPlaneHelperGroup.visible = true;
+        this.updateRadiologySliceTexture();
       } else {
         this.radiologyPlaneHelperGroup.visible = false;
       }
@@ -1365,6 +1891,51 @@ export class DualStageScene {
 
     if (this.scdsVisualizerGroup) {
       this.scdsVisualizerGroup.visible = isRadiology && this.state.radiologyState.scdsActive;
+    }
+  }
+
+  private updateRadiologySliceTexture(): void {
+    if (!this.radSliceData || !this.radSliceTexture || !this.radPlaneQuadMat) return;
+    const loadedVol = getLoadedRadiologyVolume(this.state.radiologyState.windowMode);
+    if (!loadedVol) {
+      if (this.radSliceHasVolume) {
+        this.radSliceHasVolume = false;
+        this.radPlaneQuadMat.map = null;
+        this.radPlaneQuadMat.color.setHex(this.isLightTheme ? 0x0c667e : 0x52dcf2);
+        this.radPlaneQuadMat.opacity = this.isLightTheme ? 0.14 : 0.12;
+        this.radPlaneQuadMat.needsUpdate = true;
+      }
+      return;
+    }
+
+    const plane = RADIOLOGY_PLANES[this.state.radiologyState.activePlane];
+    const texSize = DualStageScene.RAD_TEXTURE_SIZE;
+    resliceVolumeToRGBA(
+      loadedVol,
+      plane,
+      this.state.radiologyState.sliceDepthMm,
+      texSize,
+      texSize,
+      this.radSliceData,
+      {
+        fovMm: MPR_FOV_MM,
+        flipHorizontal: false, // 3D PlaneGeometry +X aligns with +inPlaneX
+        flipVertical: false,   // DataTexture flipY=false: row 0 is uv.y=0 (-inPlaneY)
+        oobR: 0,
+        oobG: 0,
+        oobB: 0,
+        oobAlpha: 0,           // Transparent outside CT 19.92^3 mm bounds
+        inBoundsAlpha: 220,
+      }
+    );
+    this.radSliceTexture.needsUpdate = true;
+
+    if (!this.radSliceHasVolume) {
+      this.radSliceHasVolume = true;
+      this.radPlaneQuadMat.map = this.radSliceTexture;
+      this.radPlaneQuadMat.color.setHex(0xffffff);
+      this.radPlaneQuadMat.opacity = 0.86;
+      this.radPlaneQuadMat.needsUpdate = true;
     }
   }
 
@@ -1451,6 +2022,12 @@ export class DualStageScene {
 
   public setCTWindowMode(mode: CTWindowMode): void {
     this.state.radiologyState.windowMode = mode;
+    if (this.state.labMode === 'radiology') {
+      preloadRadiologyVolumes(mode);
+      if (this.state.radiologyState.showPlaneHelper) {
+        this.updateRadiologySliceTexture();
+      }
+    }
     this.emitState();
   }
 
@@ -1586,8 +2163,8 @@ export class DualStageScene {
       );
     } else if (preset.id === 'exploded_view') {
       this.startCameraFly(
-        new THREE.Vector3(25.0, -12.0, 9.0),
-        new THREE.Vector3(4.5, 1.5, 0.2),
+        new THREE.Vector3(31.5, -15.5, 11.5),
+        new THREE.Vector3(4.8, 1.2, 0.0),
         550
       );
     } else {
@@ -1623,6 +2200,16 @@ export class DualStageScene {
     }
     if (params.explodePercent !== undefined) {
       this.state.explodePercent = params.explodePercent;
+      if (!this.flyAnim) {
+        const minExplodeDist = 26.5 + (params.explodePercent / 100.0) * 11.5;
+        this.scratchPinVector.subVectors(this.camera.position, this.controls.target);
+        const curDist = this.scratchPinVector.length();
+        if (curDist > 0.001 && curDist < minExplodeDist) {
+          this.scratchPinVector.multiplyScalar(minExplodeDist / curDist);
+          this.camera.position.copy(this.controls.target).add(this.scratchPinVector);
+          this.controls.update();
+        }
+      }
     }
     this.applySceneStateToMeshes();
     this.emitState();
@@ -1889,38 +2476,58 @@ export class DualStageScene {
         cand.pin.screenY = Math.max(14 + 8, Math.min(height - 14 - 8, cand.pin.screenY));
       }
 
-      const bx = cand.pin.screenX - boxW / 2;
-      const by = cand.pin.screenY - 14;
+      // Zero-GC vertical nudge pass (0, -22, +22 px) before dropping clustered pins
+      let accepted = false;
+      let finalBx = 0;
+      let finalBy = 0;
+      const baseScreenY = cand.pin.screenY;
 
-      // Ensure pin box is fully within canvas viewport margins
-      if (bx < 8 || bx + boxW > width - 8 || by < 8 || by + boxH > height - 8) {
-        continue;
-      }
+      for (let n = 0; n < 3; n++) {
+        const dy = n === 0 ? 0 : n === 1 ? -22 : 22;
+        const ny =
+          height > boxH + 16
+            ? Math.max(14 + 8, Math.min(height - 14 - 8, baseScreenY + dy))
+            : baseScreenY + dy;
+        const bx = cand.pin.screenX - boxW / 2;
+        const by = ny - 14;
 
-      let collides = false;
-      for (let j = 0; j < this.acceptedBoxCount; j++) {
-        const acc = this.acceptedBoxes[j];
-        if (
-          !(
-            bx + boxW < acc.x - 8 ||
-            bx > acc.x + acc.w + 8 ||
-            by + boxH < acc.y - 6 ||
-            by > acc.y + acc.h + 6
-          )
-        ) {
-          collides = true;
+        if (bx < 8 || bx + boxW > width - 8 || by < 8 || by + boxH > height - 8) {
+          continue;
+        }
+
+        let collides = false;
+        for (let j = 0; j < this.acceptedBoxCount; j++) {
+          const acc = this.acceptedBoxes[j];
+          if (
+            !(
+              bx + boxW < acc.x - 8 ||
+              bx > acc.x + acc.w + 8 ||
+              by + boxH < acc.y - 6 ||
+              by > acc.y + acc.h + 6
+            )
+          ) {
+            collides = true;
+            break;
+          }
+        }
+
+        if (!collides) {
+          cand.pin.screenY = ny;
+          finalBx = bx;
+          finalBy = by;
+          accepted = true;
           break;
         }
       }
 
-      if (!collides) {
+      if (accepted) {
         let box = this.acceptedBoxes[this.acceptedBoxCount];
         if (!box) {
           box = { x: 0, y: 0, w: 0, h: 0 };
           this.acceptedBoxes.push(box);
         }
-        box.x = bx;
-        box.y = by;
+        box.x = finalBx;
+        box.y = finalBy;
         box.w = boxW;
         box.h = boxH;
         this.acceptedBoxCount++;
@@ -1942,11 +2549,19 @@ export class DualStageScene {
       const dt = Math.min(0.1, (now - this.lastFrameTime) * 0.001);
       this.lastFrameTime = now;
 
-      // Update Traveling Wave Phase on Cochlea Material
-      if (this.state.labMode === 'hearing' && this.state.hearingState.isPlaying) {
-        const cochleaEntry = this.meshEntries.get('mesh_david_cochlea');
-        if (cochleaEntry) {
-          cochleaEntry.material.uniforms.uWavePhase.value += dt * 18.0;
+      // Update Traveling Wave Phase & Beacon Halo on Cochlea System
+      if (this.state.labMode === 'hearing') {
+        const isPlaying = this.state.hearingState.isPlaying;
+        for (const entry of this.meshEntries.values()) {
+          if (entry.ontology.systemGroup === 'cochlear_system') {
+            entry.material.uniforms.uWavePhase.value += dt * (isPlaying ? 18.0 : 4.2);
+          }
+        }
+        if (this.tonotopyHaloMesh) {
+          const pulse = isPlaying
+            ? 1.0 + 0.22 * Math.sin(now * 0.008)
+            : 0.94 + 0.08 * Math.sin(now * 0.003);
+          this.tonotopyHaloMesh.scale.setScalar(pulse);
         }
       }
 
@@ -2027,11 +2642,21 @@ export class DualStageScene {
               this.currentPitch,
               this.currentRoll
             );
+            const isGufoniCupulolith =
+              this.vestibularEngine.getManeuver() === 'gufoni_apogeotropic' &&
+              this.vestibularEngine.getStepIndex() <= 1;
             const particles = this.vestibularEngine.getParticles();
             for (let i = 0; i < 5; i++) {
-              const p = particles[i];
-              if (p && this.otoconiaMeshes[i]) {
-                this.otoconiaMeshes[i].position.set(p[0], p[1], p[2]);
+              const mesh = this.otoconiaMeshes[i];
+              if (!mesh) continue;
+              if (isGufoniCupulolith) {
+                const off = this.gravityIndicatorOffsets[i];
+                mesh.position.set(7.66 + off[0], 2.88 + off[1], 1.03 + off[2]);
+              } else {
+                const p = particles[i];
+                if (p) {
+                  mesh.position.set(p[0], p[1], p[2]);
+                }
               }
             }
           } else {
@@ -2092,8 +2717,47 @@ export class DualStageScene {
           this.vorDrawer.updateTelemetry(telem, simDt);
         }
 
+        const cupulaGlow = Math.min(
+          1.0,
+          Math.abs(telem.cupulaDeflectionNormalized) * 0.9 +
+            Math.abs(telem.afferentSpikesPerSec - 90) / 140.0
+        );
+        this.applyVestibularCupulaGlow(telem.canalId, cupulaGlow);
+
         for (let i = 0; i < this.onVestibularTelemetryCallbacks.length; i++) {
           this.onVestibularTelemetryCallbacks[i](telem);
+        }
+      }
+
+      // 3D Head / Labyrinth Physical Tilt in BPPV Mode relative to World Gravity (-Z)
+      if (!this.vhitAnim || !this.vhitAnim.active) {
+        if (this.state.labMode === 'vestibular' && this.vestSubmode === 'bppv') {
+          const psi = (this.currentYaw * Math.PI) / 180.0;
+          const th = (this.currentPitch * Math.PI) / 180.0;
+          const gam = (this.currentRoll * Math.PI) / 180.0;
+          const cPsi = Math.cos(psi);
+          const sPsi = Math.sin(psi);
+          const cTh = Math.cos(th);
+          const sTh = Math.sin(th);
+          const cGam = Math.cos(gam);
+          const sGam = Math.sin(gam);
+          this.headRotMatrix4.set(
+            cPsi * cGam, -sPsi, cPsi * sGam, 0,
+            cTh * sPsi * cGam + sTh * sGam, cTh * cPsi, cTh * sPsi * sGam - sTh * cGam, 0,
+            sTh * sPsi * cGam - cTh * sGam, sTh * cPsi, sTh * sPsi * sGam + cTh * cGam, 0,
+            0, 0, 0, 1
+          );
+          this.headTargetQuat.setFromRotationMatrix(this.headRotMatrix4);
+          this.labyrinthRoot.quaternion.slerp(this.headTargetQuat, Math.min(1.0, dt * 8.5));
+          this.tempPivotRotated.copy(this.LABYRINTH_PIVOT_RAS).applyQuaternion(this.labyrinthRoot.quaternion);
+          this.labyrinthRoot.position.copy(this.LABYRINTH_PIVOT_RAS).sub(this.tempPivotRotated);
+        } else if (this.labyrinthRoot.quaternion.angleTo(this.qIdentity) > 0.002) {
+          this.labyrinthRoot.quaternion.slerp(this.qIdentity, Math.min(1.0, dt * 10.0));
+          this.tempPivotRotated.copy(this.LABYRINTH_PIVOT_RAS).applyQuaternion(this.labyrinthRoot.quaternion);
+          this.labyrinthRoot.position.copy(this.LABYRINTH_PIVOT_RAS).sub(this.tempPivotRotated);
+        } else {
+          this.labyrinthRoot.quaternion.identity();
+          this.labyrinthRoot.position.set(0, 0, 0);
         }
       }
 
@@ -2163,6 +2827,8 @@ export class DualStageScene {
                 ? 'Overt Saccade (Post-Thrust Refixation)'
                 : 'VOR Conjugate Slow Phase',
             };
+            const vhitGlow = Math.min(1.0, Math.abs(vhitBuf.headVelArray[ms]) / 160.0);
+            this.applyVestibularCupulaGlow(vCanal, vhitGlow);
             for (let i = 0; i < this.onVestibularTelemetryCallbacks.length; i++) {
               this.onVestibularTelemetryCallbacks[i](vhitTelem);
             }
@@ -2351,8 +3017,32 @@ export class DualStageScene {
     this.currentRoll = roll;
   }
 
+  private applyVestibularCupulaGlow(activeCanal: CanalId, intensity: number): void {
+    const clamped = Math.max(0.0, Math.min(1.0, intensity));
+    const pairs: Array<[CanalId, string]> = [
+      ['posterior', 'ls_Hsapiens_Post_Cup_Duct'],
+      ['posterior', 'ls_Hsapiens_Post_Cup_Ut'],
+      ['horizontal', 'ls_Hsapiens_Lat_Cup_Duct'],
+      ['horizontal', 'ls_Hsapiens_Lat_Cup_Ut'],
+      ['anterior', 'ls_Hsapiens_Ant_Cup_Duct'],
+      ['anterior', 'ls_Hsapiens_Ant_Cup_Ut'],
+    ];
+    for (let i = 0; i < pairs.length; i++) {
+      const [cId, meshName] = pairs[i];
+      const entry = this.meshEntries.get(meshName);
+      if (!entry) continue;
+      let baseHL = 0.0;
+      if (this.state.selectedMesh === meshName) baseHL = 1.0;
+      else if (this.state.hoveredMesh === meshName) baseHL = 0.45;
+      const glow = this.state.labMode === 'vestibular' && cId === activeCanal ? clamped : 0.0;
+      entry.material.uniforms.uHighlight.value = Math.max(baseHL, glow);
+    }
+  }
+
   public setVestibularSubmode(submode: 'bppv' | 'caloric' | 'vhit'): void {
     this.vestSubmode = submode;
+    this.applyVestibularCupulaGlow('posterior', 0.0);
+    this.syncAuxiliaryGroupVisibility();
   }
 
   public getVestibularSubmode(): 'bppv' | 'caloric' | 'vhit' {
@@ -2547,13 +3237,17 @@ export class DualStageScene {
 
   public setSurgicalProcedure(procedure: SurgicalProcedure): void {
     this.state.surgicalState.activeProcedure = procedure;
+    this.state.selectedMesh =
+      procedure === 'cochlear_implant'
+        ? 'mesh_david_cochlea'
+        : procedure === 'labyrinthectomy'
+        ? 'ls_Hsapiens_Sl'
+        : 'ls_Hsapiens_utricle';
     if (this.state.labMode === 'surgical') {
       this.flyToSurgicalProcedure(procedure);
     }
-    if (this.ciElectrodeGroup) {
-      this.ciElectrodeGroup.visible =
-        this.state.labMode === 'surgical' && procedure === 'cochlear_implant';
-    }
+    this.syncAuxiliaryGroupVisibility();
+    this.applySceneStateToMeshes();
     this.notifySurgicalState();
     this.emitState();
   }
@@ -2592,6 +3286,24 @@ export class DualStageScene {
 
       const sMax = ciState.insertionDepthMm;
       const visibleCount = sMax > 0.05 ? SEGMENTS + 1 : 0;
+
+      // Orient CI Entry Portal Ring + Approach Arrow & keep starter tip visible at 0.0 mm
+      const p0 = evaluateScalaTympaniSpline(0.0, approach, arrayType, pitchDev, yawDev);
+      const p1 = evaluateScalaTympaniSpline(1.6, approach, arrayType, pitchDev, yawDev);
+      if (this.ciEntryPortalGroup) {
+        this.scratchEntryPos.set(p0[0], p0[1], p0[2]);
+        this.scratchEntryNext.set(p1[0], p1[1], p1[2]);
+        this.scratchEntryDir.subVectors(this.scratchEntryNext, this.scratchEntryPos).normalize();
+        this.ciEntryPortalGroup.position.copy(this.scratchEntryPos);
+        this.ciEntryPortalGroup.quaternion.setFromUnitVectors(this.scratchUpZ, this.scratchEntryDir);
+        const portalHex = approach === 'cochleostomy' ? 0xf59e0b : 0x38bdf8;
+        this.ciEntryRingMat?.color.setHex(portalHex);
+        this.ciEntryArrowMat?.color.setHex(portalHex);
+      }
+      if (this.ciStarterTipMesh) {
+        this.ciStarterTipMesh.position.set(p0[0], p0[1], p0[2]);
+        this.ciStarterTipMesh.visible = sMax <= 0.15;
+      }
 
       for (let i = 0; i <= SEGMENTS; i++) {
         const frac = i / SEGMENTS;
@@ -2733,7 +3445,25 @@ export class DualStageScene {
     if (oticCapsule && oticCapsule.material) {
       oticCapsule.material.uniforms.uSurgicalDrillActive.value = drillActive ? 1.0 : 0.0;
       // Step 1+ unroofs mastoid cortical bone over antrum to reveal canals
-      oticCapsule.material.uniforms.uOpacity.value = step >= 1 ? 0.32 : 0.88;
+      oticCapsule.material.uniforms.uOpacity.value = step >= 1 ? 0.24 : 0.72;
+    }
+
+    if (this.labyBurrMesh && this.labyBurrMat) {
+      if (step === 0) {
+        this.labyBurrMesh.position.set(
+          SURGICAL_LANDMARKS.mastoidAntrumTarget[0],
+          SURGICAL_LANDMARKS.mastoidAntrumTarget[1],
+          SURGICAL_LANDMARKS.mastoidAntrumTarget[2]
+        );
+      } else if (step === 1) {
+        this.labyBurrMesh.position.set(8.68, 0.45, 0.82); // Lateral SCC arch
+      } else if (step === 2) {
+        this.labyBurrMesh.position.set(6.2, 1.4, 0.5); // Common vestibule entry
+      } else {
+        this.labyBurrMesh.position.set(7.4, 2.4, 0.9); // Neuroepithelial ampullary curettage
+      }
+      this.labyBurrMat.emissive.setHex(drillActive ? 0xef4444 : 0x38bdf8);
+      this.labyBurrMat.emissiveIntensity = drillActive ? 0.95 : 0.35;
     }
 
     // Step 4 (Curettage): Neuroepithelial evacuation & ghosting
@@ -2811,6 +3541,72 @@ export class DualStageScene {
       }
     }
 
+    // 3D 4-Quadrant IAC Bundle + Koos Stage I-IV Schwannoma Tumor + Micro-Instrument
+    if (this.iacTumorMesh) {
+      if (koosStage === 0) {
+        this.iacTumorMesh.visible = false;
+      } else {
+        this.iacTumorMesh.visible = true;
+        if (koosStage === 1) {
+          this.iacTumorMesh.position.set(2.4, 0.95, 0.15);
+          this.iacTumorMesh.scale.set(0.75, 0.55, 0.52);
+        } else if (koosStage === 2) {
+          this.iacTumorMesh.position.set(1.1, 0.55, 0.05);
+          this.iacTumorMesh.scale.set(1.45, 1.05, 0.98);
+        } else if (koosStage === 3) {
+          this.iacTumorMesh.position.set(-0.35, 0.15, -0.05);
+          this.iacTumorMesh.scale.set(2.35, 1.75, 1.55);
+        } else {
+          this.iacTumorMesh.position.set(-1.35, -0.15, -0.15);
+          this.iacTumorMesh.scale.set(3.25, 2.45, 2.15);
+        }
+      }
+    }
+
+    if (this.iacNerveCN7) {
+      const m = this.iacNerveCN7.material as THREE.MeshStandardMaterial;
+      m.emissive.setHex(
+        neurectomyState.isEMGAlarmActive || neurectomyState.tractionRisk === 'CRITICAL'
+          ? 0xef4444
+          : 0xb45309
+      );
+      m.emissiveIntensity = neurectomyState.isEMGAlarmActive ? 0.95 : 0.35;
+    }
+    if (this.iacNerveCochlear) {
+      const m = this.iacNerveCochlear.material as THREE.MeshStandardMaterial;
+      m.emissiveIntensity = step >= 2 ? 0.72 : 0.32;
+    }
+    if (this.iacNerveSVN && this.iacNerveIVN) {
+      const svMat = this.iacNerveSVN.material as THREE.MeshStandardMaterial;
+      const ivMat = this.iacNerveIVN.material as THREE.MeshStandardMaterial;
+      const transected = neurectomyState.vestibularNerveTransected;
+      svMat.transparent = transected;
+      ivMat.transparent = transected;
+      svMat.opacity = transected ? 0.25 : 1.0;
+      ivMat.opacity = transected ? 0.25 : 1.0;
+      this.iacNerveSVN.scale.set(1, transected ? 0.72 : 1.0, 1);
+      this.iacNerveIVN.scale.set(1, transected ? 0.72 : 1.0, 1);
+    }
+    if (this.iacCleavageMesh) {
+      this.iacCleavageMesh.visible = cleavage && step >= 1;
+    }
+    if (this.iacToolGroup && this.iacToolTipMat) {
+      const advFrac = step >= 3 ? 0.92 : step === 2 ? 0.72 : step === 1 ? 0.45 : 0.15;
+      const proximityShift = Math.max(0.0, Math.min(1.0, 1.0 - toolProximity / 8.0));
+      this.iacToolGroup.position.set(
+        2.0 - (1.0 - advFrac) * 0.6,
+        -3.4 + (advFrac * 2.1 + proximityShift * 0.9),
+        0.15
+      );
+      this.iacToolTipMat.color.setHex(
+        tool === 'bipolar' ? 0xf87171 : tool === 'hook' ? 0xfbbf24 : 0x38bdf8
+      );
+      this.iacToolTipMat.emissive.setHex(
+        tool === 'bipolar' ? 0xdc2626 : tool === 'hook' ? 0xd97706 : 0x0284c7
+      );
+    }
+
+    this.applySceneStateToMeshes();
     this.notifySurgicalState();
     this.emitState();
     return neurectomyState;
@@ -2831,6 +3627,17 @@ export class DualStageScene {
     if (this.envRenderTarget) {
       this.envRenderTarget.dispose();
       this.envRenderTarget = null;
+    }
+
+    if (this.unsubRadVolumeReady) {
+      this.unsubRadVolumeReady();
+      this.unsubRadVolumeReady = null;
+    }
+
+    if (this.radSliceTexture) {
+      this.radSliceTexture.dispose();
+      this.radSliceTexture = null;
+      this.radSliceData = null;
     }
 
     if (this.controls) {
@@ -2866,7 +3673,7 @@ export class DualStageScene {
     }
 
     this.scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.LineSegments) {
         obj.geometry?.dispose();
         if (Array.isArray(obj.material)) {
           obj.material.forEach((mat) => mat.dispose());

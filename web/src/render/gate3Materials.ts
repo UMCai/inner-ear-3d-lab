@@ -182,19 +182,20 @@ const FRAGMENT_SHADER = /* glsl */ `
     float fillTerm = max(dot(nWorld, fillDir), 0.0) * 0.22;
     float topTerm = max(dot(nWorld, topDir), 0.0) * 0.18;
 
-    // Specular wet-tissue sheen (calibrated linear)
+    // Specular wet-tissue sheen (calibrated linear; attenuate backfaces to prevent muddy glare)
     vec3 halfVec = normalize(keyDir + viewDir);
-    float spec = pow(max(dot(normal, halfVec), 0.0), 34.0) * 0.28;
+    float spec = pow(max(dot(normal, halfVec), 0.0), 40.0) * 0.32 * (isFacingOut ? 1.0 : 0.25);
 
-    // Theme-aware pigment strength so specimen reads crisply on BOTH obsidian and light drafting paper
-    vec3 pigment = mix(uBaseColor * 0.92, uBaseColor * 0.62, uThemeLight);
-    vec3 litColor = pigment * (keyTerm + fillTerm + topTerm + uEmission * 0.30);
+    // Theme-aware pigment strength + optical depth gradient so specimen reads crisply on BOTH obsidian and light drafting paper
+    vec3 pigment = mix(uBaseColor * 0.94, uBaseColor * 0.72, uThemeLight);
+    float depthShade = mix(1.08, 0.84, 1.0 - ndotv);
+    vec3 litColor = pigment * depthShade * (keyTerm + fillTerm + topTerm + uEmission * 0.30);
 
     vec3 darkRim = mix(uBaseColor * 1.25, vec3(0.10, 0.55, 0.52), 0.36 + uHighlight * 0.42);
-    vec3 lightRim = mix(uBaseColor * 0.42, vec3(0.02, 0.24, 0.32), 0.45 + uHighlight * 0.45);
+    vec3 lightRim = mix(uBaseColor * 0.44, vec3(0.02, 0.22, 0.30), 0.48 + uHighlight * 0.45);
     vec3 rimColor = mix(darkRim, lightRim, uThemeLight);
 
-    litColor += rimColor * fresnel * mix(0.46 + uEmission * 0.35 + uHighlight * 0.65, 0.38 + uHighlight * 0.55, uThemeLight);
+    litColor += rimColor * fresnel * mix(0.48 + uEmission * 0.35 + uHighlight * 0.65, 0.42 + uHighlight * 0.55, uThemeLight);
     litColor += vec3(0.75, 0.85, 0.90) * spec * (1.0 - uGhostMode * 0.65);
 
     // Tonotopic Rainbow & von Békésy Traveling Wave
@@ -264,8 +265,9 @@ const FRAGMENT_SHADER = /* glsl */ `
         thermalColor = mix(warmAmpulla, warmArch, uThermal) * flowRipple;
       }
 
-      float thermalIntensity = clamp(abs(uCaloricTempDiff) / 7.0, 0.5, 2.0) * uCaloricDiffusion * uCaloricActive;
-      litColor = mix(litColor, thermalColor * (1.05 + fresnel * 0.35), min(0.92, thermalIntensity * 0.85));
+      float diffProgress = clamp(uCaloricDiffusion * 1.6, 0.0, 1.0);
+      float thermalMix = mix(0.34, 0.94, diffProgress) * clamp(abs(uCaloricTempDiff) / 7.0, 0.75, 1.35) * uCaloricActive;
+      litColor = mix(litColor, thermalColor * (1.10 + fresnel * 0.35), clamp(thermalMix, 0.0, 0.94));
     }
 
     // Cross-section cut edge highlight glow (within 0.24 mm of clipping plane, theme-calibrated)
@@ -307,10 +309,10 @@ const FRAGMENT_SHADER = /* glsl */ `
 
     if (uGhostMode > 0.5) {
       // Fresnel X-Ray Ghost Silhouette: transparent interior, crisp luminous/drafting rim
-      float ghostRim = pow(1.0 - ndotv, 1.8);
+      float ghostRim = pow(1.0 - ndotv, 1.85);
       float bfAtten = isBackface ? 0.28 : 1.0;
       float baseFill = mix(0.03, 0.06, uThemeLight);
-      float rimWeight = mix(0.40, 0.44, uThemeLight);
+      float rimWeight = mix(0.42, 0.46, uThemeLight);
       finalAlpha = clamp((baseFill + rimWeight * ghostRim) * uOpacity * bfAtten, 0.02, 0.56);
       vec3 ghostDarkCol = mix(uBaseColor * 0.55, vec3(0.12, 0.54, 0.60), ghostRim * 0.55);
       vec3 ghostLightCol = mix(vec3(0.28, 0.34, 0.38), vec3(0.04, 0.28, 0.36), ghostRim * 0.65);
@@ -319,18 +321,24 @@ const FRAGMENT_SHADER = /* glsl */ `
         finalAlpha = clamp(finalAlpha + 0.24 * uHighlight, 0.05, 0.85);
       }
     } else if (uOpacity < 0.82) {
-      // Gate 3 translucent lumen shader: clear front lumen + attenuated backface + crisp rim
-      float bfAtten = isBackface ? 0.42 : 1.0;
-      float edgeAlpha = mix(uOpacity * 0.56, min(0.95, uOpacity * 1.42), fresnel);
-      finalAlpha = clamp(edgeAlpha * bfAtten + uHighlight * 0.16, 0.07, 0.95);
+      // Gate 3 translucent lumen shader: clear front lumen window + attenuated backface + crisp rim
+      float bfAtten = isBackface ? 0.38 : 1.0;
+      float edgeAlpha = mix(uOpacity * 0.44, min(0.94, uOpacity * 1.40), fresnel);
+      finalAlpha = clamp(edgeAlpha * bfAtten + uHighlight * 0.16, 0.06, 0.94);
     }
 
     if (uTonotopyMode > 0.01) {
       finalAlpha = mix(finalAlpha, mix(0.86, 0.93, uThemeLight), uTonotopyMode * 0.65);
     }
 
-    if (uClipActive > 0.5 && isBackface) {
-      finalAlpha = max(finalAlpha, 0.36);
+    if (uClipActive > 0.5) {
+      if (isBackface) {
+        finalAlpha = max(finalAlpha, 0.36);
+      }
+      float sliceRim = 1.0 - smoothstep(0.0, 0.22, clipDist);
+      vec3 rimGlowColor = uThemeLight > 0.5 ? vec3(0.08, 0.42, 0.52) : vec3(0.55, 0.94, 1.0);
+      litColor = mix(litColor, rimGlowColor, sliceRim * 0.72);
+      finalAlpha = max(finalAlpha, sliceRim * 0.92);
     }
 
     gl_FragColor = vec4(litColor, finalAlpha);
